@@ -1,0 +1,27 @@
+# Dockerfile for the CASTOR exposure time calculator.
+
+FROM jupyter/scipy-notebook:hub-2.0.1
+LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
+
+ARG NB_USER
+ARG NOTEBOOK_DIR
+
+# WORKDIR ${NOTEBOOK_DIR}
+
+# Install astropy for science, ipyevents for interactive plots, and PyQt5 for GUI
+RUN pip install astropy ipyevents PyQt5 pylint black[jupyter]
+RUN jupyter nbextension enable --py --sys-prefix ipyevents
+
+COPY misc/overrides.json /opt/conda/share/jupyter/lab/settings/
+COPY misc/matplotlibrc /home/${NB_USER}/.config/matplotlib/
+COPY misc/black /home/${NB_USER}/.config/
+
+# (or is it ${NB_USER}?)
+USER ${NB_UID}
+
+# #
+# # VS Code configuration
+# # (see <https://code.visualstudio.com/remote/advancedcontainers/avoid-extension-reinstalls)
+# #
+# RUN mkdir -p ${HOME}/.vscode-server/extensions \
+#     && chown -R ${NB_USER} ${HOME}/.vscode-server

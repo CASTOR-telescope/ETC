@@ -1,0 +1,56 @@
+# Dockerfile for the CASTOR exposure time calculator.
+
+# Custom parameters from Docker_env file
+ARG CUSTOMIZE_ENV
+
+# <https://stackoverflow.com/a/54245466>
+FROM jupyter/scipy-notebook:hub-2.0.1 as custom_build_yes
+ARG NB_USER
+ARG NOTEBOOK_DIR
+WORKDIR ${NOTEBOOK_DIR}
+ONBUILD COPY misc/overrides.json /opt/conda/share/jupyter/lab/settings/
+ONBUILD COPY misc/matplotlibrc /home/${NB_USER}/.config/matplotlib/
+ONBUILD COPY misc/black /home/${NB_USER}/.config/
+
+FROM jupyter/scipy-notebook:hub-2.0.1 as custom_build_no
+WORKDIR /tmp/
+
+FROM custom_build_${CUSTOMIZE_ENV}
+LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
+ARG NOTEBOOK_DIR
+WORKDIR ${NOTEBOOK_DIR}
+
+# Install astropy for science, ipyevents for interactive plots, and PyQt5 for GUI
+RUN pip install astropy ipyevents PyQt5 pylint black[jupyter]
+RUN jupyter nbextension enable --py --sys-prefix ipyevents
+
+#
+# Custom JupyterLab configuration. Probably won't work on CANFAR
+#
+# RUN if [ ${CUSTOMIZE_ENV} = 1 ]; \
+#     then \
+#         echo "Customizing JupyterLab environment"; \
+#         cp misc/overrides.json /opt/conda/share/jupyter/lab/settings/; \
+#         cp misc/matplotlibrc /arc/home/${NB_USER}/.config/matplotlib/; \
+#         cp misc/black /arc/home/${NB_USER}/.config/; \
+#     else \
+#         echo "Skipping custom JupyterLab configuration."; \
+#     fi
+# RUN echo "Customizing JupyterLab environment"; \
+#     cp misc/overrides.json /opt/conda/share/jupyter/lab/settings/; \
+#     cp misc/matplotlibrc /arc/home/${NB_USER}/.config/matplotlib/; \
+#     cp misc/black /arc/home/${NB_USER}/.config/;
+# COPY misc/overrides.json /opt/conda/share/jupyter/lab/settings/
+# COPY misc/matplotlibrc /home/${NB_USER}/.config/matplotlib/
+# # COPY misc/matplotlibrc /opt/conda/lib/python3.9/site-packages/matplotlib/mpl-data/
+# COPY misc/black /home/${NB_USER}/.config/
+
+# (or is it ${NB_USER}?)
+USER ${NB_UID}
+
+# #
+# # VS Code configuration
+# # (see <https://code.visualstudio.com/remote/advancedcontainers/avoid-extension-reinstalls)
+# #
+# RUN mkdir -p ${HOME}/.vscode-server/extensions \
+#     && chown -R ${NB_USER} ${HOME}/.vscode-server
