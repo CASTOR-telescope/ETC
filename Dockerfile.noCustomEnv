@@ -3,17 +3,12 @@
 FROM jupyter/scipy-notebook:hub-2.0.1
 LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
 
-ARG NB_USER
-ARG NOTEBOOK_DIR
-
-# WORKDIR ${NOTEBOOK_DIR}
-
 # Install astropy for science, ipyevents for interactive plots, and PyQt5 for GUI
 RUN pip install astropy ipyevents PyQt5 pylint black[jupyter]
 RUN jupyter nbextension enable --py --sys-prefix ipyevents
 
-# (or is it ${NB_USER}?)
-USER ${NB_UID}
+# # (or is it ${NB_USER}?)
+# USER ${NB_UID}
 
 # #
 # # VS Code configuration

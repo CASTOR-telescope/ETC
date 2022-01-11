@@ -16,8 +16,8 @@ COPY misc/overrides.json /opt/conda/share/jupyter/lab/settings/
 COPY misc/matplotlibrc /home/${NB_USER}/.config/matplotlib/
 COPY misc/black /home/${NB_USER}/.config/
 
-# (or is it ${NB_USER}?)
-USER ${NB_UID}
+# # (or is it ${NB_USER}?)
+# USER ${NB_UID}
 
 # #
 # # VS Code configuration
