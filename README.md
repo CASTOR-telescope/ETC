@@ -4,6 +4,9 @@ Isaac Cheng - January 2022
 
 WARNING: Everything is super messy at the moment because I am stuck in debugging hell...
 
+TODO: Figure out a way to ensure consistent absolute paths for project on CANFAR & local
+systems...
+
 ## Local Build Instructions
 
 To build the project _locally_ (i.e., not on [CANFAR](https://www.canfar.net/en/)), do the
@@ -125,8 +128,9 @@ and tracked via the [issues page](https://github.com/CASTOR-telescope/ETC/issues
 ## Inside the Docker Container
 
 Please modify the `OUTPATH` variable in [`constants.py`](src/constants.py) to the proper
-directory. You can copy files and folders within a container to the local filesystem using
-the following command (TIP: use bash autocompletion to fill in the version number):
+directory. Also remember you can copy files and folders within a container to the local
+filesystem using the following command (TIP: use bash autocompletion to fill in the
+version number):
 
 ```bash
 docker cp castor_etc_v<VERSION>:<DOCKER_PATH_TO_COPY> <LOCAL_DESTINATION_PATH>
