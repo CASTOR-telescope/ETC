@@ -1,5 +1,5 @@
 NB_USER=IsaacCheng
-NOTEBOOK_DIR="/arc/home/IsaacCheng/ETC"
+NOTEBOOK_DIR="/arc/home/IsaacCheng/CASTOR/ETC"
 
 CUSTOMIZE_ENV=no
 
