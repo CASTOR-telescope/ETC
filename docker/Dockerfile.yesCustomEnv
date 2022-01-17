@@ -4,10 +4,12 @@
 FROM jupyter/scipy-notebook:hub-2.0.1
 LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
 
+ARG NB_USER
+ARG NOTEBOOK_DIR
 USER ${NB_UID}
 
-# Install astropy for science, ipyevents for interactive plots, and PyQt5 for GUI
-RUN pip install astropy ipyevents PyQt5 pylint black[jupyter]
+# Install astropy for science, ipyevents for interactive plots, PyQt5 for GUI, and git
+RUN pip install astropy ipyevents PyQt5 pylint black[jupyter] jupyterlab-git
 RUN jupyter nbextension enable --py --sys-prefix ipyevents
 
 # Custom JupyterHub settings
@@ -29,6 +31,8 @@ COPY docker/bash.bashrc /opt/image-build
 RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
 
 USER ${NB_UID}
+
+WORKDIR ${NOTEBOOK_DIR}
 
 # #
 # # VS Code configuration

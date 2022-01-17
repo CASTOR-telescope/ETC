@@ -118,7 +118,7 @@ following:
    container.
 
    The first time building this may take a while since the reference image I am using
-   (`jupyter/scipy-notebook:hub-2.0.1`) creates a Docker container that is almost 3 GB!
+   (`jupyter/scipy-notebook:hub-2.0.1`) creates a Docker container that is about 3 GB!
    Note that the actual pushed size of the image is much smaller (only around 1 GB).
 
    (In case you're wondering, the `build-vscode.sh` file is for my own use with VS Code
