@@ -3,12 +3,29 @@
 FROM jupyter/scipy-notebook:hub-2.0.1
 LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
 
+USER ${NB_UID}
+
 # Install astropy for science, ipyevents for interactive plots, and PyQt5 for GUI
 RUN pip install astropy ipyevents PyQt5 pylint black[jupyter]
 RUN jupyter nbextension enable --py --sys-prefix ipyevents
 
-# # (or is it ${NB_USER}?)
-# USER ${NB_UID}
+# Default JupyterHub settings (overridden if user has custom config?)
+COPY misc/overrides.json /opt/conda/share/jupyter/lab/settings/
+
+USER root
+
+RUN mkdir /opt/image-build && chmod 777 /opt/image-build
+
+# Add required files for CANFAR
+ADD docker/nsswitch.conf /etc/
+COPY docker/apt-install.sh /opt/image-build
+WORKDIR /opt/image-build
+RUN ./apt-install.sh sssd acl
+
+COPY docker/bash.bashrc /opt/image-build
+RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
+
+USER ${NB_UID}
 
 # #
 # # VS Code configuration

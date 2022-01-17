@@ -7,6 +7,8 @@ echo "Building CASTOR exposure time calculator..."
 VERSION=$(date +%y.%m.%d.%H%M)
 # (following line from <https://stackoverflow.com/a/246128>)
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+# (following line from <https://stackoverflow.com/a/8426110>)
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
 #
 # Load custom parameters
 #
@@ -14,18 +16,19 @@ source Docker_env
 #
 # Build the project
 #
+cd ${REPO_DIR}  # necessary so Docker can access other folders within the repo
 if [[ "$CUSTOMIZE_ENV" = "yes" ]]
 then
     echo "Building with custom JupyterLab environment"
     docker build --build-arg NOTEBOOK_DIR=${NOTEBOOK_DIR} \
                  --build-arg NB_USER=${NB_USER} \
                  -t castor_etc:${VERSION} \
-                 -f ${SCRIPT_DIR}/Dockerfile.yesCustomEnv .
+                 -f docker/Dockerfile.yesCustomEnv .
 elif [[ "$CUSTOMIZE_ENV" == "no" ]]
 then
     echo "Building with default JupyterLab environment"
     docker build -t castor_etc:${VERSION} \
-                 -f ${SCRIPT_DIR}/Dockerfile.noCustomEnv .
+                 -f docker/Dockerfile.noCustomEnv .
 else
     echo "ERROR: CUSTOMIZE_ENV is must be 'yes' or 'no'"
     exit 1
@@ -39,9 +42,12 @@ echo "Now running castor_etc_v${VERSION}..."
 docker run --interactive \
         --ip 0.0.0.0 \
         --rm \
+        --tty \
         --env DISPLAY=host.docker.internal:0 \
         -p 8888:8888 \
-        -v ${SCRIPT_DIR}:${NOTEBOOK_DIR} \
+        -v ${REPO_DIR}:${NOTEBOOK_DIR} \
+        -v /arc/home/${NB_USER}/ETC_plots:/arc/home/${NB_USER}/ETC_plots \
+        -v ${REPO_DIR}/.vscode/extensions:/home/${NB_USER}/.vscode-server/extensions \
         --env JUPYTER_ENABLE_LAB=${JUPYTER_ENABLE_LAB} \
         --env JUPYTER_TOKEN=${JUPYTER_TOKEN} \
         --env NB_USER=${NB_USER} \
@@ -52,6 +58,7 @@ docker run --interactive \
         --user root \
         --name castor_etc_v${VERSION} \
         -d castor_etc:${VERSION}
+#
 #
 # Print the JupyterLab URL
 #

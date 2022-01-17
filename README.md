@@ -2,10 +2,36 @@
 
 Isaac Cheng - January 2022
 
-WARNING: Everything is super messy at the moment because I am stuck in debugging hell...
-
 TODO: Figure out a way to ensure consistent absolute paths for project on CANFAR & local
 systems...
+
+
+## CANFAR Build Instructions
+
+1. Download the git repo:
+
+   ```bash
+   git clone https://github.com/CASTOR-telescope/ETC.git
+   ```
+
+2. Ensure you have [Docker](https://docs.docker.com/get-started/) installed.
+
+3. To build an image ready to be deployed on [CANFAR](https://www.canfar.net/en/), simply
+   run the following command _from this repository's top-level directory (i.e., ETC/)_.
+   The requirement to run from the top-level directory is so that the Dockerfile can
+   access files throughout this repo and is not limited to those in the [docker](docker/)
+   folder.
+
+   ```bash
+   docker build -t castor_etc:<VERSION> -f docker/Dockerfile.noCustomEnv .
+   ```
+
+   where `<VERSION>` is the version you would like to tag the image with.
+
+4. Then follow the instructions detailed on the skaha GitHub for [software
+   containers](https://github.com/opencadc/skaha/tree/master/containers#publishing-skaha-containers).
+   Remember to tag the pushed image as `notebook` on [Harbor](https://images.canfar.net)
+   to be able to access it via the Science Portal drop-down menu!
 
 ## Local Build Instructions
 
@@ -15,13 +41,13 @@ following:
 1. Download the git repo:
 
    ```bash
-    git clone https://github.com/CASTOR-telescope/ETC.git
+   git clone https://github.com/CASTOR-telescope/ETC.git
    ```
 
 2. Ensure you have [Docker](https://docs.docker.com/get-started/) installed.
 
-3. Modify the variables in [Docker_env](Docker_env) to your desired values. Below is a
-   brief explanation of the parameters:
+3. Modify the variables in [Docker_env](docker/Docker_env) to your desired values. Below
+   is a brief explanation of the parameters:
 
    ```bash
    # The first 3 variables + the `VERSION` parameter affects the Docker image (i.e., they
@@ -30,10 +56,11 @@ following:
    # `docker run`).
 
    NB_USER=IsaacCheng  # the username for the notebook. I recommend setting is equal to
-                       # your CANFAR username
+                       # your CANFAR username. Ignored if CUSTOMIZE_ENV=no
    NOTEBOOK_DIR="/arc/home/IsaacCheng/ETC"  # the repo bind mount destination. I recommend
                                             # setting this path to be the same path as if
-                                            # you ran this repo on CANFAR
+                                            # you ran this repo on CANFAR. Ignored if
+                                            # CUSTOMIZE_ENV=no
 
    CUSTOMIZE_ENV=yes  # yes or no. If yes, apply my custom notebook configuration
 
@@ -50,14 +77,14 @@ following:
 
    - You may also wish to save outputs and plots to a separate directory (i.e., not a
      subfolder in this repo), in which case you should add a bind mount in
-     [build.sh](build.sh) and modify the `OUTPATH` variable in
+     [build.sh](docker/build.sh) and modify the `OUTPATH` variable in
      [`constants.py`](src/constants.py) to the proper mounted path. For example, add:
 
      ```bash
      -v /arc/local_directory/ETC_plots:/container_directory/ETC_plots
      ```
 
-     to your [build.sh](build.sh) file and change `OUTPATH` in
+     to your [build.sh](docker/build.sh) file and change `OUTPATH` in
      [`constants.py`](src/constants.py) to "`/container_directory/ETC_plots/`".
 
 <!-- 3. Open the [Dockerfile](Dockerfile) and modify the `WORKDIR` value to be whichever path
@@ -86,15 +113,13 @@ following:
      to your [build.sh](build.sh) file and change `OUTPATH` in
      [`constants.py`](src/constants.py) to "`/container_directory/ETC_plots/`". -->
 
-4. Run the following command to build the image. It should automatically mount this
-   git directory in the Docker container.
-
-   ```bash
-    ./build.sh
-   ```
+4. Run the [build.sh](docker/build.sh) script to build the image (i.e., run
+   `./docker/build.sh`). It should automatically mount this git directory in the Docker
+   container.
 
    The first time building this may take a while since the reference image I am using
    (`jupyter/scipy-notebook:hub-2.0.1`) creates a Docker container that is almost 3 GB!
+   Note that the actual pushed size of the image is much smaller (only around 1 GB).
 
    (In case you're wondering, the `build-vscode.sh` file is for my own use with VS Code
    that contains some paths + settings specific to my local machine.)
