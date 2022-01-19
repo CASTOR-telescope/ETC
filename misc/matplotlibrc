@@ -4,7 +4,7 @@ font.serif          : Times
 # font.serif          : Computer Modern Roman
 font.size           : 12.0
 text.usetex         : True
-# text.latex.preamble : \usepackage{amsmath}
+text.latex.preamble : \usepackage{amsmath}
 text.hinting_factor : 8
 mathtext.default    : regular
 axes.grid           : True

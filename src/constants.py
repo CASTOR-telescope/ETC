@@ -53,7 +53,7 @@ PX_SCALE = 0.1  # arcsec (or arcsec/pixel)
 PX_AREA = PX_SCALE * PX_SCALE  # arcsec^2
 
 # Instantaneous field of view
-IFOV = 0.25  # square degrees
+IFOV = 0.25  # degrees^2
 
 # Number of pixels of CCD
 MP = 960  # megapixels
@@ -83,12 +83,12 @@ LIGHTSPEED = 299792458  # m/s
 PLANCK_H = 6.62607015e-34  # J.s
 
 # Coefficient for the conversion from flam (erg/cm^2/s/A) to photlam (photon/cm^2/s/A).
-# From <https://www.stsci.edu/~strolger/docs/UNITS.txt>
-FLAM_TO_PHOTLAM = 5.03411250e7  # photons/erg/A
+# Reference: <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf>
+FLAM_TO_PHOTLAM = 5.0341165675427094e7  # photon/erg/A
 
 # Coefficient for the conversion from fnu (erg/cm^2/s/Hz) to photlam (photon/cm^2/s/A).
-# From <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf>
-FNU_TO_PHOTLAM = 1.51e26  # photon.Hz/erg
+# Reference: <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf>
+FNU_TO_PHOTLAM = 1.5091901796421519e26  # photon.Hz/erg
 
 # Coefficient for the conversion from fnu (erg/cm^2/s/Hz) to flam (erg/cm^2/s/A).
 # Reference: <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf>
@@ -98,5 +98,6 @@ FNU_TO_FLAM = 2.99792458e18  # Hz/A
 # See <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-7-sky-background#id-9.7SkyBackground-9.7.29.7.2GeocoronalEmission,Airglow,andSHADOW>
 GEOCORONAL_FLUX = 1.5e-15  # erg/cm^2/s/arcsec^2
 GEOCORONAL_WAVELENGTH = 2471  # angstroms
+GEOCORONAL_LINEWIDTH = 0.023  # angstroms (from <https://www.stsci.edu/itt/APT_help20/STIS/c06_exptime7.html#696464>)
 
 # -------------------------------------------------------------------------------------- #
