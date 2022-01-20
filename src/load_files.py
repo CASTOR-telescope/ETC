@@ -14,7 +14,9 @@ from scipy.interpolate import interp1d
 from . import constants as const
 
 
-def load_passbands(filters="all", limits=None, resolution=None):
+def load_passbands(
+    filters="all", limits=None, resolution=None, filepaths=None, kind="linear"
+):
     """
     Loads the passband throughput curves.
 
@@ -42,6 +44,14 @@ def load_passbands(filters="all", limits=None, resolution=None):
         is assumed to be in micrometres. If None, use the native resolution of the
         passband files.
 
+      filepaths :: 1D list of strings
+        The absolute paths to the files containing the passband throughput curves. Each
+        file should contain data for one passband; lines starting with a hash (#) will be
+        ignored. If filepaths is None, use the default passband filepath for each filter.
+
+      kind :: str
+        The type of interpolation to use. See `scipy.interpolate.interp1d` for options.
+
     Returns
     -------
       passbands :: dict of `pandas.DataFrame`
@@ -63,7 +73,7 @@ def load_passbands(filters="all", limits=None, resolution=None):
     #
     # Check inputs
     #
-    if type(filters) == str:
+    if isinstance(filters, str):
         filters = [filters]
     if np.ndim(filters) != 1:
         raise ValueError("filters must be a 1D list of strings or 'all'")
@@ -88,12 +98,24 @@ def load_passbands(filters="all", limits=None, resolution=None):
     if isinstance(resolution, u.Quantity):
         resolution = resolution.to(u.um).value
     #
+    if filepaths is None:
+        filepaths = [
+            const.DATAPATH + f"passbands/passband_castor.{band}" for band in filters
+        ]
+    else:
+        if isinstance(filepaths, str):
+            filepaths = [filepaths]
+        if np.ndim(filepaths) != 1:
+            raise ValueError("filepaths must be a 1D list of strings or None")
+        elif len(filepaths) != len(filters):
+            raise ValueError("filepaths and filters must be consistent")
+    #
     # Load passband files
     #
     passbands = dict.fromkeys(filters)  # initialize empty dictionary
-    for band in passbands:
+    for filepath, band in zip(filepaths, passbands):
         passbands[band] = pd.read_csv(
-            const.DATAPATH + f"passbands/passband_castor.{band}",
+            filepath,
             sep=" +",
             header=None,
             comment="#",
@@ -108,7 +130,7 @@ def load_passbands(filters="all", limits=None, resolution=None):
             interp = interp1d(
                 passbands[band][0].values,
                 passbands[band][1].values,
-                kind="linear",
+                kind=kind,
                 bounds_error=False,
                 fill_value=np.nan,
             )
@@ -133,7 +155,12 @@ def load_passbands(filters="all", limits=None, resolution=None):
     return passbands
 
 
-def load_sky_background(resolution=None, limits=None):
+def load_sky_background(
+    resolution=None,
+    limits=None,
+    filepath=const.DATAPATH + "background/high_sky_background.txt",
+    kind="linear",
+):
     """
     Loads the sky background noise.
 
@@ -150,6 +177,13 @@ def load_sky_background(resolution=None, limits=None):
         the list elements are floats, the values are assumed to be in angstroms. If this
         parameter is None, use the min and max wavelengths from the background file as the
         interpolation limits.
+
+      filepath :: str
+        The absolute path to the file containing the sky background data. Data should be
+        separated by spaces and lines starting with a hash (#) will be ignored.
+
+      kind :: str
+        The type of interpolation to use. See `scipy.interpolate.interp1d` for options.
 
     Returns
     -------
@@ -170,7 +204,7 @@ def load_sky_background(resolution=None, limits=None):
     # Load background data
     #
     background = pd.read_csv(
-        const.DATAPATH + "background/high_sky_background.txt",
+        filepath,
         sep=" ",
         header=0,
         comment="#",
@@ -192,7 +226,7 @@ def load_sky_background(resolution=None, limits=None):
             interp = interp1d(
                 background["wavelength"].values,
                 background[col].values,
-                kind="linear",
+                kind=kind,
                 bounds_error=False,
                 fill_value=np.nan,
             )

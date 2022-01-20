@@ -47,13 +47,14 @@ PASSBAND_LIMITS = {
 FWHM = 0.15  # arcsec
 
 # The angular dimension covered by each pixel
-PX_SCALE = 0.1  # arcsec (or arcsec/pixel)
+PX_SCALE = 0.1  # arcsec (or arcsec/pixel). ? UPDATE ?
 
 # The angular area of each pixel
 PX_AREA = PX_SCALE * PX_SCALE  # arcsec^2
 
 # Instantaneous field of view
-IFOV = 0.25  # degrees^2
+IFOV_DIMEN = [0.44, 0.56]  # degrees. Angular dimensions
+IFOV_AREA = IFOV_DIMEN[0] * IFOV_DIMEN[1]  # degrees^2
 
 # Number of pixels of CCD
 MP = 960  # megapixels
