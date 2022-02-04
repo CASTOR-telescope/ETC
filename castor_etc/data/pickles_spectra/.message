@@ -1,0 +1,53 @@
+==========================================================================
+J/PASP/110/863  A Stellar Spectral Flux Library: 1150 - 25000 A (Pickles 1998)
+The following files can be converted to FITS (extension .fit .fgz or .fiZ)
+	synphot.dat lew.dat irstphot.dat o5v.dat o9v.dat, b57v.dat, a2v.dat
+	b12iii.dat, b3iii.dat, b5iii.dat, b9iii.dat
+	a0iii.dat, b0i.dat, b5i.dat, b8i.dat b0v.dat b1v.dat, a5v.dat b3v.dat
+	b8v.dat, a0iv.dat b9v.dat a0v.dat
+	a3v.dat, wf5v.dat, rf6v.dat, f8v.dat, wg0v.dat rg0v.dat a7v.dat
+	f0v.dat f2v.dat f5v.dat, wf8v.dat f6v.dat, g2v.dat rf8v.dat g0v.dat
+	g5v.dat wg5v.dat rg5v.dat g8v.dat k0v.dat rk0v.dat k2v.dat k3v.dat
+	k4v.dat k5v.dat, m6v.dat, k1iv.dat, k3iv.dat k7v.dat m1v.dat
+	m2v.dat, k2iii.dat m2p5v.dat m3v.dat
+	m4v.dat, m5v.dat, wk1iii.dat, wk4iii.dat b2iv.dat b6iv.dat a47iv.dat
+	f02iv.dat f5iv.dat f8iv.dat g0iv.dat g2iv.dat g5iv.dat
+	g8iv.dat, k0iii.dat, k3iii.dat, k5iii.dat
+	m0v.dat, k0iv.dat, k1iii.dat, m2iii.dat m7iii.dat o8iii.dat a3iii.dat
+	a5iii.dat a7iii.dat f0iii.dat f2iii.dat f5iii.dat g0iii.dat g5iii.dat
+	wg5iii.dat rg5iii.dat g8iii.dat wg8iii.dat wk0iii.dat rk0iii.dat
+	rk1iii.dat wk2iii.dat rk2iii.dat wk3iii.dat rk3iii.dat k4iii.dat
+	rk4iii.dat rk5iii.dat m0iii.dat m1iii.dat m3iii.dat, m5iii.dat
+	m4iii.dat m6iii.dat m8iii.dat m9iii.dat, m10iii.dat
+	b2ii.dat, a0i.dat, a2i.dat b5ii.dat f0ii.dat, f2ii.dat, g5ii.dat
+	k01ii.dat k34ii.dat m3ii.dat b1i.dat b3i.dat f0i.dat, f8i.dat f5i.dat
+	g0i.dat, m2i.dat g2i.dat g5i.dat g8i.dat k2i.dat k3i.dat k4i.dat
+	uko5v.dat, uka2v.dat, uka3v.dat, ukg5v.dat
+	ukf2v.dat, ukf5v.dat, ukf5iv.dat ukg8iv.dat, uka7iii.dat, ukk1iii.dat
+	uko9v.dat, ukb0v.dat ukb1v.dat, ukb57v.dat, ukb8v.dat, ukb9v.dat
+	uka5v.dat, uka7v.dat, ukf0v.dat, ukwf5v.dat
+	ukrf6v.dat, ukwf8v.dat, ukrf8v.dat ukb5ii.dat, ukf0ii.dat, ukf2ii.dat
+	ukg5ii.dat, ukk01ii.dat, ukb0i.dat ukb3i.dat, ukb5i.dat, uka0i.dat
+	uka2i.dat, ukf8i.dat, ukwg0v.dat, ukrg0v.dat
+	ukwg5v.dat, ukrg5v.dat, ukk4v.dat, ukk5v.dat
+	ukm0v.dat, ukm1v.dat, ukm3v.dat, ukm4v.dat
+	ukm6v.dat, ukb6iv.dat, uka0iv.dat uka47iv.dat, ukf02iv.dat, ukg0iv.dat
+	ukg5iv.dat, ukk0iv.dat, ukk1iv.dat
+	ukk3iv.dat, uko8iii.dat, ukb3iii.dat
+	ukb5iii.dat, ukb9iii.dat, uka0iii.dat
+	uka3iii.dat, uka5iii.dat, ukf0iii.dat
+	ukf2iii.dat, ukf5iii.dat, ukb2ii.dat ukrk5iii.dat ukb2iv.dat ukb3v.dat
+	uka0v.dat ukf6v.dat, ukm2v.dat, ukm5v.dat ukf8iv.dat, ukg8i.dat
+	ukg8v.dat, ukk3v.dat, ukf8v.dat, ukg0v.dat
+	ukk7v.dat, ukk4iii.dat, ukg2i.dat ukb1i.dat ukg2v.dat
+	ukk0v.dat, ukk2v.dat, ukm2p5v.dat ukg2iv.dat, ukb12iii.dat ukrk0v.dat
+	ukg0iii.dat, ukg8iii.dat, ukk0iii.dat
+	ukg5iii.dat, ukk4i.dat, ukm2i.dat ukk2iii.dat ukk3iii.dat ukk5iii.dat
+	ukm0iii.dat ukm1iii.dat ukm2iii.dat ukm3iii.dat ukm4iii.dat
+	ukm5iii.dat, ukm7iii.dat ukm6iii.dat ukm8iii.dat
+	ukm9iii.dat, ukm10iii.dat ukk34ii.dat
+	ukm3ii.dat, ukb8i.dat, ukf0i.dat, ukf5i.dat ukk2i.dat, ukk3i.dat
+	ukg0i.dat
+==========================================================================
+Query from: http://vizier.u-strasbg.fr/viz-bin/VizieR?-source=J/PASP/110/863
+==========================================================================

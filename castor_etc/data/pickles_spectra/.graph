@@ -1,0 +1,61 @@
+#!/bin/csh
+# Plotting the Spectrum
+# $theTab = Name of file (just add .dat)
+######################################
+
+set Sp = `echo $theTab | sed s/uk// | tr obafgkmiv OBAFGKMIV`
+# Choice of color
+if ("$Sp" =~ *A*) then
+    set c = cyan4
+else if ("$Sp" =~ *F*) then
+    set c = yellow4
+else if ("$Sp" =~ *G*) then
+    set c = DarkOrange
+else if ("$Sp" =~ *K*) then
+    set c = red
+else if ("$Sp" =~ *M*) then
+    set c = red4
+else
+    set c = purple4
+endif
+
+#################################################################
+# Vgraph not defined ==> just the text for the plot
+#################################################################
+if (! $?Vgraph) then
+    set verbose
+    set t = "$Sp"
+    if ("$Sp" =~ w*) then
+        set t = "`echo $Sp | sed 's/^.//'` (metal-weak)"
+    else if ("$Sp" =~ r*) then
+        set t = "`echo $Sp | sed 's/^.//'` (metal-rich)"
+    endif
+    echo1 "\section*{Synthetic UV-to-K spectrum {\fg{$c}$t}}"
+    cgigraph -img -ps:"Postscript Figure" -txt:"Data as a Table" -form -htx \
+	-graph $argv:q
+    exit 0
+endif
+
+################################################################
+# Actual gif or ps plot (Vgraph contains gif or plot)  $1=m or c
+################################################################
+
+if (! $?plotarg) \
+set  plotarg =  "-f 0.05 -h 0.85 -w 0.75 -u 0.125 -r 0.20"
+
+### How many curves? 4 cols ==> 2 plots, etc
+### Plot just the TOTAL Curve
+# set tt = /tmp/$$-$theTab.
+#fcat $theTab.dat | gawk -v tt=$tt '{print $1/10,$2 > tt "0"; \
+#  k=1; for (i=4; i<=NF; i++) { print $1/10,$i > tt k; k++} m=NF }\
+#  END{ for(k=0; k<=m; k++) print "" > tt k}'
+#(cat ${tt}* ; rm ${tt}*) \
+#| graph -T $Vgraph -C $plotarg -L "$theTab" \
+#   --pen-colors 1=black:2=red2:3=green2:4=blue2:5=magenta2 \
+#   -X '\*l[nm]' -Y 'F(\*l)/F(555.6nm]' $argv:q
+#    --pen-colors 1=red:2=red3:3=green -m -1 -S 3 $argv:q
+fcat $theTab.dat | gawk '{print $1/10,$2}' \
+| graph -T $Vgraph -C $plotarg \
+   --pen-colors 1=${c}:2=black:3=green2:4=blue2:5=magenta2 \
+   -X '\*l[nm]' -Y 'F(\*l)/F(555.6nm]' $argv:q
+#    --pen-colors 1=red:2=red3:3=green -m -1 -S 3 $argv:q
