@@ -1,10 +1,9 @@
 # CASTOR Exposure Time Calculator (ETC)
 
-Isaac Cheng - January 2022
+Isaac Cheng - 2022
 
 TODO: Figure out a way to ensure consistent absolute paths for project on CANFAR & local
 systems...
-
 
 ## CANFAR Build Instructions
 

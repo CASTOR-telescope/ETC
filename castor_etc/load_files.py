@@ -3,7 +3,7 @@ load_files.py
 
 Functions to load data from files.
 
-Isaac Cheng - January 2022
+Isaac Cheng - 2022
 """
 
 import astropy.units as u
@@ -11,7 +11,8 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 
-from . import constants as const
+from . import parameters as params
+from .filepaths import DATAPATH
 
 
 def load_passbands(
@@ -35,8 +36,8 @@ def load_passbands(
         (inclusive). If the values are lists of floats, the units are assumed to be
         micrometres. For example:
         {"uv": [0.15, 0.30], "u": [0.30, 0.40], "g": [0.40, 0.55]} or
-        {"uv": [150 * u.nm, 300 * u.nm], "g": [400 * u.nm, 550 * u.nm]}.
-        If None, use the passband limits (from the constants file) for each of the
+        {"uv": [150, 300] * u.nm, "g": [400, 550] * u.nm}.
+        If None, use the passband limits (from the parameters file) for each of the
         specified filters.
 
       resolution :: scalar or `astropy.Quantity` or None
@@ -48,6 +49,8 @@ def load_passbands(
         The absolute paths to the files containing the passband throughput curves. Each
         file should contain data for one passband; lines starting with a hash (#) will be
         ignored. If filepaths is None, use the default passband filepath for each filter.
+
+        TODO: Explain format of each file (later).
 
       kind :: str
         The type of interpolation to use. See `scipy.interpolate.interp1d` for options.
@@ -78,15 +81,17 @@ def load_passbands(
     if np.ndim(filters) != 1:
         raise ValueError("filters must be a 1D list of strings or 'all'")
     if filters == ["all"]:
-        filters = const.PASSBANDS
+        filters = params.PASSBANDS
     else:
-        if any(band not in const.PASSBANDS for band in filters):
-            raise ValueError(f"Invalid filters. Valid filters are: {const.PASSBANDS}")
+        if any(band not in params.PASSBANDS for band in filters):
+            raise ValueError(f"Invalid filters. Valid filters are: {params.PASSBANDS}")
     #
     if limits is None:
-        limits = {band: const.PASSBAND_LIMITS[band] for band in filters}
+        limits = {band: params.PASSBAND_LIMITS[band].to(u.um).value for band in filters}
     else:
+        limits = limits.copy()
         for key in limits.keys():
+            limits[key] = list(limits[key])
             for i, lim in enumerate(limits[key]):
                 if isinstance(lim, u.Quantity):
                     limits[key][i] = lim.to(u.um).value
@@ -99,9 +104,7 @@ def load_passbands(
         resolution = resolution.to(u.um).value
     #
     if filepaths is None:
-        filepaths = [
-            const.DATAPATH + f"passbands/passband_castor.{band}" for band in filters
-        ]
+        filepaths = [DATAPATH + f"passbands/passband_castor.{band}" for band in filters]
     else:
         if isinstance(filepaths, str):
             filepaths = [filepaths]
@@ -158,7 +161,7 @@ def load_passbands(
 def load_sky_background(
     resolution=None,
     limits=None,
-    filepath=const.DATAPATH + "background/high_sky_background.txt",
+    filepath=DATAPATH + "background/high_sky_background.txt",
     kind="linear",
 ):
     """
@@ -181,6 +184,8 @@ def load_sky_background(
       filepath :: str
         The absolute path to the file containing the sky background data. Data should be
         separated by spaces and lines starting with a hash (#) will be ignored.
+
+        TODO: Explain format of file (later)
 
       kind :: str
         The type of interpolation to use. See `scipy.interpolate.interp1d` for options.
