@@ -26,11 +26,8 @@ RUN ./apt-install.sh sssd acl
 COPY docker/bash.bashrc /opt/image-build
 RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
 
-USER ${NB_UID}
+# Start notebook in user's home directory
+RUN mkdir /usr/local/bin/start-notebook.d && chmod 777 /usr/local/bin/start-notebook.d
+COPY docker/startup-hook.sh /usr/local/bin/start-notebook.d/
 
-# #
-# # VS Code configuration
-# # (see <https://code.visualstudio.com/remote/advancedcontainers/avoid-extension-reinstalls)
-# #
-# RUN mkdir -p ${HOME}/.vscode-server/extensions \
-#     && chown -R ${NB_USER} ${HOME}/.vscode-server
+USER ${NB_UID}

@@ -12,7 +12,7 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 #
 # Load custom parameters
 #
-source Docker_env
+source ${SCRIPT_DIR}/Docker_env
 #
 # Build the project
 #
@@ -24,13 +24,13 @@ then
                  --build-arg NB_USER=${NB_USER} \
                  -t castor_etc:${VERSION} \
                  -f docker/Dockerfile.yesCustomEnv .
-elif [[ "$CUSTOMIZE_ENV" == "no" ]]
+elif [[ "$CUSTOMIZE_ENV" = "no" ]]
 then
     echo "Building with default JupyterLab environment"
     docker build -t castor_etc:${VERSION} \
                  -f docker/Dockerfile.noCustomEnv .
 else
-    echo "ERROR: CUSTOMIZE_ENV is must be 'yes' or 'no'"
+    echo "ERROR: CUSTOMIZE_ENV is must be yes or no"
     exit 1
 fi
 #
