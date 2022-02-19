@@ -1,9 +1,5 @@
 """
-snr.py
-
 Calculations involving signal-to-noise ratio (SNR).
-
-Isaac Cheng - 2022
 """
 
 import astropy.units as u
@@ -13,7 +9,7 @@ from scipy.interpolate import interp1d
 
 from . import parameters as params
 from .data.background.background_values import (
-    GEOCORONAL_FLUX,
+    GEOCORONAL_FLUX_AVG,
     GEOCORONAL_LINEWIDTH,
     GEOCORONAL_WAVELENGTH,
     SKY_BACKGROUND,
@@ -95,7 +91,7 @@ def _calc_snr_from_t(
         raise ValueError(
             "All inputs must be scalars. `astropy.Quantity` objects are not supported."
         )
-    if not isinstance(nread, (int, np.int64)):
+    if not isinstance(nread, (int, np.integer)):
         raise ValueError("nread must be an integer")
     #
     # Calculate signal-to-noise ratio
@@ -179,71 +175,12 @@ def _calc_t_from_snr(
       t :: float or array of floats
         The times required to reach the given SNR in seconds.
     """
-    """
-    Calculate the time required to reach a given signal-to-noise ratio (SNR). Based on
-    <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-6-estimating-exposure-times>.
-
-    The equation to calculate the time required to reach a given SNR is:
-    ```math
-                t = {
-                    SNR^2 * (Q + N_pix * Poisson)
-                    + sqrt[
-                        SNR^4 * (Q + N_pix * Poisson)^2
-                        + 4 * Q^2 * SNR^2 * N_pix * N_read * Read^2
-                    ]
-                } / (2 * Q^2)
-    ```
-    where:
-      - SNR is the desired signal-to-noise ratio
-      - t is the integration time in seconds
-      - Q is the total signal due to the source in electrons/s
-      - N_pix is the number of pixels occupied by the source on the detector
-      - Poisson = (B_Earthshine + B_zodiacal + B_geocoronal + Darkcurrent + Redleak) is
-        the total Poisson noise due to the sky backgorund (Earthshine, zodiacal light, and
-        geocoronal emission), dark current, and red leak in electrons/s (per pixel)
-      - N_read is the number of detector readouts
-      - Read is the detector read noise in electrons (per pixel)
-    Note that this is simply the quadratic formula applied to the generic SNR equation.
-
-    Parameters
-    ----------
-      snr :: int or float
-        The target SNR.
-
-      signal :: scalar or array of scalars
-        The signals of the source in electron/s. These are the total electron rates over
-        the whole npix (see below).
-
-      npix :: int or float
-        The number of pixels occupied by the source.
-
-      totskynoise :: int or float
-        The total background noise due to Earthshine + zodiacal light + geocoronal
-        emission (if applicable) in electron/s (per pixel).
-
-      readnoise :: int or float
-        The CCD read noise in electron (per pixel).
-
-      darkcurrent :: int or float
-        The CCD dark current in electron/s (per pixel).
-
-      redleak :: int or float
-        The CCD read leak due to the source in electron/s (per pixel).
-
-      nread :: int
-        The number of CCD readouts.
-
-    Returns
-    -------
-      t :: float or array of floats
-        The times required to reach the given SNR in seconds.
-    """
     variables = [snr, signal, npix, totskynoise, readnoise, darkcurrent, redleak, nread]
     if np.any([isinstance(var, u.Quantity) for var in variables]):
         raise ValueError(
             "All inputs must be scalars. `astropy.Quantity` objects are not supported."
         )
-    if not isinstance(nread, (int, np.int64)):
+    if not isinstance(nread, (int, np.integer)):
         raise ValueError("nread must be an integer")
     #
     # Calculate useful quantities
@@ -338,9 +275,11 @@ def calc_snr_AB(
     readnoise=params.READ_NOISE,
     darkcurrent=params.DARK_CURRENT,
     redleak=None,  # TODO: implement this (once I figure out the cause of the discrepancy)
+    include_geocoronal=True,
     nread=1,
 ):
     """
+    ! DEPRECATED !
     Given some AB magnitudes in CASTOR passbands, calculate the signal-to-noise ratio
     (SNR) reached in a given time, t, OR the time required to reach a given SNR, snr.
 
@@ -425,39 +364,49 @@ def calc_snr_AB(
     #
     # Add geocoronal emission line
     #
-    geo_background = (
-        GEOCORONAL_FLUX
-        * params.PX_AREA.value
-        * params.APER_AREA.value
-        / calc_photon_energy(wavelength=GEOCORONAL_WAVELENGTH.value, wavelength_err=0.0)[
-            0
-        ]
-    )  # photon/s/A
-    for band in passbands:
-        throughput = passband_response[band]["throughput"].values
-        band_start = (passband_response[band]["wavelength"].iloc[0] * u.um).to(u.AA).value
-        band_end = (passband_response[band]["wavelength"].iloc[-1] * u.um).to(u.AA).value
-        # Add geocoronal emission line [O II] 2471A to the relevant passband
-        if (GEOCORONAL_WAVELENGTH.value >= band_start) & (
-            GEOCORONAL_WAVELENGTH.value <= band_end
-        ):
-            throughput_interp = interp1d(
-                passband_response[band]["wavelength"].values,
-                throughput,
-                kind=interp_kind,
-                bounds_error=False,
-                fill_value=np.nan,
+    if include_geocoronal:
+        geo_background = (
+            GEOCORONAL_FLUX_AVG
+            * params.PX_AREA.value
+            * params.MIRROR_AREA.value
+            / calc_photon_energy(
+                wavelength=GEOCORONAL_WAVELENGTH.value, wavelength_err=0.0
+            )[0]
+        )  # photon/s/A
+        for band in passbands:
+            throughput = passband_response[band]["throughput"].values
+            band_start = (
+                (passband_response[band]["wavelength"].iloc[0] * u.um).to(u.AA).value
             )
-            geo_throughput = throughput_interp(GEOCORONAL_WAVELENGTH.to(u.um).value)
-            sky_background_e_rate[band] += (
-                geo_background * geo_throughput * GEOCORONAL_LINEWIDTH.value
-            )  # electron/s
+            band_end = (
+                (passband_response[band]["wavelength"].iloc[-1] * u.um).to(u.AA).value
+            )
+            # Add geocoronal emission line [O II] 2471A to the relevant passband
+            if (GEOCORONAL_WAVELENGTH.value >= band_start) & (
+                GEOCORONAL_WAVELENGTH.value <= band_end
+            ):
+                throughput_interp = interp1d(
+                    passband_response[band]["wavelength"].values,
+                    throughput,
+                    kind=interp_kind,
+                    bounds_error=False,
+                    fill_value=np.nan,
+                )
+                geo_throughput = throughput_interp(GEOCORONAL_WAVELENGTH.to(u.um).value)
+                # sky_background_e_rate[band] += (
+                #     geo_background * geo_throughput * GEOCORONAL_LINEWIDTH.value
+                # )  # electron/s
+                # REVIEW: don't need to multiply by linewidth?
+                sky_background_e_rate[band] += (
+                    geo_background * geo_throughput
+                )  # electron/s
     #
     # Generate signal from source
     #
     source_e_rate = dict.fromkeys(passbands)  # electron/s
     for band in source_e_rate:
         source_e_rate[band] = mag_to_flux(source_AB_mags, zpt=phot_zpts[band].values)[0]
+    print(source_e_rate)
     # #
     # # Calculate red leak
     # #

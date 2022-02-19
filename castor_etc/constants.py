@@ -1,9 +1,5 @@
 """
-constants.py
-
-A file to track filepaths and telescope parameters. N.B. use cgs units when possible.
-
-Isaac Cheng - 2022
+Useful constants. N.B. use cgs units when possible.
 """
 
 import astropy.units as u
@@ -21,6 +17,9 @@ K_B = 1.380649e-16 << (u.erg / u.K)  # erg/K
 
 # The radius of the Sun
 SUN_RADIUS = 6.96340e10 << u.cm  # cm
+
+# Solar luminosity
+SUN_LUMINOSITY = 3.828e26 << (u.erg / u.s)  # erg/s
 
 # Coefficient for the conversion from flam (erg/cm^2/s/A) to photlam (photon/cm^2/s/A).
 # Reference: <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf>

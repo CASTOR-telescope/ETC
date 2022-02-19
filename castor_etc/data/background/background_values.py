@@ -3,7 +3,9 @@ background_values.py
 
 Contains average sky background values and geocoronal emission line data.
 
-Isaac Cheng - 2022
+Copyright 2022, CASTOR Mission Team
+Author: Isaac Cheng
+Contact: isaac.cheng.ca@gmail.com
 """
 
 import astropy.units as u
@@ -11,9 +13,10 @@ import astropy.units as u
 # ------------------------------- BACKGROUND NOISE VALUES ------------------------------ #
 
 # The flux of the geocoronal emission line [O II] 2471A.
-# See <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-7-sky-background#id-9.7SkyBackground-9.7.29.7.2GeocoronalEmission,Airglow,andSHADOW>
-# and <https://www.stsci.edu/itt/APT_help20/STIS/c06_exptime7.html#696464>
-GEOCORONAL_FLUX = 1.5e-15  # erg/cm^2/s/arcsec^2
+# See <https://hst-docs.stsci.edu/stisihb/chapter-6-exposure-time-calculations/6-6-tabular-sky-backgrounds
+GEOCORONAL_FLUX_HIGH = 3.0e-15  # erg/cm^2/s/arcsec^2
+GEOCORONAL_FLUX_AVG = 1.5e-15  # erg/cm^2/s/arcsec^2
+GEOCORONAL_FLUX_LOW = 7.5e-17  # erg/cm^2/s/arcsec^2
 GEOCORONAL_WAVELENGTH = 2471 << u.AA  # angstroms
 GEOCORONAL_LINEWIDTH = 0.023 << u.AA  # angstroms
 

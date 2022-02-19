@@ -5,6 +5,11 @@ Isaac Cheng - 2022
 TODO: Figure out a way to ensure consistent absolute paths for project on CANFAR & local
 systems...
 
+TODO: finish the docstrings and make them stylistically consistent (e.g., the Attributes).
+
+TODO: generating_sources.ipynb, telescope.ipynb, spectroscopy.ipynb, background.ipynb,
+normalizations.ipynb, etc...
+
 ## CANFAR Build Instructions
 
 1. Download the git repo:

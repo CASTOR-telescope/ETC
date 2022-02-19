@@ -1,19 +1,13 @@
 """
-conversions.py
-
-Utilities to convert between different units.
+Utilities to convert between different units and quantities.
 
 Common units (also see <https://pysynphot.readthedocs.io/en/latest/units.html>):
   - fnu :: erg/s/cm^2/Hz
   - flam :: erg/s/cm^2/A
   - photnu :: photons/s/cm^2/Hz
   - photlam :: photons/s/cm^2/A
-
-Isaac Cheng - 2022
 """
 
-from json.tool import main
-from multiprocessing.sharedctypes import Value
 import astropy.units as u
 import numpy as np
 
@@ -121,16 +115,18 @@ def fnu_to_flam(fnu, wavelength, fnu_err=0.0, wavelength_err=0.0):
       fnu :: array of scalar
         The flux in fnu.
 
-      wavelength :: array of scalars or `astropy.Quantity` array
+      wavelength :: scalar, `astropy.Quantity`, scalar array, or`astropy.Quantity` array
         The corresponding wavelengths of the flux. If values are scalars, they are assumed
-        to be in angstroms.
+        to be in angstroms. If not an array, wavelength should be the pivot wavelength of
+        the passband.
 
       fnu_err :: array of scalars
         The absolute uncertainty in fnu.
 
       wavelength_err :: array of scalars or `astropy.Quantity` array
-        The absolute uncertainty in wavelength. If values are scalars, they are assumed
-        to be in angstroms.
+        The absolute uncertainty in wavelength. If values are scalars, they are assumed to
+        be in angstroms. If not an array, wavelength_err should be the uncertainty in the
+        pivot wavelength of the passband.
 
     Returns
     -------
@@ -332,12 +328,18 @@ def convert_electron_flux_mag(
     var2_type,
     var1_err=0.0,
     passband=None,
+    phot_zpt=None,
     wavelengths=None,
     wavelengths_err=0.0,
 ):
     """
     Convert between electron rates (electron/s), flux in "fnu" units (erg/s/cm^2/Hz), flux
-    in "flam" units (erg/s/cm^2/angstrom), and magnitudes (AB mags).
+    in "flam" units (erg/s/cm^2/angstrom), and magnitudes (AB mags). To convert to/from
+    electron/s, this function uses photometric zero points, which implicitly assumes the
+    inputs are over the entire passband. For example, do NOT use this function to convert
+    geocoronal emission line flux to electron/s.
+
+    TODO: test this function
 
     Parameters
     ----------
@@ -351,17 +353,27 @@ def convert_electron_flux_mag(
         The uncertainty in var1.
 
       passband :: "uv", "u", or "g"
-        The passband of the variables. Required if var1_type or var2_type is "electron",
-        ignored otherwise.
+        The passband of the variables. Required if var1_type or var2_type is "electron"
+        and phot_zpt is None, ignored otherwise.
 
-      wavelengths, wavelengths_err :: scalar or array
+      phot_zpt :: scalar
+        The photometric zero point of the passband. This should be the AB magnitude
+        required to produce 1 electron/s in the passband. Required if var1_type or
+        var2_type is "electron" and passband is None, ignored otherwise. Will override any
+        default zero points.
+
+      wavelengths, wavelengths_err :: scalar or array or `astropy.Quantity` or
+                                      `astropy.Quantity` array
         The wavelengths and their uncertainties corresponding to the data represented by
         var1. Required if var1_type or var2_type is "flam", ignored otherwise.
-        INFO: is there a way to convert from, e.g., AB mag to flam without this?
+        Alternatively, if passband is specified and wavelengths is None, then the pivot
+        wavelength of the passband will be used (the pivot wavelength is typically used if
+        var1 is a quantity integrated over the whole passband). If scalar value(s),
+        wavelengths and wavelengths_err are assumed to be in angstroms.
 
     Returns
     -------
-      var2, var2_err :: scalar or array
+      var2, var2_err :: scalar or array of scalars
         The converted var1 values and their uncertainties.
     """
     #
@@ -375,29 +387,38 @@ def convert_electron_flux_mag(
     if var1_type == var2_type:
         raise ValueError("var1_type and var2_type must be different")
     if var1_type == "electron" or var2_type == "electron":
-        if passband is None:
-            raise ValueError(
-                "passband must be provided if var1_type or var2_type is 'electron'"
+        if phot_zpt is None:
+            if passband is None:
+                raise ValueError(
+                    "passband must be provided if var1_type or var2_type is 'electron'"
+                )
+            elif (not isinstance(passband, str)) or (passband not in params.PASSBANDS):
+                raise ValueError("passband must be 'uv', 'u', or 'g'")
+            else:
+                phot_zpt = params.PHOT_ZPTS[passband]
+        elif phot_zpt is not None and passband is not None:
+            print(
+                "INFO: Using provided phot_zpt and ignoring default passband zero-point."
             )
-        elif (not isinstance(passband, str)) or (passband not in params.PASSBANDS):
-            raise ValueError("passband must be 'uv', 'u', or 'g'")
     if var1_type == "flam" or var2_type == "flam":
         if wavelengths is None:
-            raise ValueError(
-                "wavelengths must be provided if var1_type or var2_type is 'flam'"
-            )
+            if passband is not None:
+                wavelengths = params.PASSBAND_PIVOTS[passband]
+            else:
+                raise ValueError(
+                    "wavelengths or passband must be provided if "
+                    + "var1_type or var2_type is 'flam'"
+                )
     if np.any(var1_err < 0):
         raise ValueError("var1_err must be non-negative")
-
     #
     # Convert var1 & var1_err to desired quantities: var2 & var2_err
     #
-
     if var1_type == "mag":
         if var2_type == "electron":
             # AB magnitude to electron/s
             var2, var2_err = mag_to_flux(
-                var1, mag_err=var1_err, zpt=params.PHOT_ZPTS[passband]
+                var1, mag_err=var1_err, zpt=phot_zpt
             )  # electron/s
         else:  # var2_type == "fnu" or var2_type == "flam"
             # AB magnitude to fnu
@@ -407,7 +428,7 @@ def convert_electron_flux_mag(
                 var2, var2_err = fnu_to_flam(
                     var2, wavelengths, fnu_err=var2_err, wavelength_err=wavelengths_err
                 )  # flam
-
+    #
     elif var1_type == "fnu":
         if var2_type == "flam":
             # Fnu to flam
@@ -422,13 +443,13 @@ def convert_electron_flux_mag(
             if var2_type == "electron":
                 # Fnu to electron/s (via fnu -> AB mag -> electrons/s)
                 var2, var2_err = mag_to_flux(
-                    var2, mag_err=var2_err, zpt=params.PHOT_ZPTS[passband]
+                    var2, mag_err=var2_err, zpt=phot_zpt
                 )  # electron/s
-
+    #
     elif var1_type == "electron":
         # Electron/s to AB magnitude
         var2, var2_err = flux_to_mag(
-            var1, flux_err=var1_err, zpt=params.PHOT_ZPTS[passband], calc_abs=False
+            var1, flux_err=var1_err, zpt=phot_zpt, calc_abs=False
         )  # AB mags (per the definition of the PHOT_ZPTS quantities)
         if var2_type == "fnu" or "flam":
             # Electron/s to fnu (via electron/s -> AB mag -> fnu)
@@ -438,7 +459,7 @@ def convert_electron_flux_mag(
                 var2, var2_err = fnu_to_flam(
                     var2, wavelengths, fnu_err=var2_err, wavelength_err=wavelengths_err
                 )  # flam
-
+    #
     elif var1_type == "flam":
         # Flam to fnu
         var2, var2_err = flam_to_fnu(
@@ -452,12 +473,12 @@ def convert_electron_flux_mag(
             if var2_type == "electron":
                 # Flam to electron/s (via flam -> fnu -> AB mag -> electron/s)
                 var2, var2_err = mag_to_flux(
-                    var2, mag_err=var2_err, zpt=params.PHOT_ZPTS[passband]
+                    var2, mag_err=var2_err, zpt=phot_zpt
                 )  # electron/s
-
+    #
     else:
         raise ValueError(
             "Something went wrong. This statement should be impossible to reach..."
         )
-
+    #
     return var2, var2_err

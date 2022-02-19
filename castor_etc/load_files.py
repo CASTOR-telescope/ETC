@@ -1,9 +1,5 @@
 """
-load_files.py
-
-Functions to load data from files.
-
-Isaac Cheng - 2022
+Utilities to load data from files.
 """
 
 import astropy.units as u
@@ -104,7 +100,7 @@ def load_passbands(
         resolution = resolution.to(u.um).value
     #
     if filepaths is None:
-        filepaths = [DATAPATH + f"passbands/passband_castor.{band}" for band in filters]
+        filepaths = [DATAPATH + f"/passbands/passband_castor.{band}" for band in filters]
     else:
         if isinstance(filepaths, str):
             filepaths = [filepaths]
@@ -161,7 +157,7 @@ def load_passbands(
 def load_sky_background(
     resolution=None,
     limits=None,
-    filepath=DATAPATH + "background/high_sky_background.txt",
+    filepath=DATAPATH + "/background/high_sky_background.txt",
     kind="linear",
 ):
     """
@@ -196,6 +192,7 @@ def load_sky_background(
         DataFrame containing the sky background noise. Wavelengths are in angstroms and
         the background values are in erg/cm^2/s/A/arcsec^2.
     """
+    # raise DeprecationWarning("This function is deprecated.")
     #
     # Check inputs
     #

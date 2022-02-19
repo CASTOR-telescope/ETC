@@ -3,7 +3,9 @@ test_conversions.py
 
 Unit tests for the conversions module.
 
-Isaac Cheng - 2022
+Copyright 2022, CASTOR Mission Team
+Author: Isaac Cheng
+Contact: isaac.cheng.ca@gmail.com
 """
 
 import unittest

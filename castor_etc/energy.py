@@ -1,9 +1,5 @@
 """
-energy.py
-
-Functions to calculate energies.
-
-Isaac Cheng - 2022
+Utilities to calculate energies.
 """
 
 import astropy.units as u
