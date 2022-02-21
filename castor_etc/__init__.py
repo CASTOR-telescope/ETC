@@ -21,7 +21,6 @@ __all__ = [
     "constants",
     "conversions",
     "data",
-    "energy",
     "filepaths",
     "load_files",
     "parameters",
@@ -34,7 +33,6 @@ __all__ = [
 from . import constants
 from . import conversions
 from . import data
-from . import energy
 from . import filepaths
 from . import load_files
 from . import parameters

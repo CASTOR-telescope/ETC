@@ -12,7 +12,7 @@ import unittest
 import astropy.units as u
 import numpy as np
 
-from ..energy import calc_photon_energy
+from ..conversions import calc_photon_energy
 
 _TOL = 1e-15  # floating-point tolerance
 

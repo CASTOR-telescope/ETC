@@ -14,8 +14,7 @@ from scipy.integrate import simpson
 
 from . import constants as const
 from . import parameters as params
-from .conversions import convert_electron_flux_mag
-from .energy import calc_photon_energy
+from .conversions import convert_electron_flux_mag, calc_photon_energy
 from .telescope import Telescope
 
 # TODO: emission lines (see Gaussian functions below)

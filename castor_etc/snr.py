@@ -14,10 +14,9 @@ from .data.background.background_values import (
     GEOCORONAL_WAVELENGTH,
     SKY_BACKGROUND,
 )
-from .energy import calc_photon_energy
 from .filepaths import DATAPATH
 from .load_files import load_passbands, load_sky_background
-from .conversions import mag_to_flux
+from .conversions import mag_to_flux, calc_photon_energy
 
 
 def _calc_snr_from_t(

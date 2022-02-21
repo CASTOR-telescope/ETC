@@ -12,8 +12,7 @@ from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from .background import Background
-from .conversions import convert_electron_flux_mag, mag_to_flux
-from .energy import calc_photon_energy
+from .conversions import convert_electron_flux_mag, mag_to_flux, calc_photon_energy
 from .sources import ExtendedSource, PointSource, Source
 from .telescope import Telescope
 
