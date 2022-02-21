@@ -32,7 +32,7 @@ PASSBAND_RESOLUTION = 1 << u.nm  # nanometres
 
 # Photometric zero-points for the different filters
 PHOT_ZPTS = {"uv": 24.23, "u": 24.71, "g": 24.78}  # AB mag for 1 electron/s
-# INFO: how to calculate photometric zero-points? What is "effective area curve"?
+# PHOT_ZPTS = {"uv": 24.463, "u": 24.511, "g": 24.766}  # AB mag for 1 electron/s
 
 # Passband pivot wavelengths (CASTOR SMS values)
 PASSBAND_PIVOTS = {"uv": 226 << u.nm, "u": 345 << u.nm, "g": 478 << u.nm}  # nanometres

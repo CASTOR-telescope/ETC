@@ -136,7 +136,7 @@ def fnu_to_photlam(fnu, wavelength):
       fnu :: array
         The flux in fnu.
 
-      wavelength :: array of scalars or `astropy.Quantity`
+      wavelength :: array of scalars or `astropy.Quantity` array
         The corresponding wavelengths of the flux. If values are scalars, they are assumed
         to be in angstroms.
 
