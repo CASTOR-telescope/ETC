@@ -46,6 +46,7 @@ dependencies:
     - astroid==2.9.3
     - astropy==5.0
     - black==21.12b0
+    - colorama==0.4.4
     - gitdb==4.0.9
     - gitpython==3.1.26
     - ipyevents==2.0.1
@@ -57,6 +58,7 @@ dependencies:
     - mypy-extensions==0.4.3
     - nbdime==3.1.1
     - pathspec==0.9.0
+    - photutils==1.3.0
     - platformdirs==2.4.1
     - pyerfa==2.0.0.1
     - pylint==2.12.2

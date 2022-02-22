@@ -7,7 +7,7 @@ LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
 USER ${NB_UID}
 
 # Install astropy for science, ipyevents for interactive plots, PyQt5 for GUI, and git
-RUN pip install astropy ipyevents PyQt5 pylint black[jupyter] jupyterlab-git
+RUN pip install astropy ipyevents PyQt5 pylint black[jupyter] jupyterlab-git photutils
 RUN jupyter nbextension enable --py --sys-prefix ipyevents
 
 # Default JupyterHub settings (overridden if user has custom config?)

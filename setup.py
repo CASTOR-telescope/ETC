@@ -51,7 +51,7 @@ setup(
     # maintainer="Isaac Cheng",
     # maintainer_email="isaac.cheng.ca@gmail.com"
     packages=["castor_etc"],
-    install_requires=["numpy", "scipy", "astropy", "pandas"],
+    install_requires=["numpy", "scipy", "astropy", "pandas", "photutils"],
     license="GPLv3",
     python_requires=">=3.9",
     platforms=["Linux"],  # only tested on Ubuntu. MacOS may be okay, Windows probably not
