@@ -9,12 +9,13 @@ Generate and handle spectral data and normalizations. Includes:
 from numbers import Number
 
 import astropy.units as u
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import simpson
 
 from . import constants as const
 from . import parameters as params
-from .conversions import convert_electron_flux_mag, calc_photon_energy
+from .conversions import calc_photon_energy, convert_electron_flux_mag
 from .telescope import Telescope
 
 # TODO: emission lines (see Gaussian functions below)
@@ -495,10 +496,10 @@ class NormMixin:
         pivot_wavelength=None,
     ):
         """
-        Normalize the spectrum so that it has a flux density (in erg/s/cm^2/A) or AB
-        magnitude equal to the given value, either over the whole wavelength range or
-        within a passband. The `Source` object should have its spectrum in units of flam
-        (erg/s/cm^2/A) and wavelengths in angstrom.
+        Normalize the spectrum so that it has a total flux density (in erg/s/cm^2/A) or
+        total AB magnitude equal to the given value, either over the whole wavelength
+        range or within a passband. The `Source` object should have its spectrum in units
+        of flam (erg/s/cm^2/A) and wavelengths in angstrom.
 
         The higher the resolution of the spectrum, the more accurate the normalization.
         Also, if passband or passband_lims is not None, note that some wavelength/spectrum
@@ -665,6 +666,34 @@ class NormMixin:
         tot_luminosity = simpson(y=erg_s_A, x=self.wavelengths.value, even="avg")  # erg/s
         norm_factor = luminosity / tot_luminosity  # dimensionless
         self.spectrum *= norm_factor  # erg/s/cm^2/A
+
+    def show_spectrum(self, plot=True):
+        """
+        Plot the spectrum (which should be in units of flam).
+
+        Parameters
+        ----------
+          plot :: bool
+            If True, plot the source weights and return None. If False, return the figure
+            and axis instance associated with the plot.
+
+        Returns
+        -------
+          None (if plot is True)
+
+          fig, ax (if plot is False) :: `matplotlib.figure.Figure`, `matplotlib.axes.Axes`
+            The figure and axis instance associated with the plot.
+        """
+        fig, ax = plt.subplots()
+        ax.plot(self.wavelengths.to(u.AA).value, self.spectrum, "k")
+        ax.fill_between(self.source.wavelengths.to(u.AA).value, self.spectrum, alpha=0.5)
+        ax.set_xlabel("Wavelength [\AA]")
+        ax.set_ylabel(r"Flux Density [$\rm erg\, s^{-1}\, cm^{-2}\,$\AA$^{-1}$]")
+        ax.set_ylim(bottom=0)
+        if plot:
+            plt.show()
+        else:
+            return fig, ax
 
 
 # ------------------------------------ OLD FUNCTIONS ----------------------------------- #

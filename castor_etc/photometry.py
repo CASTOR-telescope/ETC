@@ -4,15 +4,17 @@ Utilities for photometric calculations.
 
 import warnings
 from copy import deepcopy
+from numbers import Number
 
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+from photutils.aperture import EllipticalAnnulus, EllipticalAperture, RectangularAperture
 from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from .background import Background
-from .conversions import convert_electron_flux_mag, mag_to_flux, calc_photon_energy
+from .conversions import calc_photon_energy, convert_electron_flux_mag, mag_to_flux
 from .sources import ExtendedSource, PointSource, Source
 from .telescope import Telescope
 
@@ -74,6 +76,8 @@ class Photometry:
 
         self.aper_xs = None
         self.aper_ys = None
+        self._aper_mask = None
+        self._eff_npix = None
         self._aper_extent = None
         self.source_weights = None
         self.sky_background_weights = None
@@ -256,14 +260,9 @@ class Photometry:
         source_weights = profile(aper_xs, aper_ys, center)
         return source_weights
 
-    def show_source_weights(self, mark_source=False, source_markersize=4):
+    def show_source_weights(self, mark_source=False, source_markersize=4, plot=True):
         """
-        Plot the source as seen through the aperture's FOV. This shows a "high resolution"
-        version of the source, NOT the weights of each "pixel" (we do not use "pixel
-        weights" due to fractional pixel errors). The weights are simply used to compute a
-        weighted average of the source flux...
-
-        TODO: Explain this better
+        Plot the source as seen through the aperture's FOV.
 
         Parameters
         ----------
@@ -273,9 +272,18 @@ class Photometry:
           source_markersize :: int or float
             The markersize for the cyan point indicating the center of the source.
 
+          plot :: bool
+            If True, plot the source weights and return None. If False, return the figure,
+            axis, and colorbar instance associated with the plot.
+
         Returns
         -------
-          None
+          None (if plot is True)
+
+          fig, ax, cbar (if plot is False) :: `matplotlib.figure.Figure`,
+                                              `matplotlib.axes.Axes`,
+                                              `matplotlib.colorbar.Colorbar`
+            The figure, axis, and colorbar instance associated with the plot.
         """
         if self.source_weights is None or self._aper_extent is None:
             raise ValueError("Please select an aperture first.")
@@ -298,7 +306,11 @@ class Photometry:
             cbar.set_label("Relative Weight to Center of Source")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
-            plt.show()
+            ax.set_title("Effective No." + "\u00A0" + f"of Pixels: {self._eff_npix:.2f}")
+            if plot:
+                plt.show()
+            else:
+                return fig, ax, cbar
 
     def set_background_weights(self, sky_background_weights):
         """
@@ -468,21 +480,37 @@ class Photometry:
         source_weights = Photometry.calc_source_weights(
             self.SourceObj.profile, self.aper_xs, self.aper_ys, center
         )
-        # Restrict weight map to aperture (which is an unrotated ellipse)
-        is_out_aper = (
-            np.sqrt(
-                (self.aper_xs / aper_dimen[0].value) ** 2
-                + (self.aper_ys / aper_dimen[1].value) ** 2
-            )
-            > 1
+        #
+        # Create aperture
+        #
+        center_px = [
+            0.5 * (source_weights.shape[1] - 1),  # x-coordinate in pixel units
+            0.5 * (source_weights.shape[0] - 1),  # y-coordinate in pixel units
+        ]
+        aper_dimen_px = [
+            (dimen / self.TelescopeObj.px_scale.to(u.arcsec)).value
+            for dimen in aper_dimen
+        ]
+        aper = EllipticalAperture(
+            positions=center_px, a=aper_dimen_px[0], b=aper_dimen_px[1], theta=0
         )
-        source_weights[is_out_aper] = np.nan
-        self.source_weights = source_weights
-        self.sky_background_weights[is_out_aper] = np.nan
-        self.dark_current_weights[is_out_aper] = np.nan
-        self.redleak_weights[is_out_aper] = np.nan
+        # Restrict weight maps to aperture (which is an unrotated ellipse)
+        aper_mask = aper.to_mask(method="exact").to_image(source_weights.shape)
+        aper_mask[aper_mask <= 1e-12] = np.nan  # account for floating point errors
+        self._aper_mask = aper_mask
+        self.source_weights = source_weights * aper_mask
+        self.sky_background_weights *= aper_mask
+        self.dark_current_weights *= aper_mask
+        self.redleak_weights *= aper_mask
+        self._eff_npix = np.nansum(aper_mask)
+        if abs(self._eff_npix - self.npix) > 0.1:
+            # Discrepancy larger than 0.1 pixels
+            warnings.warn(
+                "Effective aperture area is off by more than 0.1 pixels... "
+                + "Contact the developer with a minimal working example please. Thanks!"
+            )
 
-    def use_elliptical_aperture(self, a, b, center=[0, 0] << u.arcsec):
+    def use_elliptical_aperture(self, a, b, center=[0, 0] << u.arcsec, rotation=0):
         """
         Use an elliptical aperture.
 
@@ -497,6 +525,11 @@ class Photometry:
             The (x, y) center of the aperture relative to the center of the source.
             Positive values means the source is displaced to the bottom/left relative to
             the aperture center.
+
+          rotation :: int or float
+            The counter-clockwise rotation angle in degrees of the ellipse's semimajor
+            axis from the positive x-axis. If rotation is 0, the semimajor axis is along
+            the x-axis and the semiminor axis is along the y-axis.
 
         Returns
         -------
@@ -522,6 +555,10 @@ class Photometry:
                 )
         else:
             b = b * self.TelescopeObj.px_scale.to(u.arcsec)
+        if not isinstance(rotation, Number):
+            raise TypeError("rotation must be an int or float")
+        rotation = np.deg2rad(rotation)
+        sin_rotate, cos_rotate = np.sin(rotation), np.cos(rotation)
 
         self.aperture = np.pi * a * b  # area of ellipse
         self._assign_npix()
@@ -531,19 +568,47 @@ class Photometry:
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
-        self._create_aper_arrs(a.value, b.value, center)
+        # Modified rotation matrix to ensure full aperture is covered in 2D arrays
+        x = (cos_rotate * a + sin_rotate * b).value
+        y = (sin_rotate * a + cos_rotate * b).value
+        x = x if x >= a.value else a.value
+        y = y if y >= b.value else b.value
+        self._create_aper_arrs(x, y, center)
         source_weights = Photometry.calc_source_weights(
             self.SourceObj.profile, self.aper_xs, self.aper_ys, center
         )
-        # Restrict weight map to aperture (which is an unrotated ellipse)
-        is_out_aper = (
-            np.sqrt((self.aper_xs / a.value) ** 2 + (self.aper_ys / b.value) ** 2) > 1
+        #
+        # Create aperture
+        #
+        center_px = [
+            0.5 * (source_weights.shape[1] - 1),  # x-coordinate in pixel units
+            0.5 * (source_weights.shape[0] - 1),  # y-coordinate in pixel units
+        ]
+        aper_dimen_px = [
+            (a / self.TelescopeObj.px_scale.to(u.arcsec)).value,
+            (b / self.TelescopeObj.px_scale.to(u.arcsec)).value,
+        ]
+        aper = EllipticalAperture(
+            positions=center_px,
+            a=aper_dimen_px[0],
+            b=aper_dimen_px[1],
+            theta=rotation,
         )
-        source_weights[is_out_aper] = np.nan
-        self.source_weights = source_weights
-        self.sky_background_weights[is_out_aper] = np.nan
-        self.dark_current_weights[is_out_aper] = np.nan
-        self.redleak_weights[is_out_aper] = np.nan
+        # Restrict weight maps to aperture
+        aper_mask = aper.to_mask(method="exact").to_image(source_weights.shape)
+        aper_mask[aper_mask <= 1e-12] = np.nan  # account for floating point errors
+        self._aper_mask = aper_mask
+        self.source_weights = source_weights * aper_mask
+        self.sky_background_weights *= aper_mask
+        self.dark_current_weights *= aper_mask
+        self.redleak_weights *= aper_mask
+        self._eff_npix = np.nansum(aper_mask)
+        if abs(self._eff_npix - self.npix) > 0.1:
+            # Discrepancy larger than 0.1 pixels
+            warnings.warn(
+                "Effective aperture area is off by more than 0.1 pixels... "
+                + "Contact the developer with a minimal working example please. Thanks!"
+            )
 
         if isinstance(self.SourceObj, PointSource):
             aper_threshold = min(self._optimal_aperture_dimen)
@@ -627,9 +692,38 @@ class Photometry:
             0.5 * length.value,  # length is along y
             center,
         )
-        self.source_weights = Photometry.calc_source_weights(
+        source_weights = Photometry.calc_source_weights(
             self.SourceObj.profile, self.aper_xs, self.aper_ys, center
         )
+        #
+        # Create aperture
+        #
+        center_px = [
+            0.5 * (source_weights.shape[1] - 1),  # x-coordinate in pixel units
+            0.5 * (source_weights.shape[0] - 1),  # y-coordinate in pixel units
+        ]
+        aper_dimen_px = [
+            (width / self.TelescopeObj.px_scale.to(u.arcsec)).value,
+            (length / self.TelescopeObj.px_scale.to(u.arcsec)).value,
+        ]
+        aper = RectangularAperture(
+            positions=center_px, w=aper_dimen_px[0], h=aper_dimen_px[1], theta=0
+        )
+        # Restrict weight maps to aperture
+        aper_mask = aper.to_mask(method="exact").to_image(source_weights.shape)
+        aper_mask[aper_mask <= 1e-12] = np.nan  # account for floating point errors
+        self._aper_mask = aper_mask
+        self.source_weights = source_weights * aper_mask
+        self.sky_background_weights *= aper_mask
+        self.dark_current_weights *= aper_mask
+        self.redleak_weights *= aper_mask
+        self._eff_npix = np.nansum(aper_mask)
+        if abs(self._eff_npix - self.npix) > 0.1:
+            # Discrepancy larger than 0.1 pixels
+            warnings.warn(
+                "Effective aperture area is off by more than 0.1 pixels... "
+                + "Contact the developer with a minimal working example please. Thanks!"
+            )
 
         if isinstance(self.SourceObj, PointSource):
             aper_threshold = min(self._optimal_aperture_dimen) * 2
@@ -752,6 +846,7 @@ class Photometry:
     def _calc_snr_from_t(
         t,
         signal,
+        npix,
         totskynoise,
         readnoise,
         darkcurrent,
@@ -791,9 +886,8 @@ class Photometry:
             The signals of the source in electron/s. These are the total electron rates over
             the whole npix (see below).
 
-        (DEPRECATED)
-        npix :: int or float
-            The number of pixels occupied by the source.
+        npix :: int
+            The integer number of pixels occupied by the source. Only used for read noise.
 
         totskynoise :: int or float
             The total background noise due to Earthshine + zodiacal light + geocoronal
@@ -825,6 +919,8 @@ class Photometry:
                 "All inputs must be scalars or scalar arrays. "
                 + "`astropy.Quantity` objects are not supported."
             )
+        if not isinstance(npix, (int, np.integer)):
+            raise ValueError("npix must be an integer")
         if not isinstance(nread, (int, np.integer)):
             raise ValueError("nread must be an integer")
         #
@@ -833,10 +929,8 @@ class Photometry:
         signal_t = np.nansum(signal * t)  # electron
         noise = np.sqrt(
             signal_t
-            + np.nansum(
-                t * (totskynoise + darkcurrent + redleak)
-                + (readnoise * readnoise * nread)
-            )
+            + np.nansum(t * (totskynoise + darkcurrent + redleak))
+            + (npix * readnoise * readnoise * nread)
         )  # electron
         snr = signal_t / noise
         # signal_t = signal * t  # electron
@@ -854,6 +948,7 @@ class Photometry:
     def _calc_t_from_snr(
         snr,
         signal,
+        npix,
         totskynoise,
         readnoise,
         darkcurrent,
@@ -898,9 +993,8 @@ class Photometry:
             The signals of the source in electron/s. These are the total electron rates
             over the whole npix (see below).
 
-        (DEPRECATED)
-        npix :: int or float
-            The number of pixels occupied by the source.
+        npix :: int
+            The integer number of pixels occupied by the source. Only used for read noise.
 
         totskynoise :: int or float
             The total background noise due to Earthshine + zodiacal light + geocoronal
@@ -929,6 +1023,8 @@ class Photometry:
                 "All inputs must be scalars or scalar arrays. "
                 + "`astropy.Quantity` objects are not supported."
             )
+        if not isinstance(npix, (int, np.integer)):
+            raise ValueError("npix must be an integer")
         if not isinstance(nread, (int, np.integer)):
             raise ValueError("nread must be an integer")
         # #
@@ -956,12 +1052,7 @@ class Photometry:
         #
         numer1 = snr_sq * poisson_noise
         numer2 = snr_sq * snr_sq * poisson_noise * poisson_noise
-        numer3 = (
-            4
-            * snr_sq
-            * signal_sq
-            * (np.sum(np.isfinite(signal)) * readnoise * readnoise * nread)
-        )
+        numer3 = 4 * snr_sq * signal_sq * (npix * readnoise * readnoise * nread)
         t = (numer1 + np.sqrt(numer2 + numer3)) / (2 * signal_sq)  # seconds
         return t
 
@@ -1177,7 +1268,6 @@ class Photometry:
         #
         source_erate = dict.fromkeys(self.TelescopeObj.passbands, np.nan)
 
-        # FIXME: the following only works when each spectrum element in passband is normalized to the some magnitude/value. Compare with below
         # source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
         # source_photon_s_A = (  # photon/s/A
         #     self.SourceObj.spectrum  # erg/s/cm^2/A
@@ -1224,14 +1314,13 @@ class Photometry:
         #         np.nansum(redleaks[band]) / np.nansum(source_erate[band]),
         #     )
 
-        # FIXME: the following works when total flux in a passband is normalized to some magnitude/value. Compare with above
         for band in source_erate:
             is_in_passband = (
                 self.SourceObj.wavelengths >= self.TelescopeObj.passband_limits[band][0]
             ) & (self.SourceObj.wavelengths <= self.TelescopeObj.passband_limits[band][1])
-            tot_passband_flam_per_px = np.nansum(
-                self.SourceObj.spectrum[is_in_passband]
-            ) / np.sum(np.isfinite(self.source_weights))
+            tot_passband_flam_per_px = (
+                np.nansum(self.SourceObj.spectrum[is_in_passband]) / self._eff_npix
+            )
             # Convert flux to electron/s
             source_erate[band] = convert_electron_flux_mag(
                 tot_passband_flam_per_px * self.source_weights,
@@ -1256,6 +1345,8 @@ class Photometry:
                 results[band] = Photometry._calc_snr_from_t(
                     t=t,
                     signal=source_erate[band],
+                    # npix=np.ceil(self._eff_npix).astype(int),  # only used for read noise
+                    npix=int(np.ceil(self._eff_npix)),  # only used for read noise
                     totskynoise=sky_background_erate[band],
                     readnoise=self.TelescopeObj.read_noise,  # constant per pixel
                     darkcurrent=dark_current,
@@ -1267,6 +1358,8 @@ class Photometry:
                 results[band] = Photometry._calc_t_from_snr(
                     snr=snr,
                     signal=source_erate[band],
+                    # npix=np.ceil(self._eff_npix).astype(int),  # only used for read noise
+                    npix=int(np.ceil(self._eff_npix)),  # only used for read noise
                     totskynoise=sky_background_erate[band],
                     readnoise=self.TelescopeObj.read_noise,  # constant per pixel
                     darkcurrent=dark_current,

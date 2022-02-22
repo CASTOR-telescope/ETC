@@ -98,8 +98,8 @@ def _calc_snr_from_t(
     signal_t = signal * t  # electron
     noise = np.sqrt(
         signal_t
-        + npix
-        * (t * (totskynoise + darkcurrent + redleak) + (readnoise * readnoise * nread))
+        + npix * t * (totskynoise + darkcurrent + redleak)
+        + np.ceil(npix) * (readnoise * readnoise * nread)
     )  # electron
     snr = signal_t / noise
     return snr
@@ -192,7 +192,7 @@ def _calc_t_from_snr(
     #
     numer1 = snr_sq * poisson_noise
     numer2 = snr_sq * snr_sq * poisson_noise * poisson_noise
-    numer3 = 4 * snr_sq * signal_sq * (npix * readnoise * readnoise * nread)
+    numer3 = 4 * snr_sq * signal_sq * (np.ceil(npix) * readnoise * readnoise * nread)
     t = (numer1 + np.sqrt(numer2 + numer3)) / (2 * signal_sq)  # seconds
     return t
 
@@ -405,7 +405,6 @@ def calc_snr_AB(
     source_e_rate = dict.fromkeys(passbands)  # electron/s
     for band in source_e_rate:
         source_e_rate[band] = mag_to_flux(source_AB_mags, zpt=phot_zpts[band].values)[0]
-    print(source_e_rate)
     # #
     # # Calculate red leak
     # #

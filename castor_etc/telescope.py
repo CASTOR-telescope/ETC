@@ -759,7 +759,7 @@ class Telescope:
             )
         if tol <= 0:
             raise ValueError("tol must be > 0")
-        if not isinstance(max_iter, (int, np.int64, np.int32, np.int16, np.int8)):
+        if not isinstance(max_iter, (int, np.integer)):
             raise ValueError("max_iter must be an integer")
         #
         # Find photometric zero points
