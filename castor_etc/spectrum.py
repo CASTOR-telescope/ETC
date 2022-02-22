@@ -128,7 +128,7 @@ class SpectrumMixin:
         redshift=0.0,
         emissivity=1.0,
         wavelengths=None,
-        limits=[0.1, 1.1] << u.um,
+        limits=[0.1, 1.2] << u.um,
         resolution=1 << u.nm,
         radius=1,
         dist=1 << u.kpc,

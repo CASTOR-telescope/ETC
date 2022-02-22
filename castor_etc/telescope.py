@@ -222,6 +222,8 @@ class Telescope:
 
           passband_curves ::
 
+          full_passband_curves ::
+
           phot_zpts ::
 
           fwhm ::
@@ -411,9 +413,17 @@ class Telescope:
         ]  # total wavelength range spanned by the passbands
         self.passband_resolution = passband_resolution
 
+        # TODO: change passband_curves to full_passband_curves (will need to change a lot of other stuff!)
         self.passband_curves = Telescope.load_passbands(
             passband_response_filepaths,
             passband_limits,
+            passband_response_fileunits,
+            resolution=passband_resolution,
+        )
+
+        self.full_passband_curves = Telescope.load_passbands(  # needed for redleak calcs
+            passband_response_filepaths,
+            None,  # load all wavelengths from the file for each passband
             passband_response_fileunits,
             resolution=passband_resolution,
         )
@@ -522,7 +532,11 @@ class Telescope:
 
     @staticmethod
     def load_passbands(
-        filepaths, limits, file_units, resolution=1 << u.nm, interp_kind="linear"
+        filepaths,
+        limits,
+        file_units,
+        resolution=1 << u.nm,
+        interp_kind="linear",
     ):
         """
         Load the passband response curves.
@@ -537,11 +551,14 @@ class Telescope:
             hash (#) will be ignored. Note that the passband response values should
             account for quantum efficiency.
 
-          limits :: dict of 2-element `astropy.Quantity` length arrays
+          limits :: dict of 2-element `astropy.Quantity` length arrays or None
             Dictionary containing key-value pairs of the filter and the wavelength where
             the value is an `astropy.Quantity` array containing the lower and upper
             wavelength limits for that passband (inclusive). For example:
             `{"uv": [150, 300] * u.nm, "u": [300, 400] * u.nm, "g": [400, 550] * u.nm}.`
+            If None, the limits will be the minimum and maximum wavelength in the files
+            (note that the maximum wavelength might be slightly greater/smaller than the
+            actual maximum wavelength in the file because of floating point errors).
 
           file_units :: dict of `astropy.Quantity` lengths
             The units of the wavelength data in the passband response curve files.
@@ -580,18 +597,25 @@ class Telescope:
         # Check inputs
         #
         if (
-            any(band not in limits.keys() for band in filepaths.keys())
-            or any(band not in filepaths.keys() for band in limits.keys())
+            (
+                limits is not None
+                and any(band not in limits.keys() for band in filepaths.keys())
+            )
+            or (
+                limits is not None
+                and any(band not in filepaths.keys() for band in limits.keys())
+            )
             or any(band not in file_units.keys() for band in filepaths.keys())
             or any(band not in filepaths.keys() for band in file_units.keys())
         ):
             raise ValueError(
                 "filepaths, limits, and file_units must have consistent keys"
             )
-        limits = limits.copy()
-        for band in limits:
-            limits[band] = (limits[band]).to(file_units[band]).value
-        #
+        if limits is not None:
+            limits = limits.copy()
+            for band in limits:
+                limits[band] = (limits[band]).to(file_units[band]).value
+            #
         if resolution is not None:
             resolutions = dict.fromkeys(filepaths)
             for band in resolutions:
@@ -613,6 +637,22 @@ class Telescope:
         #
         # Trim passband data to given limits
         #
+        if limits is None:
+            limits = dict.fromkeys(filepaths)
+            if resolutions is not None:
+                for band in limits:
+                    limits[band] = [
+                        curves[band][0].values[0],
+                        curves[band][0].values[-1] - 0.5 * resolutions[band],
+                        # N.B. the subtraction above helps avoid overestimating the max
+                        # wavelength (due to floating point errors), which would result in
+                        # NaNs. This is at the expense of not including the lastmost data
+                        # point. (But again, the lastmost data point might be NaN anyway
+                        # because of floating point errors...)
+                    ]
+            else:
+                for band in limits:
+                    limits[band] = [curves[band][0].values[0], curves[band][0].values[-1]]
         if resolutions is not None:
             # Interpolate passband data to given resolution
             for band in curves:

@@ -649,6 +649,105 @@ class Photometry:
             b_in = b_out * (a_in / a_out)
         raise NotImplementedError("Not yet implemented")
 
+    def _calc_redleaks(self, source_erate, mirror_area_cm_sq, include_redleak=True):
+        """
+        Calculate redleak of a source from its redleak fraction. The redleak fraction is
+        defined to be the ratio of redleak electron/s to in-passband electron/s.
+
+        This is a more robust way to calculate redleaks that is independent of how
+        source_erate is determined.
+        """
+        #
+        # Calculate redleak fraction (redleak electron/s to passband electron/s)
+        #
+        redleak_fracs = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
+        if include_redleak:
+            source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
+            source_photon_s_A = (  # photon/s/A
+                self.SourceObj.spectrum  # erg/s/cm^2/A
+                * mirror_area_cm_sq  # cm^2
+                / calc_photon_energy(wavelength=source_wavelengths_AA)[0]  # photon/erg
+            )
+            source_interp = interp1d(
+                source_wavelengths_AA,
+                source_photon_s_A,
+                kind="linear",
+                bounds_error=False,
+                fill_value=np.nan,
+            )  # photon/s/A
+            for band in redleak_fracs:
+                full_response_curve_wavelengths_AA = (
+                    self.TelescopeObj.full_passband_curves[band]["wavelength"]
+                    .to(u.AA)
+                    .value
+                )
+                is_redleak = (
+                    full_response_curve_wavelengths_AA
+                    > self.TelescopeObj.redleak_thresholds[band].to(u.AA).value
+                )
+                is_in_passband = (
+                    full_response_curve_wavelengths_AA
+                    >= self.TelescopeObj.passband_limits[band][0].to(u.AA).value
+                ) & (
+                    full_response_curve_wavelengths_AA
+                    <= self.TelescopeObj.passband_limits[band][1].to(u.AA).value
+                )
+                redleak_wavelengths = full_response_curve_wavelengths_AA[is_redleak]
+                in_passband_wavelengths = full_response_curve_wavelengths_AA[
+                    is_in_passband
+                ]
+                redleak_per_A = (
+                    source_interp(redleak_wavelengths)
+                    * self.TelescopeObj.full_passband_curves[band]["response"][is_redleak]
+                )  # electron/s/A
+                passband_erate_per_A = (
+                    source_interp(in_passband_wavelengths)
+                    * self.TelescopeObj.full_passband_curves[band]["response"][
+                        is_in_passband
+                    ]
+                )  # electron/s/A
+                isgood_redleak = np.isfinite(redleak_per_A)  # don't include NaNs
+                isgood_passband = np.isfinite(passband_erate_per_A)  # don't include NaNs
+                if not np.all(isgood_redleak) or not np.all(isgood_passband):
+                    warnings.warn(
+                        "Could not estimate redleak fraction "
+                        + f"at 1 or more passband wavelengths in {band}-band",
+                        RuntimeWarning,
+                    )
+                try:
+                    redleak_per_px = simpson(  # electron/s (per px)
+                        y=redleak_per_A[isgood_redleak],
+                        x=redleak_wavelengths[isgood_redleak],
+                        even="avg",
+                    )
+                    passband_erate_per_px = simpson(  # electron/s (per px)
+                        y=passband_erate_per_A[isgood_passband],
+                        x=in_passband_wavelengths[isgood_passband],
+                        even="avg",
+                    )
+                    redleak_frac = redleak_per_px / passband_erate_per_px
+                except Exception:
+                    raise RuntimeError(
+                        f"Unable to calculate redleak fraction for {band}-band! "
+                        + "Please ensure there is at least 1 wavelength that is above "
+                        + "the redleak threshold."
+                    )
+                if np.isfinite(redleak_frac):
+                    redleak_fracs[band] = redleak_frac * self.redleak_weights
+                else:
+                    raise RuntimeError(
+                        "Source redleak fraction could not be calculated "
+                        + f"in {band}-band!"
+                    )
+        #
+        # Calculate redleak from redleak fraction
+        #
+        redleaks = dict.fromkeys(self.TelescopeObj.passbands)
+        for band in redleaks:
+            redleaks[band] = redleak_fracs[band] * source_erate[band]
+        #
+        return redleaks
+
     @staticmethod
     def _calc_snr_from_t(
         t,
@@ -1054,8 +1153,6 @@ class Photometry:
                         bounds_error=False,
                         fill_value=np.nan,
                     )
-                    # REVIEW: don't need geocoronal linewidth? Correct.
-                    # geo_erate = response_interp(gw) * geo_photon_rate * gl  # electron/s
                     geo_erate = response_interp(gw) * geo_photon_rate  # electron/s
                     if not np.isfinite(geo_erate):
                         warnings.warn(
@@ -1070,38 +1167,8 @@ class Photometry:
         #
         # Sky background noise (electron/s) is present in every pixel in aperture
         #
-        print("sky_background_erate per px:", sky_background_erate)
         for band in sky_background_erate:
             sky_background_erate[band] *= self.sky_background_weights
-            print(
-                "tot sky_background_erate:", band, np.nansum(sky_background_erate[band])
-            )
-        #
-        # Calculate redleak
-        #
-        if include_redleak:
-
-            raise NotImplementedError("Redleak not implemented yet! Still debugging...")
-
-            redleaks = dict.fromkeys(self.TelescopeObj.passbands)
-            redleak_thresholds = self.TelescopeObj.redleak_thresholds
-            for band in redleaks:
-                is_redleak = self.SourceObj.wavelengths > redleak_thresholds[band]
-                #
-                # TODO: convolve with passband response instead of using total flux in passband
-                #
-                redleak = np.nansum(self.SourceObj.spectrum[is_redleak])
-                redleaks[band] = convert_electron_flux_mag(
-                    redleak * self.redleak_weights,
-                    "flam",
-                    "electron",
-                    phot_zpt=self.TelescopeObj.phot_zpts[band],
-                    wavelengths=self.TelescopeObj.passband_pivots[band],
-                )[0]
-        else:
-            redleaks = dict.fromkeys(
-                self.TelescopeObj.passbands, 0.0  # * self.redleak_weights # include later
-            )
         #
         # Calculate signal in each passband (flam -> electron/s)
         #
@@ -1123,18 +1190,13 @@ class Photometry:
         #     kind="linear",
         #     bounds_error=False,
         #     fill_value=np.nan,
-        # )
+        # )  # photon/s/A
         # # Convolve with response curve (photon -> electron) & integrate over band
         # for band in source_erate:
         #     source_erate_A = (
         #         source_interp(response_curve_wavelengths_AA[band])
         #         * self.TelescopeObj.passband_curves[band]["response"]
         #     )  # electron/s/A
-        #     # plt.plot(
-        #     #     response_curve_wavelengths_AA[band],
-        #     #     source_interp(response_curve_wavelengths_AA[band]),
-        #     #     label=band,
-        #     # )
         #     isgood_source = np.isfinite(source_erate_A)  # don't integrate over NaNs
         #     if not np.all(isgood_source):
         #         warnings.warn(
@@ -1155,10 +1217,12 @@ class Photometry:
         #             "Signal of source (in electron/s) could not be calculated "
         #             + f"in {band}-band!"
         #         )
-        # # plt.legend()
-        # # plt.xlabel("Wavelength (A)")
-        # # plt.ylabel("photon/s/A")
-        # # plt.show()
+        #     print("(total) source_erate", band, np.nansum(source_erate[band]))
+        #     print(
+        #         "redleak fraction",
+        #         band,
+        #         np.nansum(redleaks[band]) / np.nansum(source_erate[band]),
+        #     )
 
         # FIXME: the following works when total flux in a passband is normalized to some magnitude/value. Compare with above
         for band in source_erate:
@@ -1176,21 +1240,19 @@ class Photometry:
                 phot_zpt=self.TelescopeObj.phot_zpts[band],
                 wavelengths=self.TelescopeObj.passband_pivots[band],
             )[0]
-            print("(total) source_erate", band, np.nansum(source_erate[band]))
-
+        #
+        # Calculate redleak
+        #
+        redleaks = self._calc_redleaks(
+            source_erate, mirror_area_cm_sq, include_redleak=include_redleak
+        )
         #
         # Calculate desired results (either integration time given SNR or SNR given time)
         #
         results = dict.fromkeys(self.TelescopeObj.passbands)
         dark_current = self.TelescopeObj.dark_current * self.dark_current_weights
-        print("redleaks", redleaks)
         if t is not None:
             for band in results:
-                print(
-                    "tot_sky_background_erate",
-                    band,
-                    np.nansum(sky_background_erate[band]),
-                )
                 results[band] = Photometry._calc_snr_from_t(
                     t=t,
                     signal=source_erate[band],
