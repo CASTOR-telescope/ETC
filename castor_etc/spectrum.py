@@ -407,6 +407,36 @@ class SpectrumMixin:
         self._check_existing_spectrum(False)  # Ensure spectrum already exists
         raise NotImplementedError("subtract_gaussian not implemented yet.")
 
+    def show_spectrum(self, plot=True):
+        """
+        Plot the spectrum (which should be in units of flam).
+
+        Parameters
+        ----------
+          plot :: bool
+            If True, plot the source weights and return None. If False, return the figure
+            and axis instance associated with the plot.
+
+        Returns
+        -------
+          None (if plot is True)
+
+          fig, ax (if plot is False) :: `matplotlib.figure.Figure`, `matplotlib.axes.Axes`
+            The figure and axis instance associated with the plot.
+        """
+        if self.spectrum is None or self.wavelengths is None:
+            raise ValueError("Please generate a spectrum before plotting.")
+        fig, ax = plt.subplots()
+        ax.plot(self.wavelengths.to(u.AA).value, self.spectrum, "k")
+        ax.fill_between(self.wavelengths.to(u.AA).value, self.spectrum, alpha=0.5)
+        ax.set_xlabel("Wavelength [\AA]")
+        ax.set_ylabel(r"Flux Density [$\rm erg\, s^{-1}\, cm^{-2}\,$\AA$^{-1}$]")
+        ax.set_ylim(bottom=0)
+        if plot:
+            plt.show()
+        else:
+            return fig, ax
+
 
 class NormMixin:
     """
@@ -666,34 +696,6 @@ class NormMixin:
         tot_luminosity = simpson(y=erg_s_A, x=self.wavelengths.value, even="avg")  # erg/s
         norm_factor = luminosity / tot_luminosity  # dimensionless
         self.spectrum *= norm_factor  # erg/s/cm^2/A
-
-    def show_spectrum(self, plot=True):
-        """
-        Plot the spectrum (which should be in units of flam).
-
-        Parameters
-        ----------
-          plot :: bool
-            If True, plot the source weights and return None. If False, return the figure
-            and axis instance associated with the plot.
-
-        Returns
-        -------
-          None (if plot is True)
-
-          fig, ax (if plot is False) :: `matplotlib.figure.Figure`, `matplotlib.axes.Axes`
-            The figure and axis instance associated with the plot.
-        """
-        fig, ax = plt.subplots()
-        ax.plot(self.wavelengths.to(u.AA).value, self.spectrum, "k")
-        ax.fill_between(self.source.wavelengths.to(u.AA).value, self.spectrum, alpha=0.5)
-        ax.set_xlabel("Wavelength [\AA]")
-        ax.set_ylabel(r"Flux Density [$\rm erg\, s^{-1}\, cm^{-2}\,$\AA$^{-1}$]")
-        ax.set_ylim(bottom=0)
-        if plot:
-            plt.show()
-        else:
-            return fig, ax
 
 
 # ------------------------------------ OLD FUNCTIONS ----------------------------------- #

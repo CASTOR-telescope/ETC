@@ -306,7 +306,9 @@ class Photometry:
             cbar.set_label("Relative Weight to Center of Source")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
-            ax.set_title("Effective No." + "\u00A0" + f"of Pixels: {self._eff_npix:.2f}")
+            ax.set_title(
+                "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
+            )
             if plot:
                 plt.show()
             else:
