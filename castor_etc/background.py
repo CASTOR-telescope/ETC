@@ -21,11 +21,6 @@ from .data.background.background_values import (
 from .filepaths import DATAPATH
 from .telescope import Telescope
 
-# TODO: allow user to input magnitude or spectrum for background. Magnitude will use phot_zpt, spectrum will use passband response.
-
-if __name__ == "__main__":
-    print(DATAPATH)
-
 
 class Background:
     """
