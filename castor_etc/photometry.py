@@ -1058,7 +1058,7 @@ class Photometry:
         t = (numer1 + np.sqrt(numer2 + numer3)) / (2 * signal_sq)  # seconds
         return t
 
-    def calc_snr_or_t(self, t=None, snr=None, nread=1, include_redleak=True):
+    def calc_snr_or_t(self, t=None, snr=None, npix=None, nread=1, include_redleak=True):
         """
         Calculate the signal-to-noise ratio (SNR) reached in a given time or the
         integration time (t) required to reach a given SNR.
@@ -1073,6 +1073,16 @@ class Photometry:
 
           snr :: float
             Desired signal-to-noise ratio.
+
+          npix :: int or float or None
+            The number of pixels occupied by the source to use for the noise calculations
+            (e.g., sky background, dark current). If None, use the automatically
+            calculated "effective pixel" count. Note that the number of pixels used for
+            the read noise will always be npix rounded up to the nearest integer. Finally,
+            this value does not affect the total signal of the source---only the
+            non-signal-derived noise values are affected (e.g., higher npix means higher
+            total sky background, dark current, and read noise but not higher signal nor
+            redleak).
 
           nread :: int
             Number of detector readouts.
@@ -1089,6 +1099,8 @@ class Photometry:
         """
         if (t is None and snr is None) or (t is not None and snr is not None):
             raise ValueError("Exactly one of t or snr must be specified")
+        if npix is not None and not isinstance(npix, Number):
+            raise TypeError("npix must be an int or float or None")
         #
         # Make some useful variables
         #
@@ -1098,6 +1110,11 @@ class Photometry:
             response_curve_wavelengths_AA[band] = (
                 self.TelescopeObj.passband_curves[band]["wavelength"].to(u.AA).value
             )
+        if npix is None:
+            aper_weight_scale = 1.0  # don't scale aperture weights
+            npix = self._eff_npix
+        else:
+            aper_weight_scale = npix / self._eff_npix  # scale aperture weights
         #
         # Calculate sky background electron/s
         # (incl. Earthshine & zodiacal light, excl. geocoronal emission lines)
@@ -1140,13 +1157,15 @@ class Photometry:
                             + f"at 1 or more passband wavelengths in {band}-band",
                             RuntimeWarning,
                         )
-                    es_erate = simpson(
-                        y=es_erate_A,
-                        x=response_curve_wavelengths_AA[band][isgood_es],
-                        even="avg",
-                    ) / np.sum(
-                        isgood_es
-                    )  # ? I have to do this... Why ?
+                    # Average Earthshine through passband (electron/s)
+                    es_erate = (
+                        simpson(
+                            y=es_erate_A,
+                            x=response_curve_wavelengths_AA[band][isgood_es],
+                            even="avg",
+                        )
+                        / np.sum(isgood_es)
+                    )
                     if np.isfinite(es_erate):
                         sky_background_erate[band] += es_erate
                     else:
@@ -1183,13 +1202,15 @@ class Photometry:
                             + f"at 1 or more passband wavelengths in {band}-band",
                             RuntimeWarning,
                         )
-                    zodi_erate = simpson(
-                        y=zodi_erate_A[isgood_zodi],
-                        x=response_curve_wavelengths_AA[band][isgood_zodi],
-                        even="avg",
-                    ) / np.sum(
-                        isgood_zodi
-                    )  # ? I have to do this... Why ?
+                    # Average zodiacal light through passband (electron/s)
+                    zodi_erate = (
+                        simpson(
+                            y=zodi_erate_A[isgood_zodi],
+                            x=response_curve_wavelengths_AA[band][isgood_zodi],
+                            even="avg",
+                        )
+                        / np.sum(isgood_zodi)
+                    )
                     if np.isfinite(zodi_erate):
                         sky_background_erate[band] += zodi_erate
                     else:
@@ -1261,7 +1282,7 @@ class Photometry:
         # Sky background noise (electron/s) is present in every pixel in aperture
         #
         for band in sky_background_erate:
-            sky_background_erate[band] *= self.sky_background_weights
+            sky_background_erate[band] *= self.sky_background_weights * aper_weight_scale
         #
         # Calculate signal in each passband (flam -> electron/s)
         #
@@ -1269,54 +1290,8 @@ class Photometry:
             raise ValueError("Please choose an aperture first.")
         #
         source_erate = dict.fromkeys(self.TelescopeObj.passbands, np.nan)
-
-        # source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
-        # source_photon_s_A = (  # photon/s/A
-        #     self.SourceObj.spectrum  # erg/s/cm^2/A
-        #     * mirror_area_cm_sq  # cm^2
-        #     / calc_photon_energy(wavelength=source_wavelengths_AA)[0]  # photon/erg
-        # )
-        # source_interp = interp1d(
-        #     source_wavelengths_AA,
-        #     source_photon_s_A,
-        #     kind="linear",
-        #     bounds_error=False,
-        #     fill_value=np.nan,
-        # )  # photon/s/A
-        # # Convolve with response curve (photon -> electron) & integrate over band
-        # for band in source_erate:
-        #     source_erate_A = (
-        #         source_interp(response_curve_wavelengths_AA[band])
-        #         * self.TelescopeObj.passband_curves[band]["response"]
-        #     )  # electron/s/A
-        #     isgood_source = np.isfinite(source_erate_A)  # don't integrate over NaNs
-        #     if not np.all(isgood_source):
-        #         warnings.warn(
-        #             "Could not estimate source signal (electron/s/A) "
-        #             + f"at 1 or more passband wavelengths in {band}-band",
-        #             RuntimeWarning,
-        #         )
-        #     source_erate_per_px = simpson(
-        #         y=source_erate_A[isgood_source],
-        #         x=response_curve_wavelengths_AA[band][isgood_source],
-        #         even="avg",
-        #     )
-        #     print("source_erate_per_px:", band, source_erate_per_px)
-        #     if np.isfinite(source_erate_per_px):
-        #         source_erate[band] = source_erate_per_px * self.source_weights
-        #     else:
-        #         raise RuntimeError(
-        #             "Signal of source (in electron/s) could not be calculated "
-        #             + f"in {band}-band!"
-        #         )
-        #     print("(total) source_erate", band, np.nansum(source_erate[band]))
-        #     print(
-        #         "redleak fraction",
-        #         band,
-        #         np.nansum(redleaks[band]) / np.nansum(source_erate[band]),
-        #     )
-
         for band in source_erate:
+            # aper_weight_scale and npix cancel out here. Just use old _eff_npix
             is_in_passband = (
                 self.SourceObj.wavelengths >= self.TelescopeObj.passband_limits[band][0]
             ) & (self.SourceObj.wavelengths <= self.TelescopeObj.passband_limits[band][1])
@@ -1341,14 +1316,15 @@ class Photometry:
         # Calculate desired results (either integration time given SNR or SNR given time)
         #
         results = dict.fromkeys(self.TelescopeObj.passbands)
-        dark_current = self.TelescopeObj.dark_current * self.dark_current_weights
+        dark_current = (
+            self.TelescopeObj.dark_current * self.dark_current_weights * aper_weight_scale
+        )
         if t is not None:
             for band in results:
                 results[band] = Photometry._calc_snr_from_t(
                     t=t,
                     signal=source_erate[band],
-                    # npix=np.ceil(self._eff_npix).astype(int),  # only used for read noise
-                    npix=int(np.ceil(self._eff_npix)),  # only used for read noise
+                    npix=int(np.ceil(npix)),  # only used for read noise
                     totskynoise=sky_background_erate[band],
                     readnoise=self.TelescopeObj.read_noise,  # constant per pixel
                     darkcurrent=dark_current,
@@ -1360,8 +1336,7 @@ class Photometry:
                 results[band] = Photometry._calc_t_from_snr(
                     snr=snr,
                     signal=source_erate[band],
-                    # npix=np.ceil(self._eff_npix).astype(int),  # only used for read noise
-                    npix=int(np.ceil(self._eff_npix)),  # only used for read noise
+                    npix=int(np.ceil(npix)),  # only used for read noise
                     totskynoise=sky_background_erate[band],
                     readnoise=self.TelescopeObj.read_noise,  # constant per pixel
                     darkcurrent=dark_current,
