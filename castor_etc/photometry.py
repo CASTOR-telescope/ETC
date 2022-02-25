@@ -555,7 +555,8 @@ class Photometry:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
-                + "Contact the developer with a minimal working example please. Thanks!"
+                + "Contact the developer with a minimal working example please. Thanks!",
+                RuntimeWarning
             )
 
     def use_elliptical_aperture(self, a, b, center=[0, 0] << u.arcsec, rotation=0):
@@ -655,7 +656,8 @@ class Photometry:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
-                + "Contact the developer with a minimal working example please. Thanks!"
+                + "Contact the developer with a minimal working example please. Thanks!",
+                RuntimeWarning
             )
 
         if isinstance(self.SourceObj, PointSource):
@@ -664,7 +666,7 @@ class Photometry:
                 warnings.warn(
                     "Chosen a/b is smaller than the 'ideal' aperture size "
                     + f"for this source! a & b should be at least {aper_threshold}.",
-                    RuntimeWarning,
+                    UserWarning,
                 )
 
     def use_rectangular_aperture(
@@ -770,7 +772,8 @@ class Photometry:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
-                + "Contact the developer with a minimal working example please. Thanks!"
+                + "Contact the developer with a minimal working example please. Thanks!",
+                RuntimeWarning
             )
 
         if isinstance(self.SourceObj, PointSource):
@@ -780,7 +783,7 @@ class Photometry:
                     "Chosen length/width is smaller than the 'ideal' aperture "
                     + "size for this source! "
                     + f"Length/width should be at least {aper_threshold}.",
-                    RuntimeWarning,
+                    UserWarning,
                 )
 
     def use_annular_aperture(self, a_out, b_out, a_in=0, b_in=None):
