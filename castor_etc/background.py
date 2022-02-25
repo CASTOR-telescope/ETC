@@ -119,7 +119,6 @@ class Background:
         self.geo_flux = []
         self.geo_wavelength = []
         self.geo_linewidth = []
-        self.geo_shape = []
 
     def copy(self):
         """
@@ -141,18 +140,15 @@ class Background:
         flux="avg",
         wavelength=GEOCORONAL_WAVELENGTH,
         linewidth=GEOCORONAL_LINEWIDTH,
-        shape="boxcar",
     ):
         """
-        Add a geocoronal emission line of a specified shape and value.
-
-        TODO: add "lorentzian" and "gaussian" emission line shape. Doubt it would make much of a diff...
+        Add a geocoronal emission line.
 
         Parameters
         ----------
-          flux :: float or "high" or "medium" or "low"
+          flux :: float or "high" or "avg" or "low"
             The flux of the geocoronal emission line in erg/cm^2/s/arcsec^2. If "high",
-            "medium", or "low", use the pre-defined geocoronal emission line values
+            "avg", or "low", use the pre-defined geocoronal emission line values
             (3.0e-15, 1.5e-15, and 7.5e-17 erg/cm^2/s/arcsec^2, respectively).
 
           wavelength :: int or float or `astropy.Quantity` length
@@ -162,11 +158,6 @@ class Background:
           linewidth :: int or float or `astropy.Quantity` length
             The linewidth of the geocoronal emission line. If an int or float, it is
             assumed to be in angstrom.
-
-          shape :: "boxcar", "gaussian", or "lorentzian"
-            The shape of the geocoronal emission line. If "boxcar", the flux is uniform
-            over the given linewidth and centred on the given wavelength. If "gaussian",
-            TODO: explain "gaussian" (and "lorentzian")
 
         Attributes
         ----------
@@ -178,11 +169,6 @@ class Background:
 
           geo_linewidth :: list of floats
             The linewidths of the geocoronal emission lines in angstrom.
-
-          geo_shape :: list of str
-            The shapes of the geocoronal emission lines. Valid elements are "boxcar",
-            "gaussian", and "lorentzian".
-            * (LORENTZIAN AND GAUSSIAN NOT IMPLEMENTED YET)
 
         Returns
         -------
@@ -208,38 +194,24 @@ class Background:
                 linewidth = linewidth.to(u.AA).value
             except Exception:
                 raise TypeError("geo_linewidth must be an `astropy.Quantity` length.")
-        if shape not in ["boxcar", "gaussian", "lorentzian"]:
-            raise ValueError(
-                "geo_shape must be one of 'boxcar', 'gaussian', or 'lorentzian'."
-            )
-        if shape == "lorentzian" or shape == "gaussian":
-            raise NotImplementedError("'lorentzian' and 'gaussian' not implemented yet.")
         self.geo_flux.append(flux)
         self.geo_wavelength.append(wavelength)
         self.geo_linewidth.append(linewidth)
-        self.geo_shape.append(shape)
 
     @staticmethod
-    def _calc_sky_background_mags(
+    def _calc_background_mags_per_sq_arcsec(
         earthshine_wavelengths,
         earthshine_flam,
         zodi_wavelengths,
         zodi_flam,
-        geo_wavelength,
-        geo_flux,
-        geo_linewidth,
         passband_limits,
         passband_pivots,
-        px_area,
     ):
         """
-        ! DEPRECATED !
+        Internal method to calculate sky background magnitudes per square arcsecond.
+        Please use the regular calc_background_mags_per_sq_arcsec() function instead.
 
         If any of the background parameters are None, skip from calculation.
-
-        TODO: finish docstring
-
-        TODO: implement geo_shape
         """
 
         def _sum_flam(wavelengths, flam):
@@ -259,30 +231,11 @@ class Background:
             band: limits.to(u.AA).value for band, limits in passband_limits.items()
         }
         avg_sky_flam = dict.fromkeys(passband_limits, 0.0)  # average flam through band
-        px_area = px_area.to(u.arcsec ** 2).value
 
         if earthshine_wavelengths is not None and earthshine_flam is not None:
             _sum_flam(earthshine_wavelengths, earthshine_flam)
         if zodi_wavelengths is not None and zodi_flam is not None:
             _sum_flam(zodi_wavelengths, zodi_flam)
-        if geo_wavelength and geo_flux and geo_linewidth:  # non-empty lists
-            for gw, gf, gl in zip(geo_wavelength, geo_flux, geo_linewidth):
-                for band in avg_sky_flam:
-                    if (gw >= passband_limits_AA[band][0]) and (
-                        gw <= passband_limits_AA[band][1]
-                    ):
-                        print(band)
-                        passband_range = (
-                            passband_limits_AA[band][1] - passband_limits_AA[band][0]
-                        )
-                        passband_frac = gl / passband_range
-                        # geo_flam = gf * px_area / gl  # erg/s/cm^2/A
-                        # geo_flam *= passband_frac
-                        # (The two lines above can be simplified to the one line below)
-                        geo_flam = gf * px_area * passband_frac  # erg/s/cm^2/A
-                        avg_sky_flam[band] += geo_flam
-                        break  # don't need to check other bands for this emission line
-
         avg_sky_mags = dict.fromkeys(passband_limits, np.nan)
         for band in avg_sky_flam:
             # (No need to return uncertainty)
@@ -292,24 +245,24 @@ class Background:
 
         return avg_sky_mags
 
-    def calc_sky_background_mags(self, TelescopeObj):
+    def calc_background_mags_per_sq_arcsec(self, TelescopeObj):
         """
-        ! DEPRECATED !
-
-        Calculates the sky background AB magnitudes (not including geocoronal emission
-        lines??) through the telescope's passbands. This is useful if reusing the same sky
-        background object for multiple Photometry/Spectroscopy instances with the same
-        `Telescope` object.
+        Calculates the sky background AB magnitudes per square arcsecond (not including
+        geocoronal emission lines) through the telescope's passbands. This is useful if
+        reusing the same sky background object for multiple Photometry/Spectroscopy
+        instances with the same `Telescope` object.
 
         Parameters
         ----------
           TelescopeObj :: `Telescope` object
-            The `castor_etc.Telescope` object to use for the sky background calculations.
+            The `castor_etc.Telescope` object to use for the sky background calculations
+            (needed for passband limits and pivots).
 
         Attributes
         ----------
-          sky_background_mags :: dict of floats
-            The total sky background AB magnitudes in the telescope's passbands.
+          mags_per_sq_arcsec :: dict of floats
+            The total sky background AB magnitudes per square arcsecond in the telescope's
+            passbands.
 
         Returns
         -------
@@ -317,15 +270,11 @@ class Background:
         """
         if not isinstance(TelescopeObj, Telescope):
             raise TypeError("TelescopeObj must be a `castor_etc.Telescope` object.")
-        self.mags_per_sq_arcsec = Background._calc_sky_background_mags(
+        self.mags_per_sq_arcsec = Background._calc_background_mags_per_sq_arcsec(
             self.earthshine_wavelengths,
             self.earthshine_flam,
             self.zodi_wavelengths,
             self.zodi_flam,
-            self.geo_wavelength,
-            self.geo_flux,
-            self.geo_linewidth,
             TelescopeObj.passband_limits,
             TelescopeObj.passband_pivots,
-            TelescopeObj.px_area,
         )

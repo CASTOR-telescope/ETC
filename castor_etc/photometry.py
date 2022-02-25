@@ -1157,14 +1157,14 @@ class Photometry:
                             + f"at 1 or more passband wavelengths in {band}-band",
                             RuntimeWarning,
                         )
-                    # Average Earthshine through passband (electron/s)
+                    # Total Earthshine over 1 pixel area (electron/s)
                     es_erate = (
                         simpson(
                             y=es_erate_A,
                             x=response_curve_wavelengths_AA[band][isgood_es],
                             even="avg",
                         )
-                        / np.sum(isgood_es)
+                        * px_area_arcsec_sq
                     )
                     if np.isfinite(es_erate):
                         sky_background_erate[band] += es_erate
@@ -1202,14 +1202,14 @@ class Photometry:
                             + f"at 1 or more passband wavelengths in {band}-band",
                             RuntimeWarning,
                         )
-                    # Average zodiacal light through passband (electron/s)
+                    # Total zodiacal light over 1 pixel area (electron/s)
                     zodi_erate = (
                         simpson(
                             y=zodi_erate_A[isgood_zodi],
                             x=response_curve_wavelengths_AA[band][isgood_zodi],
                             even="avg",
                         )
-                        / np.sum(isgood_zodi)
+                        * px_area_arcsec_sq
                     )
                     if np.isfinite(zodi_erate):
                         sky_background_erate[band] += zodi_erate
@@ -1255,7 +1255,7 @@ class Photometry:
                     # (Doing this in the if statement since each geocoronal emission line
                     # is likely only in 1 band. Reduces unnecessary computation)
                     geo_photon_rate = (
-                        gf
+                        gf  # erg/cm^2/s/arcsec^2
                         * px_area_arcsec_sq
                         * mirror_area_cm_sq
                         / calc_photon_energy(wavelength=gw)[0]
