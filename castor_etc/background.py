@@ -9,6 +9,7 @@ from os.path import join
 import astropy.units as u
 import numpy as np
 from astropy.io import fits
+from scipy.integrate import simpson
 
 from .conversions import convert_electron_flux_mag
 from .data.background.background_values import (
@@ -198,54 +199,7 @@ class Background:
         self.geo_wavelength.append(wavelength)
         self.geo_linewidth.append(linewidth)
 
-    @staticmethod
-    def _calc_background_mags_per_sq_arcsec(
-        earthshine_wavelengths,
-        earthshine_flam,
-        zodi_wavelengths,
-        zodi_flam,
-        passband_limits,
-        passband_pivots,
-    ):
-        """
-        Internal method to calculate sky background magnitudes per square arcsecond.
-        Please use the regular calc_background_mags_per_sq_arcsec() function instead.
-
-        If any of the background parameters are None, skip from calculation.
-        """
-
-        def _sum_flam(wavelengths, flam):
-            for band in avg_sky_flam:
-                in_passband = (wavelengths >= passband_limits_AA[band][0]) & (
-                    wavelengths <= passband_limits_AA[band][1]
-                )
-                passband_range = passband_limits_AA[band][1] - passband_limits_AA[band][0]
-                passband_frac = (  # to weight the relative contribution of component
-                    wavelengths[in_passband][-1] - wavelengths[in_passband][0]
-                ) / passband_range
-                avg_sky_flam[band] += (
-                    np.nanmean(flam[in_passband]) * passband_frac
-                )  # erg/cm^2/s/A
-
-        passband_limits_AA = {
-            band: limits.to(u.AA).value for band, limits in passband_limits.items()
-        }
-        avg_sky_flam = dict.fromkeys(passband_limits, 0.0)  # average flam through band
-
-        if earthshine_wavelengths is not None and earthshine_flam is not None:
-            _sum_flam(earthshine_wavelengths, earthshine_flam)
-        if zodi_wavelengths is not None and zodi_flam is not None:
-            _sum_flam(zodi_wavelengths, zodi_flam)
-        avg_sky_mags = dict.fromkeys(passband_limits, np.nan)
-        for band in avg_sky_flam:
-            # (No need to return uncertainty)
-            avg_sky_mags[band] = convert_electron_flux_mag(
-                avg_sky_flam[band], "flam", "mag", wavelengths=passband_pivots[band]
-            )[0]
-
-        return avg_sky_mags
-
-    def calc_background_mags_per_sq_arcsec(self, TelescopeObj):
+    def calc_mags_per_sq_arcsec(self, TelescopeObj):
         """
         Calculates the sky background AB magnitudes per square arcsecond (not including
         geocoronal emission lines) through the telescope's passbands. This is useful if
@@ -270,11 +224,39 @@ class Background:
         """
         if not isinstance(TelescopeObj, Telescope):
             raise TypeError("TelescopeObj must be a `castor_etc.Telescope` object.")
-        self.mags_per_sq_arcsec = Background._calc_background_mags_per_sq_arcsec(
-            self.earthshine_wavelengths,
-            self.earthshine_flam,
-            self.zodi_wavelengths,
-            self.zodi_flam,
-            TelescopeObj.passband_limits,
-            TelescopeObj.passband_pivots,
-        )
+
+        def _sum_flam(wavelengths, flam):
+            for band in avg_sky_flam:
+                in_passband = (wavelengths >= passband_limits_AA[band][0]) & (
+                    wavelengths <= passband_limits_AA[band][1]
+                )
+                passband_range = passband_limits_AA[band][1] - passband_limits_AA[band][0]
+                # Mean value of the flux density in the passband
+                avg_sky_flam[band] += (
+                    simpson(y=flam[in_passband], x=wavelengths[in_passband], even="avg")
+                    / passband_range
+                )  # erg/cm^2/s/A
+
+        passband_limits_AA = {
+            band: limits.to(u.AA).value
+            for band, limits in TelescopeObj.passband_limits.items()
+        }
+        avg_sky_flam = dict.fromkeys(
+            TelescopeObj.passband_limits, 0.0
+        )  # average flam through band
+
+        if self.earthshine_wavelengths is not None and self.earthshine_flam is not None:
+            _sum_flam(self.earthshine_wavelengths, self.earthshine_flam)
+        if self.zodi_wavelengths is not None and self.zodi_flam is not None:
+            _sum_flam(self.zodi_wavelengths, self.zodi_flam)
+        avg_sky_mags = dict.fromkeys(TelescopeObj.passband_limits, np.nan)
+        for band in avg_sky_flam:
+            # (No need to return uncertainty)
+            avg_sky_mags[band] = convert_electron_flux_mag(
+                avg_sky_flam[band],
+                "flam",
+                "mag",
+                wavelengths=TelescopeObj.passband_pivots[band],
+            )[0]
+
+        self.mags_per_sq_arcsec = avg_sky_mags
