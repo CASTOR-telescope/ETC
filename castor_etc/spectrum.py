@@ -6,6 +6,7 @@ Generate and handle spectral data and normalizations. Includes:
   - normalizations (LIST THEM)
 """
 
+import warnings
 from numbers import Number
 from os.path import join
 
@@ -14,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.integrate import simpson
+from scipy.interpolate import interp1d
 
 from . import constants as const
 from . import parameters as params
@@ -21,7 +23,6 @@ from .conversions import calc_photon_energy, convert_electron_flux_mag
 from .filepaths import DATAPATH
 from .telescope import Telescope
 
-# TODO: emission lines (see Gaussian functions below)
 # TODO: Pickles spectra
 
 
@@ -323,15 +324,26 @@ class SpectrumMixin:
         self.spectrum = spectrum
 
     @staticmethod
-    def _generate_gaussian(wavelengths, center, fwhm, peak=None, tot_flux=None):
+    def _generate_gaussian(
+        wavelengths,
+        spectrum,
+        center,
+        fwhm,
+        peak=None,
+        tot_flux=None,
+        add=True,
+        abs_peak=True,
+    ):
         """
-        Generate a spectrum in the shape of a Gaussian. This is useful for representing
-        emission lines (i.e., by adding a Gaussian source) or absorption lines (i.e., by
-        subtracting a Gaussian source).
+        Add/subtract a Gaussian spectrum to/from an existing spectrum. This is useful for
+        representing emission lines (i.e., by adding a Gaussian source) or absorption
+        lines (i.e., by subtracting a Gaussian source). Note that the minimum/maximum
+        wavelengths of the source spectrum will not change.
 
-        The spectrum can be represented by the following formulae:
+        The Gaussian spectrum can be represented by the following formulae (from
+        <https://pysynphot.readthedocs.io/en/latest/spectrum.html#gaussian-emission>):
         ```math
-                    spectrum = peak / exp[(wavelengths - center)^2 / (2 * sigma^2)]
+                    gaussian = peak / exp[(wavelengths - center)^2 / (2 * sigma^2)]
         ```
         and
         ```math
@@ -339,10 +351,10 @@ class SpectrumMixin:
         ```
         and
         ```math
-                    peak = tot_flux / sqrt(2 * pi * sigma^2)
+                    peak = tot_flux / sqrt(2 * pi * sigma^2) <-- see Gaussian integral
         ```
         where:
-          - spectrum is the spectrum's flux in some arbitrary unit
+          - gaussian is the Gaussian spectrum's flux in some arbitrary unit
           - peak is the flux at the center of the Gaussian (i.e., the central wavelength)
           - center is the central wavelength of the Gaussian
           - wavelengths is the array of wavelengths over which to calculate the spectrum
@@ -352,79 +364,359 @@ class SpectrumMixin:
         Parameters
         ----------
           wavelengths :: array of floats or `astropy.Quantity` array
-            The wavelengths over which to calculate the Gaussian spectrum. If an
-            `astropy.Quantity` array, it must have the same units as the center parameter.
+            The wavelengths over which to calculate the Gaussian spectrum.
+
+          spectrum :: array of floats
+            The spectrum to/from which to add/subtract the Gaussian spectrum.
 
           center :: scalar or `astropy.Quantity`
             The central wavelength of the Gaussian.
 
           fwhm :: scalar or `astropy.Quantity`
-            The full-width at half-maximum of the Gaussian. If an `astropy.Quantity`
-            object, it must have the same units as the wavelengths array.
+            The full-width at half-maximum of the Gaussian.
 
-          peak :: scalar or `astropy.Quantity`
+          peak :: int or float
             The peak flux of the Gaussian (i.e., the flux at the center wavelength). This
             determines the unit of the returned spectrum. Exactly one of peak or tot_flux
             must be specified.
 
-          tot_flux :: scalar or `astropy.Quantity`
+          tot_flux :: int or float
             The total flux under the curve. This implicitly determines the unit of the
             returned spectrum. Exactly one of peak or tot_flux must be specified.
 
+          add :: bool
+            If True, add the Gaussian spectrum to the existing spectrum. If False,
+            subtract the Gaussian from the existing spectrum.
+
+          abs_peak :: bool
+            If True, scale spectrum so that the peak of the emission or dip of the
+            absorption line is at the given value. Otherwise, just naively add/subtract
+            the given Gaussian peak.
+
         Returns
         -------
-          spectrum :: array of floats or `astropy.Quantity` array
-            The flux of the source in the shape of a Gaussian curve.
+          sorted_wavelengths :: array of floats or `astropy.Quantity` array
+            The wavelengths of the new spectrum. The shape of this array will be different
+            from the input `wavelengths` array.
+
+          sorted_spectrum :: array of floats
+            The spectrum with the Gaussian added/subtracted. The shape of this array will
+            be different from the input `spectrum` array.
         """
 
-        raise NotImplementedError(
-            "Gaussian emission/absorption lines not yet implemented."
-        )
+        def _gaussian(_peak, _wavelengths, _center, _sigma):
+            _num_sigma = (_wavelengths - _center) / _sigma
+            return _peak / np.exp(0.5 * _num_sigma * _num_sigma)
 
+        #
+        # Check inputs
+        #
         if np.size(center) != 1:
             raise ValueError("center must be a single scalar or `astropy.Quantity`.")
-        if isinstance(wavelengths, u.Quantity) and isinstance(center, u.Quantity):
-            if wavelengths.unit != center.unit:
-                raise ValueError("wavelengths and center must have the same units.")
         if np.size(fwhm) != 1:
             raise ValueError("fwhm must be a single scalar or `astropy.Quantity`.")
-        if isinstance(fwhm, u.Quantity):
-            if isinstance(center, u.Quantity) and center.unit != fwhm.unit:
-                raise ValueError("center and fwhm must have the same units.")
-            if isinstance(wavelengths, u.Quantity) and wavelengths.unit != fwhm.unit:
-                raise ValueError("wavelengths and fwhm must have the same units.")
         if (peak is None and tot_flux is None) or (
             peak is not None and tot_flux is not None
         ):
             raise ValueError("Exactly one of peak or tot_flux must be specified.")
-        if peak is not None and np.size(peak) != 1:
-            raise ValueError("peak must be a single scalar or `astropy.Quantity`.")
-        elif np.size(tot_flux) != 1:
-            raise ValueError("tot_flux must be a single scalar or `astropy.Quantity`.")
+        if peak is not None and (
+            np.size(peak) != 1 or not isinstance(peak, Number) or peak <= 0
+        ):
+            raise ValueError("peak must be a single int or float >= 0.")
+        elif tot_flux is not None and (
+            np.size(tot_flux) != 1 or not isinstance(tot_flux, Number) or tot_flux <= 0
+        ):
+            raise ValueError("tot_flux must be a single int or float >= 0.")
+        # Convert lengths to angstrom
+        if isinstance(wavelengths, u.Quantity):
+            wavelengths_unit = wavelengths.unit
+            wavelengths = wavelengths.to(u.AA).value
+        else:
+            wavelengths_unit = None
+        if isinstance(center, u.Quantity):
+            center = center.to(u.AA).value
+        if isinstance(fwhm, u.Quantity):
+            fwhm = fwhm.to(u.AA).value
+        if fwhm <= 0:
+            raise ValueError("fwhm must be >= 0.")
         #
         # Gaussian spectrum
         #
         sigma = fwhm / (2 * np.sqrt(2 * np.log(2)))
         if peak is None:
             peak = tot_flux / (np.sqrt(2 * np.pi) * sigma)
-        spectrum = peak / np.exp((wavelengths - center) ** 2 / (2 * sigma ** 2))
-        return spectrum
+        spectrum_interp = interp1d(
+            wavelengths, spectrum, kind="linear", bounds_error=False, fill_value=np.nan
+        )
+        if add:
+            if abs_peak:
+                # Ensure final peak is actually at desired value
+                peak -= spectrum_interp(center)
+                if peak < 0:
+                    raise ValueError("peak of emission line below continuum.")
+        else:
+            if abs_peak:
+                # Ensure final dip is actually at desired value
+                center_val = spectrum_interp(center)
+                if peak > center_val:
+                    raise ValueError("dip of absorption line above continuum.")
+                peak = center_val - peak
+        # Ensure Gaussian is well sampled by evaluating at the wavelengths within +/- 5
+        # sigma of the center. This also prevents overflow errors caused by calculations
+        # at wavelengths too far from the center.
+        gauss_wavelengths = center + np.arange(-5, 5.05, 0.1) * sigma
+        sorted_wavelengths = np.unique(np.concatenate((wavelengths, gauss_wavelengths)))
+        sorted_wavelengths = sorted_wavelengths[
+            (sorted_wavelengths > 0) & (sorted_wavelengths <= wavelengths[-1])
+        ]
+        sorted_spectrum = spectrum_interp(sorted_wavelengths)
+        in_range = (sorted_wavelengths >= gauss_wavelengths[0]) & (
+            sorted_wavelengths <= gauss_wavelengths[-1]
+        )
+        if add:
+            sorted_spectrum[in_range] += _gaussian(
+                peak, sorted_wavelengths[in_range], center, sigma
+            )
+        else:
+            sorted_spectrum[in_range] -= _gaussian(
+                peak, sorted_wavelengths[in_range], center, sigma
+            )
+        is_good = np.isfinite(sorted_wavelengths) & np.isfinite(sorted_spectrum)
+        sorted_wavelengths = sorted_wavelengths[is_good]
+        sorted_spectrum = sorted_spectrum[is_good]
+        is_negative_spectrum = sorted_spectrum < 0
+        if np.any(is_negative_spectrum):
+            sorted_spectrum[is_negative_spectrum] = 0.0
+            warnings.warn("Setting negative flux in spectrum to zero.", RuntimeWarning)
+        if wavelengths_unit is not None:
+            sorted_wavelengths <<= wavelengths_unit  # convert to `astropy.Quantity` array
+        return sorted_wavelengths, sorted_spectrum
 
-    def add_gaussian(self, center, fwhm, peak=None, tot_flux=None):
-        # TODO: Implement add_gaussian
+    @staticmethod
+    def _generate_lorentzian(
+        wavelengths,
+        spectrum,
+        center,
+        fwhm,
+        peak=None,
+        tot_flux=None,
+        add=True,
+        abs_peak=True,
+    ):
+        """
+        Add/subtract a Lorentzian spectrum to/from an existing spectrum. This is useful
+        for representing emission lines (i.e., by adding a Lorentzian source) or
+        absorption lines (i.e., by subtracting a Lorentzian source). Note that the
+        minimum/maximum wavelengths of the source spectrum will not change.
+
+        The Lorentzian spectrum can be represented by the following formulae:
+        ```math
+                    lorentzian = peak / (1 + num_half_widths^2)
+        ```
+        and
+        ```math
+                    num_half_widths = (wavelengths - center) / probable_error
+        ```
+        and
+        ```math
+                    peak = tot_flux / (pi * probable_error) <-- see Cauchy distribution
+        ```
+        and
+        ```math
+                    probable_error = fwhm / 2
+        ```
+        where:
+          - lorentzian is the Lorentzian spectrum's flux in some arbitrary unit
+          - peak is the flux at the center (i.e., central wavelength) of the Lorentzian
+          - center is the central wavelength of the Lorentzian
+          - wavelengths is the array of wavelengths over which to calculate the spectrum
+          - fwhm is the full-width at half-maximum of the Lorentzian
+          - tot_flux is the total flux of the Lorentzian under the curve
+
+        Parameters
+        ----------
+          wavelengths :: array of floats or `astropy.Quantity` array
+            The wavelengths over which to calculate the Lorentzian spectrum.
+
+          spectrum :: array of floats
+            The spectrum to/from which to add/subtract the Lorentzian spectrum.
+
+          center :: scalar or `astropy.Quantity`
+            The central wavelength of the Lorentzian.
+
+          fwhm :: scalar or `astropy.Quantity`
+            The full-width at half-maximum of the Lorentzian.
+
+          peak :: int or float
+            The peak flux of the Lorentzian (i.e., the flux at the center wavelength). This
+            determines the unit of the returned spectrum. Exactly one of peak or tot_flux
+            must be specified.
+
+          tot_flux :: int or float
+            The total flux under the curve. This implicitly determines the unit of the
+            returned spectrum. Exactly one of peak or tot_flux must be specified.
+
+          add :: bool
+            If True, add the Lorentzian spectrum to the existing spectrum. If False,
+            subtract the Lorentzian from the existing spectrum.
+
+          abs_peak :: bool
+            If True, scale spectrum so that the peak of the emission or dip of the
+            absorption line is at the given value. Otherwise, just naively add/subtract
+            the given Lorentzian peak.
+
+        Returns
+        -------
+          sorted_wavelengths :: array of floats or `astropy.Quantity` array
+            The wavelengths of the new spectrum. The shape of this array will be different
+            from the input `wavelengths` array.
+
+          sorted_spectrum :: array of floats
+            The spectrum with the Lorentzian added/subtracted. The shape of this array will
+            be different from the input `spectrum` array.
+        """
+
+        def _lorentzian(_peak, _wavelengths, _center, _probable_error):
+            _num_half_widths = (_wavelengths - _center) / _probable_error
+            return _peak / (1 + _num_half_widths * _num_half_widths)
+
         #
         # Check inputs
         #
-        self._check_existing_spectrum(False)  # Ensure spectrum already exists
-        raise NotImplementedError("add_gaussian not implemented yet.")
+        if np.size(center) != 1:
+            raise ValueError("center must be a single scalar or `astropy.Quantity`.")
+        if np.size(fwhm) != 1:
+            raise ValueError("fwhm must be a single scalar or `astropy.Quantity`.")
+        if (peak is None and tot_flux is None) or (
+            peak is not None and tot_flux is not None
+        ):
+            raise ValueError("Exactly one of peak or tot_flux must be specified.")
+        if peak is not None and (
+            np.size(peak) != 1 or not isinstance(peak, Number) or peak <= 0
+        ):
+            raise ValueError("peak must be a single int or float >= 0.")
+        elif tot_flux is not None and (
+            np.size(tot_flux) != 1 or not isinstance(tot_flux, Number) or tot_flux <= 0
+        ):
+            raise ValueError("tot_flux must be a single int or float >= 0.")
+        # Convert lengths to angstrom
+        if isinstance(wavelengths, u.Quantity):
+            wavelengths_unit = wavelengths.unit
+            wavelengths = wavelengths.to(u.AA).value
+        else:
+            wavelengths_unit = None
+        if isinstance(center, u.Quantity):
+            center = center.to(u.AA).value
+        if isinstance(fwhm, u.Quantity):
+            fwhm = fwhm.to(u.AA).value
+        if fwhm <= 0:
+            raise ValueError("fwhm must be >= 0.")
+        #
+        # Lorentzian spectrum
+        #
+        probable_error = 0.5 * fwhm
+        if peak is None:
+            peak = tot_flux / (np.pi * probable_error)
+        spectrum_interp = interp1d(
+            wavelengths, spectrum, kind="linear", bounds_error=False, fill_value=np.nan
+        )
+        if add:
+            if abs_peak:
+                # Ensure final peak is actually at desired value
+                peak -= spectrum_interp(center)
+                if peak < 0:
+                    raise ValueError("peak of emission line below continuum.")
+        else:
+            if abs_peak:
+                # Ensure final dip is actually at desired value
+                center_val = spectrum_interp(center)
+                if peak > center_val:
+                    raise ValueError("dip of absorption line above continuum.")
+                peak = center_val - peak
+        # Ensure Lorentzian is well sampled by evaluating at the wavelengths within +/- 80
+        # units of probable error from the center. This also prevents overflow errors
+        # caused by calculations at wavelengths too far from the center.
+        gauss_wavelengths = center + np.arange(-80, 80.25, 0.5) * probable_error
+        sorted_wavelengths = np.unique(np.concatenate((wavelengths, gauss_wavelengths)))
+        sorted_wavelengths = sorted_wavelengths[
+            (sorted_wavelengths > 0) & (sorted_wavelengths <= wavelengths[-1])
+        ]
+        sorted_spectrum = spectrum_interp(sorted_wavelengths)
+        in_range = (sorted_wavelengths >= gauss_wavelengths[0]) & (
+            sorted_wavelengths <= gauss_wavelengths[-1]
+        )
+        if add:
+            sorted_spectrum[in_range] += _lorentzian(
+                peak, sorted_wavelengths[in_range], center, probable_error
+            )
+        else:
+            sorted_spectrum[in_range] -= _lorentzian(
+                peak, sorted_wavelengths[in_range], center, probable_error
+            )
+        is_good = np.isfinite(sorted_wavelengths) & np.isfinite(sorted_spectrum)
+        sorted_wavelengths = sorted_wavelengths[is_good]
+        sorted_spectrum = sorted_spectrum[is_good]
+        is_negative_spectrum = sorted_spectrum < 0
+        if np.any(is_negative_spectrum):
+            sorted_spectrum[is_negative_spectrum] = 0.0
+            warnings.warn("Setting negative flux in spectrum to zero.", RuntimeWarning)
+        if wavelengths_unit is not None:
+            sorted_wavelengths <<= wavelengths_unit  # convert to `astropy.Quantity` array
+        return sorted_wavelengths, sorted_spectrum
 
-    def subtract_gaussian(self, center, fwhm, peak=None, tot_flux=None):
-        # TODO: Implement subtract_gaussian
-        #
-        # Check inputs
-        #
-        self._check_existing_spectrum(False)  # Ensure spectrum already exists
-        raise NotImplementedError("subtract_gaussian not implemented yet.")
+    def add_emission_line(
+        self, center, fwhm, peak=None, tot_flux=None, shape="gaussian", abs_peak=True
+    ):
+        """
+        TODO: docstring
+
+        Note that the minimum/maximum wavelengths of the source spectrum will not change.
+        """
+        if self.wavelengths is None or self.spectrum is None:
+            raise ValueError("Please generate or load a spectrum first")
+        if shape == "gaussian":
+            spectrum_func = SpectrumMixin._generate_gaussian
+        elif shape == "lorentzian":
+            spectrum_func = SpectrumMixin._generate_lorentzian
+        else:
+            raise ValueError("Emission line shape must be 'gaussian' or 'lorentzian'")
+        self.wavelengths, self.spectrum = spectrum_func(
+            self.wavelengths,
+            self.spectrum,
+            center,
+            fwhm,
+            peak=peak,
+            tot_flux=tot_flux,
+            add=True,
+            abs_peak=abs_peak,
+        )
+
+    def add_absorption_line(
+        self, center, fwhm, dip=None, tot_flux=None, shape="gaussian", abs_dip=True
+    ):
+        """
+        TODO: docstring
+
+        Note that the minimum/maximum wavelengths of the source spectrum will not change.
+        """
+        if self.wavelengths is None or self.spectrum is None:
+            raise ValueError("Please generate or load a spectrum first")
+        if shape == "gaussian":
+            spectrum_func = SpectrumMixin._generate_gaussian
+        elif shape == "lorentzian":
+            spectrum_func = SpectrumMixin._generate_lorentzian
+        else:
+            raise ValueError("Absorption line shape must be 'gaussian' or 'lorentzian'")
+        self.wavelengths, self.spectrum = spectrum_func(
+            self.wavelengths,
+            self.spectrum,
+            center,
+            fwhm,
+            peak=dip,
+            tot_flux=tot_flux,
+            add=False,
+            abs_peak=abs_dip,
+        )
 
     def use_custom_spectrum(self, filepath, wavelength_unit=u.AA, overwrite=False):
         """
