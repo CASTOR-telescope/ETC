@@ -303,7 +303,53 @@ class Photometry:
             cbar = fig.colorbar(img)
             if mark_source:
                 ax.plot(0, 0, "co", ms=source_markersize)
-            cbar.set_label("Relative Weight to Center of Source")
+            cbar.set_label("Relative Flux to Center of Source")
+            ax.set_xlabel("$x$ [arcsec]")
+            ax.set_ylabel("$y$ [arcsec]")
+            ax.set_title(
+                "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
+            )
+            if plot:
+                plt.show()
+            else:
+                return fig, ax, cbar
+
+    def show_aper_weights(self, plot=True):
+        """
+        Plot the telescope's aperture mask.
+
+        Parameters
+        ----------
+          plot :: bool
+            If True, plot the aperture weights and return None. If False, return the
+            figure, axis, and colorbar instance associated with the plot.
+
+        Returns
+        -------
+          None (if plot is True)
+
+          fig, ax, cbar (if plot is False) :: `matplotlib.figure.Figure`,
+                                              `matplotlib.axes.Axes`,
+                                              `matplotlib.colorbar.Colorbar`
+            The figure, axis, and colorbar instance associated with the plot.
+        """
+        if self._aper_mask is None or self._aper_extent is None:
+            raise ValueError("Please select an aperture first.")
+
+        rc = {"axes.grid": False}
+        with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
+            fig, ax = plt.subplots()
+            # (N.B. array already "xy" indexing. Do not transpose array)
+            img = ax.imshow(
+                self._aper_mask,
+                origin="lower",
+                extent=self._aper_extent,
+                interpolation=None,
+                cmap="inferno",
+            )
+            ax.tick_params(color="grey", which="both")
+            cbar = fig.colorbar(img)
+            cbar.set_label("Relative Weight to Center of Aperture")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
             ax.set_title(
@@ -1290,17 +1336,33 @@ class Photometry:
             raise ValueError("Please choose an aperture first.")
         #
         source_erate = dict.fromkeys(self.TelescopeObj.passbands, np.nan)
+        source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
         for band in source_erate:
-            # aper_weight_scale and npix cancel out here. Just use old _eff_npix
-            is_in_passband = (
-                self.SourceObj.wavelengths >= self.TelescopeObj.passband_limits[band][0]
-            ) & (self.SourceObj.wavelengths <= self.TelescopeObj.passband_limits[band][1])
-            tot_passband_flam_per_px = (
-                np.nansum(self.SourceObj.spectrum[is_in_passband]) / self._eff_npix
+            passband_limits_AA = self.TelescopeObj.passband_limits[band].to(u.AA).value
+            is_in_passband = (source_wavelengths_AA >= passband_limits_AA[0]) & (
+                source_wavelengths_AA <= passband_limits_AA[1]
             )
+            # Use mean value of flux through passband as nominal flux value. In other
+            # words, if avg_passband_flam (below) was constant throughout the whole
+            # passband, the integrated flux (erg/s/cm^2) would be equal to the spectrum's
+            # integrated flux in the passband (erg/s/cm^2). Thus, we will use this
+            # avg_passband_flam value to calculate the source's AB magnitude and then
+            # convert to electron/s using the passband's photometric zero point.
+            avg_passband_flam = (  # erg/s/cm^2/A
+                simpson(
+                    y=self.SourceObj.spectrum[is_in_passband],
+                    x=source_wavelengths_AA[is_in_passband],
+                    even="avg",
+                )
+                / (passband_limits_AA[1] - passband_limits_AA[0])
+            )
+            # (N.B. Unlike background noise, aper_weight_scale and npix cancel out here.
+            # Just use original _eff_npix and source_weights below; no need for npix or
+            # aper_weight_scale)
+            avg_passband_flam_per_px = avg_passband_flam / self._eff_npix
             # Convert flux to electron/s
             source_erate[band] = convert_electron_flux_mag(
-                tot_passband_flam_per_px * self.source_weights,
+                avg_passband_flam_per_px * self.source_weights,
                 "flam",
                 "electron",
                 phot_zpt=self.TelescopeObj.phot_zpts[band],
