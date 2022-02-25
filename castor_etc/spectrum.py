@@ -7,21 +7,22 @@ Generate and handle spectral data and normalizations. Includes:
 """
 
 from numbers import Number
+from os.path import join
 
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from scipy.integrate import simpson
 
 from . import constants as const
 from . import parameters as params
 from .conversions import calc_photon_energy, convert_electron_flux_mag
+from .filepaths import DATAPATH
 from .telescope import Telescope
 
 # TODO: emission lines (see Gaussian functions below)
 # TODO: Pickles spectra
-# TODO: allow user to input own source spectrum
-# TODO: galaxy spectra
 
 
 def redshift_wavelengths(wavelengths, redshift):
@@ -30,10 +31,10 @@ def redshift_wavelengths(wavelengths, redshift):
 
     Parameters
     ----------
-        wavelengths :: int or float or `astropy.Quantity` or array
+      wavelengths :: int or float or `astropy.Quantity` or array
         Wavelengths to redshift.
 
-        redshift :: int or float
+      redshift :: int or float
         Redshift to apply.
 
     Returns
@@ -86,6 +87,29 @@ class SpectrumMixin:
             )
         self.spectrum /= calc_photon_energy(wavelength=self.wavelengths)[0]
 
+    def redshift_wavelengths(self, redshift):
+        """
+        Apply redshift correction to wavelengths. Does not affect the y-axis values of the
+        spectrum.
+
+        Parameters
+        ----------
+          redshift :: int or float
+            Redshift to apply.
+
+        Attributes
+        ----------
+          wavelengths :: `astropy.Quantity` array
+            The redshifted wavelengths of the spectrum, in angstroms.
+
+        Returns
+        -------
+          None
+        """
+        if not isinstance(redshift, Number):
+            raise TypeError("redshift must be an int or float")
+        self.wavelengths *= 1 + redshift
+
     def generate_uniform(self, wavelengths, value):
         """
         Generate a uniform spectrum equal to a constant value in some arbitrary unit.
@@ -102,7 +126,7 @@ class SpectrumMixin:
         Attributes
         ----------
           wavelengths :: `astropy.Quantity` array
-            The redshifted wavelengths of the spectrum, in angstroms.
+            The wavelengths of the spectrum, in angstroms.
 
           spectrum :: array of floats
             Uniform spectrum in arbitrary units.
@@ -229,11 +253,6 @@ class SpectrumMixin:
         # Incorporate emissivity and convert per cm to per angstrom
         #
         spectrum *= 1e-8 * emissivity  # erg/s/cm^2/A/sr
-        # spectrum *= 1e-8 * emissivity / const.SR_TO_SQARCSEC  # erg/s/cm^2/A/arcsec^2
-        # #
-        # # Convert to photon/s/cm^2/A/sr
-        # #
-        # spectrum /= calc_photon_energy(wavelength=wavelengths * u.cm)[0]
         #
         # Convert wavelengths back to angstroms
         #
@@ -407,6 +426,111 @@ class SpectrumMixin:
         self._check_existing_spectrum(False)  # Ensure spectrum already exists
         raise NotImplementedError("subtract_gaussian not implemented yet.")
 
+    def use_custom_spectrum(self, filepath, wavelength_unit=u.AA, overwrite=False):
+        """
+        Use custom spectrum from an ASCII file.
+
+        Parameters
+        ----------
+          filepath :: str
+            The absolute path to the file containing the spectrum. The files should be in
+            ASCII format with the first column containing the wavelengths in
+            `wavelength_units` and the second column containing the spectrum in flam
+            (erg/s/cm^2/A); the columns should be separated by a constant number of
+            spaces. Lines starting with a hash (#) will be ignored.
+
+          wavelength_unit :: `astropy.Quantity` length unit
+            The unit of the wavelengths in the file (e.g., u.AA for angstrom, u.nm for
+            nanometer, u.um for micrometer, etc.)
+
+          overwrite :: bool
+            If True, overwrite any existing wavelengths/spectrum. If False, raise an error
+            if wavelengths or spectrum is not None.
+
+        Attributes
+        ----------
+          wavelengths :: `astropy.Quantity` array
+            The wavelengths of the spectrum, in angstroms.
+
+          spectrum :: array of floats
+            Source spectrum in units of flam (erg/s/cm^2/A).
+
+        Returns
+        -------
+          None
+        """
+        #
+        # Check inputs
+        #
+        self._check_existing_spectrum(overwrite)
+        if not isinstance(filepath, str):
+            raise TypeError("filepath must be a string.")
+        try:
+            _ = wavelength_unit.to(u.AA)
+        except Exception:
+            raise TypeError("wavelength_units must be an `astropy.Quantity` length unit.")
+        data = pd.read_csv(
+            filepath,
+            sep=" +",
+            header=None,
+            comment="#",
+            engine="python",
+        )  # sep=" +" is Python regex to match a variable number of spaces
+        self.wavelengths = (data[0].values * wavelength_unit).to(u.AA)
+        self.spectrum = data[1].values
+
+    def use_galaxy_spectrum(self, type, overwrite=False):
+        """
+        Use one of the predefined galaxy spectra. These non-uniformly sampled spectra are
+        from Fioc & Rocca-Volmerange (1997)
+        <https://ui.adsabs.harvard.edu/abs/1997A%26A...326..950F/abstract>. In particular,
+        the data files were downloaded from the Gemini Observatory Control Software (OCS)
+        GitHub repository:
+        <https://github.com/gemini-hlsw/ocs/blob/develop/bundle/edu.gemini.itc/src/main/resources/sed/non_stellar/elliptical-galaxy.nm>
+        and
+        <https://github.com/gemini-hlsw/ocs/blob/develop/bundle/edu.gemini.itc/src/main/resources/sed/non_stellar/spiral-galaxy.nm>.
+
+        Parameters
+        ----------
+          type :: "elliptical" or "spiral"
+            The galaxy morphology. The elliptical galaxy (class T=-5, -4) and spiral
+            galaxy (type Sc, class T=5) spectra both run from 22-10000 nm.
+
+          overwrite :: bool
+            If True, overwrite any existing wavelengths/spectrum. If False, raise an error
+            if wavelengths or spectrum is not None.
+
+        Attributes
+        ----------
+          wavelengths :: `astropy.Quantity` array
+            The wavelengths of the spectrum, in angstroms.
+
+          spectrum :: array of floats
+            Galaxy spectrum in arbitrary units, normalized such that it is equal to 1 at
+            550 nm.
+
+        Returns
+        -------
+          None
+        """
+        #
+        # Check inputs
+        #
+        self._check_existing_spectrum(overwrite)
+        if type == "elliptical" or type == "spiral":
+            filepath = join(DATAPATH, "galaxy_spectra", f"{type}_galaxy.txt")
+        else:
+            raise ValueError("Galaxy type must be 'elliptical' or 'spiral'")
+        data = pd.read_csv(
+            filepath,
+            sep=" +",
+            header=None,
+            comment="#",
+            engine="python",
+        )  # sep=" +" is Python regex to match a variable number of spaces
+        self.wavelengths = (data[0].values * u.nm).to(u.AA)
+        self.spectrum = data[1].values
+
     def show_spectrum(self, plot=True):
         """
         Plot the spectrum (which should be in units of flam).
@@ -427,7 +551,7 @@ class SpectrumMixin:
         if self.spectrum is None or self.wavelengths is None:
             raise ValueError("Please generate a spectrum before plotting.")
         fig, ax = plt.subplots()
-        ax.plot(self.wavelengths.to(u.AA).value, self.spectrum, "k")
+        ax.plot(self.wavelengths.to(u.AA).value, self.spectrum, "k", lw=1)
         ax.fill_between(self.wavelengths.to(u.AA).value, self.spectrum, alpha=0.5)
         ax.set_xlabel("Wavelength [\AA]")
         ax.set_ylabel(r"Flux Density [$\rm erg\, s^{-1}\, cm^{-2}\,$\AA$^{-1}$]")
@@ -488,35 +612,6 @@ class NormMixin:
         radian = radius / dist
         return spectrum * np.pi * radian * radian  # multiply by projected solid angle
 
-    @staticmethod
-    def _norm_to_value(value, spectrum):
-        # def _norm_to_value(value, spectrum, wavelengths):
-        """
-        ! DEPRECATED !
-        Calculate the normalization factor for the spectrum so that the spectrum has a
-        total flux equal to some value (i.e., the area under the spectrum is value). This
-        function can also be used to normalize the flux in a passband by simply passing in
-        the passband's spectrum and wavelengths instead of the entire spectrum +
-        wavelengths.
-
-        Parameters
-        ----------
-          wavelegths :: array of floats
-            The wavelengths corresponding to the spectrum.
-
-          value :: int or float
-            The value to which the area under the spectrum should equal. This value should
-            be in the same units as the spectrum integrated over its wavelength range.
-
-        Returns
-        -------
-          norm_factor :: float
-            The normalization multiplicative constant.
-        """
-        # tot_flux = simpson(y=spectrum, x=wavelengths, even="avg")
-        tot_flux = np.nansum(spectrum)
-        return value / tot_flux
-
     def norm_to_value(
         self,
         value,
@@ -526,10 +621,10 @@ class NormMixin:
         pivot_wavelength=None,
     ):
         """
-        Normalize the spectrum so that it has a total flux density (in erg/s/cm^2/A) or
-        total AB magnitude equal to the given value, either over the whole wavelength
-        range or within a passband. The `Source` object should have its spectrum in units
-        of flam (erg/s/cm^2/A) and wavelengths in angstrom.
+        Normalize the spectrum so that it's average flux density (in erg/s/cm^2/A) or AB
+        magnitude is equal to the given value, either over the whole wavelength range or
+        within a passband. The `Source` object should have its spectrum in units of flam
+        (erg/s/cm^2/A) and wavelengths in angstrom.
 
         The higher the resolution of the spectrum, the more accurate the normalization.
         Also, if passband or passband_lims is not None, note that some wavelength/spectrum
@@ -539,12 +634,9 @@ class NormMixin:
 
         Parameters
         ----------
-          wavelegths :: array of floats, float, `astropy.Quantity`, or None
-            The wavelengths corresponding to the spectrum.
-
           value :: int or float
-            The value to which the area under the spectrum should equal. This value should
-            be in the same units as the spectrum integrated over its wavelength range.
+            The value to which the average value of the spectrum should equal. This value
+            should be in the same units as the spectrum.
 
           value_type :: "flux" or "mag"
             Flux density (erg/s/cm^2/A) or AB magnitude (mag).
@@ -584,6 +676,13 @@ class NormMixin:
         -------
           None
         """
+
+        def _get_norm_factor(_value, _flam, _wavelengths, _lims):
+            _avg_flam = simpson(y=_flam, x=_wavelengths, even="avg") / (
+                _lims[1] - _lims[0]
+            )  # erg/s/cm^2/A
+            return _value / _avg_flam
+
         #
         # Check inputs
         #
@@ -619,11 +718,13 @@ class NormMixin:
             )[0]
         #
         if passband is None and passband_lims is None:
-            # norm_factor = NormMixin._norm_to_value(
-            #     value,
-            #     self.spectrum,  # self.wavelengths.value
-            # )
-            norm_factor = value / np.nansum(self.spectrum)
+            wavelengths_AA = self.wavelengths.to(u.AA).value
+            norm_factor = _get_norm_factor(
+                value,
+                self.spectrum,
+                wavelengths_AA,
+                [wavelengths_AA[0], wavelengths_AA[-1]],
+            )
         else:
             if passband_lims is not None:
                 if np.size(passband_lims) != 2 or not isinstance(
@@ -644,27 +745,28 @@ class NormMixin:
             is_in_passband = (self.wavelengths >= passband_lims[0]) & (
                 self.wavelengths <= passband_lims[1]
             )
-            # norm_factor = NormMixin._norm_to_value(
-            #     value,
-            #     self.spectrum[is_in_passband],
-            #     # self.wavelengths[is_in_passband].value,
-            # )
-            norm_factor = value / np.nansum(self.spectrum[is_in_passband])
+            wavelengths_AA = self.wavelengths[is_in_passband].to(u.AA).value
+            norm_factor = _get_norm_factor(
+                value,
+                self.spectrum[is_in_passband],
+                wavelengths_AA,
+                passband_lims.to(u.AA).value,
+            )
         self.spectrum *= norm_factor
 
     def norm_luminosity_dist(self, luminosity, dist):
         """
-        Normalize the spectrum to a star of given luminosity and distance. The `Source`
-        object should have its spectrum in units of flam (erg/s/cm^2/A) and wavelengths in
-        angstrom. (Technically it is okay as long as the wavelengths are in some unit <U>
-        and the spectrum is in units of erg/s/cm^2/<U>.)
+        Normalize the spectrum to a source of given (bolometric) luminosity and distance.
+        The `Source` object should have its spectrum in units of flam (erg/s/cm^2/A) and
+        wavelengths in angstrom. (Technically it is okay as long as the wavelengths are in
+        some unit <U> and the spectrum is in units of erg/s/cm^2/<U>.)
 
         Parameters
         ----------
           luminosity :: scalar or `astropy.Quantity` unit of power
-            The desired luminosity. If a scalar, this is assumed to be in units of solar
-            luminosities. If an `astropy.Quantity`, it must be a unit of power (e.g.,
-            erg/s).
+            The desired bolometric luminosity. If a scalar, this is assumed to be in units
+            of solar luminosities. If an `astropy.Quantity`, it must be a unit of power
+            (e.g., erg/s).
 
           dist :: float or `astropy.Quantity` length
             The distance to the source. If a scalar, it is assumed to be in units of kpc.
@@ -696,6 +798,81 @@ class NormMixin:
         tot_luminosity = simpson(y=erg_s_A, x=self.wavelengths.value, even="avg")  # erg/s
         norm_factor = luminosity / tot_luminosity  # dimensionless
         self.spectrum *= norm_factor  # erg/s/cm^2/A
+
+    def get_avg_value(self, value_type="mag", TelescopeObj=None):
+        """
+        Calculate the average value of the source spectrum (in either flam, erg/s/cm^2/A,
+        or AB magnitude) either over the whole spectrum or through a telescope's passbands
+        (in which case TelescopeObj is required).
+
+        Parameters
+        ----------
+          value_type :: "flam" or "mag"
+            The desired output value type. If "flam", the output is in units of
+            erg/s/cm^2/A. If "mag", the output is in AB magnitudes and the pivot
+            wavelength is automatically calculated assuming a flat response function
+            (i.e., perfect throughput/response over all the entire spectrum).
+
+          TelescopeObj :: `Telescope` object or None
+            If provided, will calculate the average value in each of the telescope's
+            passbands.
+
+        Returns
+        -------
+          result :: scalar or dict of scalars
+            If TelescopeObj is None, the result is a scalar equal to the average value
+            (either erg/s/cm^2/A or AB magnitude) of the entire spectrum. If TelescopeObj
+            is not None, the result is a dict of average values in each of the telescope's
+            passbands.
+        """
+        if value_type not in ["flam", "mag"]:
+            raise ValueError("value_type must be either 'flam' or 'mag'.")
+        source_AA = self.wavelengths.to(u.AA).value
+        if TelescopeObj is None:
+            avg_flam = simpson(y=self.spectrum, x=source_AA, even="avg") / (
+                source_AA[-1] - source_AA[0]
+            )  # erg/s/cm^2/A
+            if value_type == "mag":
+                pivot_wavelength = (
+                    Telescope.calc_pivot_wavelength(
+                        source_AA,
+                        np.ones(np.shape(source_AA), dtype=float),  # perfect response
+                    )
+                    * u.AA
+                )
+                result = convert_electron_flux_mag(
+                    avg_flam,
+                    "flam",
+                    "mag",
+                    wavelengths=pivot_wavelength,
+                )[0]
+            else:
+                result = avg_flam
+        else:
+            result = dict.fromkeys(TelescopeObj.passbands)
+            for band in TelescopeObj.passbands:
+                passband_lims_AA = TelescopeObj.passband_limits[band].to(u.AA).value
+                is_in_passband = (source_AA >= passband_lims_AA[0]) & (
+                    source_AA <= passband_lims_AA[1]
+                )
+                avg_flam = (  # erg/s/cm^2/A
+                    simpson(
+                        y=self.spectrum[is_in_passband],
+                        x=source_AA[is_in_passband],
+                        even="avg",
+                    )
+                    / (passband_lims_AA[1] - passband_lims_AA[0])
+                )
+                if value_type == "mag":
+                    result[band] = convert_electron_flux_mag(
+                        avg_flam,
+                        "flam",
+                        "mag",
+                        wavelengths=TelescopeObj.passband_pivots[band],
+                    )[0]
+                else:
+                    result[band] = avg_flam
+        return result
 
 
 # ------------------------------------ OLD FUNCTIONS ----------------------------------- #
