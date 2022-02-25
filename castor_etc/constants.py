@@ -19,7 +19,7 @@ K_B = 1.380649e-16 << (u.erg / u.K)  # erg/K
 SUN_RADIUS = 6.96340e10 << u.cm  # cm
 
 # Solar luminosity
-SUN_LUMINOSITY = 3.828e26 << (u.erg / u.s)  # erg/s
+SUN_LUMINOSITY = 3.828e33 << (u.erg / u.s)  # erg/s
 
 # Coefficient for the conversion from flam (erg/cm^2/s/A) to photlam (photon/cm^2/s/A).
 # Reference: <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf>
