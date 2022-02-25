@@ -51,7 +51,8 @@ def secant_method(f, x0, x1, tol=1e-6, max_iter=100):
         x0, x1 = x1, x2
     warnings.warn(
         "Maximum number of iterations reached in secant method. "
-        + "Exiting and returning current estimate"
+        + "Exiting and returning current estimate",
+        RuntimeWarning,
     )
     return x2
 
@@ -94,7 +95,8 @@ def bisection_method(f, x0, x1, tol=1e-6, max_iter=100):
             x0 = x2  # move lower bound right
     warnings.warn(
         "Maximum number of iterations reached in bisection method. "
-        + "Exiting and returning current estimate"
+        + "Exiting and returning current estimate",
+        RuntimeWarning,
     )
     return x2
 
