@@ -345,7 +345,7 @@ class Photometry:
                 origin="lower",
                 extent=self._aper_extent,
                 interpolation=None,
-                cmap="inferno",
+                cmap="viridis",
             )
             ax.tick_params(color="grey", which="both")
             cbar = fig.colorbar(img)
@@ -556,7 +556,7 @@ class Photometry:
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
                 + "Contact the developer with a minimal working example please. Thanks!",
-                RuntimeWarning
+                RuntimeWarning,
             )
 
     def use_elliptical_aperture(self, a, b, center=[0, 0] << u.arcsec, rotation=0):
@@ -607,7 +607,7 @@ class Photometry:
         if not isinstance(rotation, Number):
             raise TypeError("rotation must be an int or float")
         rotation = np.deg2rad(rotation)
-        sin_rotate, cos_rotate = np.sin(rotation), np.cos(rotation)
+        abs_sin_rotate, abs_cos_rotate = abs(np.sin(rotation)), abs(np.cos(rotation))
 
         self.aperture = np.pi * a * b  # area of ellipse
         self._assign_npix()
@@ -618,8 +618,8 @@ class Photometry:
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
         # Modified rotation matrix to ensure full aperture is covered in 2D arrays
-        x = (cos_rotate * a + sin_rotate * b).value
-        y = (sin_rotate * a + cos_rotate * b).value
+        x = (abs_cos_rotate * a + abs_sin_rotate * b).value
+        y = (abs_sin_rotate * a + abs_cos_rotate * b).value
         x = x if x >= a.value else a.value
         y = y if y >= b.value else b.value
         self._create_aper_arrs(x, y, center)
@@ -657,7 +657,7 @@ class Photometry:
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
                 + "Contact the developer with a minimal working example please. Thanks!",
-                RuntimeWarning
+                RuntimeWarning,
             )
 
         if isinstance(self.SourceObj, PointSource):
@@ -669,9 +669,7 @@ class Photometry:
                     UserWarning,
                 )
 
-    def use_rectangular_aperture(
-        self, width, length, center=[0, 0] << u.arcsec, weight_res=1
-    ):
+    def use_rectangular_aperture(self, width, length, center=[0, 0] << u.arcsec):
         """
         Use a rectangular aperture.
 
@@ -687,9 +685,6 @@ class Photometry:
             The (x, y) center of the aperture relative to the center of the source.
             Positive values means the source is displaced to the bottom/left relative to
             the aperture center.
-
-          weight_res :: float
-            The resolution of the weight map in fraction of the telescope's pixel size.
 
         Returns
         -------
@@ -773,7 +768,7 @@ class Photometry:
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
                 + "Contact the developer with a minimal working example please. Thanks!",
-                RuntimeWarning
+                RuntimeWarning,
             )
 
         if isinstance(self.SourceObj, PointSource):
@@ -1107,7 +1102,9 @@ class Photometry:
         t = (numer1 + np.sqrt(numer2 + numer3)) / (2 * signal_sq)  # seconds
         return t
 
-    def calc_snr_or_t(self, t=None, snr=None, npix=None, nread=1, include_redleak=True):
+    def calc_snr_or_t(
+        self, t=None, snr=None, npix=None, extinction=0, nread=1, include_redleak=True
+    ):
         """
         Calculate the signal-to-noise ratio (SNR) reached in a given time or the
         integration time (t) required to reach a given SNR.
@@ -1133,6 +1130,14 @@ class Photometry:
             total sky background, dark current, and read noise but not higher signal nor
             redleak).
 
+          extinction :: scalar or dict of scalars
+            The extinction in each passband. If a scalar, the same extinction value
+            (E(B-V)) will be applied across all the telescope passbands. If using a
+            dictionary of scalars, the dictionary keys must at least contain all the
+            telescope passband keys
+            (e.g., `extinction={"uv": 0.66, "u": 0.46, "g": 0.36}`).
+            REVIEW: maybe have extinction coefficients defined in `Telescope` class?
+
           nread :: int
             Number of detector readouts.
 
@@ -1150,6 +1155,24 @@ class Photometry:
             raise ValueError("Exactly one of t or snr must be specified")
         if npix is not None and not isinstance(npix, Number):
             raise TypeError("npix must be an int or float or None")
+        if isinstance(extinction, Number):
+            # Apply same extinction value to all passbands
+            if extinction < 0:
+                raise ValueError("extinction must be non-negative")
+            extinction = {band: extinction for band in self.TelescopeObj.passbands}
+        else:
+            try:
+                if any(
+                    band not in extinction.keys() for band in self.TelescopeObj.passbands
+                ):
+                    raise ValueError(
+                        "If extinction is a dictionary, all Telescope passbands bands "
+                        + "must be specified in the extinction dictionary"
+                    )
+                if any(coeff < 0 for coeff in extinction.values()):
+                    raise ValueError("All extinction values must be non-negative")
+            except Exception:
+                raise TypeError("extinction must be a scalar or a dictionary of scalars")
         #
         # Make some useful variables
         #
@@ -1291,6 +1314,7 @@ class Photometry:
         #
         # Add geocoronal emission line contribution to sky background
         #
+        # REVIEW: remove requirement for linewidth? Unused here... Maybe need it for spectroscopy?
         for gw, gf, gl in zip(
             self.BackgroundObj.geo_wavelength,
             self.BackgroundObj.geo_flux,
@@ -1347,10 +1371,11 @@ class Photometry:
             )
             # Use mean value of flux through passband as nominal flux value. In other
             # words, if avg_passband_flam (below) was constant throughout the whole
-            # passband, the integrated flux (erg/s/cm^2) would be equal to the spectrum's
-            # integrated flux in the passband (erg/s/cm^2). Thus, we will use this
-            # avg_passband_flam value to calculate the source's AB magnitude and then
-            # convert to electron/s using the passband's photometric zero point.
+            # passband, the integrated flux in this passband (erg/s/cm^2) would be equal
+            # to the original spectrum's integrated flux in the same passband
+            # (erg/s/cm^2). Thus, we will use this avg_passband_flam value to calculate
+            # the source's AB magnitude and then convert to electron/s using the
+            # passband's photometric zero point.
             avg_passband_flam = (  # erg/s/cm^2/A
                 simpson(
                     y=self.SourceObj.spectrum[is_in_passband],
@@ -1363,14 +1388,28 @@ class Photometry:
             # Just use original _eff_npix and source_weights below; no need for npix or
             # aper_weight_scale)
             avg_passband_flam_per_px = avg_passband_flam / self._eff_npix
+            # Convert source flux to AB magnitudes and correct for extinction
+            source_ab_mag = (
+                convert_electron_flux_mag(
+                    avg_passband_flam_per_px,
+                    "flam",
+                    "mag",
+                    wavelengths=self.TelescopeObj.passband_pivots[band],
+                )[0]
+                + extinction[band]
+            )
             # Convert flux to electron/s
-            source_erate[band] = convert_electron_flux_mag(
-                avg_passband_flam_per_px * self.source_weights,
-                "flam",
-                "electron",
-                phot_zpt=self.TelescopeObj.phot_zpts[band],
-                wavelengths=self.TelescopeObj.passband_pivots[band],
-            )[0]
+            source_erate[band] = (
+                mag_to_flux(source_ab_mag, zpt=self.TelescopeObj.phot_zpts[band])[0]
+                * self.source_weights
+            )
+            # source_erate[band] = convert_electron_flux_mag(
+            #     avg_passband_flam_per_px * self.source_weights,
+            #     "flam",
+            #     "electron",
+            #     phot_zpt=self.TelescopeObj.phot_zpts[band],
+            #     wavelengths=self.TelescopeObj.passband_pivots[band],
+            # )[0]
         #
         # Calculate redleak
         #
@@ -1409,3 +1448,6 @@ class Photometry:
                     nread=nread,
                 )
         return results
+
+
+# TODO: MAKE REDLEAK FRACTION FUNCTION
