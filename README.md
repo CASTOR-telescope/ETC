@@ -8,7 +8,50 @@ systems...
 TODO: finish the docstrings and make them stylistically consistent (e.g., the Attributes).
 
 TODO: generating_sources.ipynb, telescope.ipynb, spectroscopy.ipynb, background.ipynb,
-normalizations.ipynb, etc...
+normalizations.ipynb, redleak.ipynb, etc...
+
+TODO: add attribute in `Source` objects specifying if properties are intrinsic or observed
+(for extinction correction)
+
+## Installation
+
+If you do not wish to clone the repository, the easiest way to install the `castor_etc`
+package is via:
+
+```bash
+pip install git+https://github.com/CASTOR-telescope/ETC.git
+```
+
+Note that executing this command in a conda environment (i.e., by building from the
+[environment file](docker/castor_etc_env.yml)) is recommended.
+
+If you have cloned this repository, then you can install the ETC package using one of the
+following commands, which should be executed while inside the repository folder (`ETC/`).
+
+To install the `castor_etc` package "normally", use either:
+
+```bash
+pip install .
+```
+
+or
+
+```bash
+python setup.py install
+```
+
+If you want to install in [develop
+mode](https://pip-python3.readthedocs.io/en/latest/reference/pip_install.html#install-editable),
+use:
+
+```bash
+pip install -e .
+```
+
+In develop mode, the installation of the package simply links back to the
+[`castor_etc`](castor_etc/) folder itself, meaning any changes made to this package will
+be reflected in your environment.
+
 
 ## CANFAR Build Instructions
 
@@ -79,7 +122,7 @@ following:
    SCRIPT_DIR="/arc/home/IsaacCheng/ETC"  # the absolute path of this repo on local machine
    ```
 
-   - You may also wish to save outputs and plots to a separate directory (i.e., not a
+   <!-- - You may also wish to save outputs and plots to a separate directory (i.e., not a
      subfolder in this repo), in which case you should add a bind mount in
      [build.sh](docker/build.sh) and modify the `OUTPATH` variable in
      [`constants.py`](src/constants.py) to the proper mounted path. For example, add:
@@ -89,7 +132,7 @@ following:
      ```
 
      to your [build.sh](docker/build.sh) file and change `OUTPATH` in
-     [`constants.py`](src/constants.py) to "`/container_directory/ETC_plots/`".
+     [`constants.py`](src/constants.py) to "`/container_directory/ETC_plots/`". -->
 
 <!-- 3. Open the [Dockerfile](Dockerfile) and modify the `WORKDIR` value to be whichever path
    you would like this repo to be contained in. I recommend setting this path to be the
@@ -156,8 +199,9 @@ and tracked via the [issues page](https://github.com/CASTOR-telescope/ETC/issues
 
 ## Inside the Docker Container
 
-Please modify the `OUTPATH` variable in [`constants.py`](src/constants.py) to the proper
-directory. Also remember you can copy files and folders within a container to the local
+<!-- Please modify the `OUTPATH` variable in [`constants.py`](src/constants.py) to the proper
+directory. -->
+Also remember you can copy files and folders within a container to the local
 filesystem using the following command (TIP: use bash autocompletion to fill in the
 version number):
 
