@@ -7,7 +7,7 @@ Includes:
   - user-input spectrum
   - Gaussian and Lorentzian emission/absorption lines
   - generic spiral and elliptical galaxy spectra
-  - stellar spectra from Pickles (TODO)
+  - stellar spectra from the Pickles catalog
   - normalization functions:
     - normalize a blackbody spectrum to a star of given radius and distance
     - normalize a spectrum to some average value or AB magnitude, either within a passband
@@ -96,8 +96,6 @@ from . import parameters as params
 from .conversions import calc_photon_energy, convert_electron_flux_mag
 from .filepaths import DATAPATH
 from .telescope import Telescope
-
-# TODO: Pickles spectra
 
 
 def redshift_wavelengths(wavelengths, redshift):
@@ -916,6 +914,589 @@ class SpectrumMixin:
         )  # sep=" +" is Python regex to match a variable number of spaces
         self.wavelengths = (data[0].values * u.nm).to(u.AA)
         self.spectrum = data[1].values
+
+    def use_pickles_spectrum(self, spectral_class, overwrite=False):
+        """
+        Use a spectrum from the Pickles catalog
+        (<https://ui.adsabs.harvard.edu/abs/1998PASP..110..863P/abstract>) containing
+        spectra for numerous stellar spectral classes.
+
+        A table containing valid `spectral_class` inputs is at the end of this docstring.
+
+        Parameters
+        ----------
+          spectral_class :: str from the "Table of valid `spectral_class` inputs" below
+            The spectral type of the star.
+
+          overwrite :: bool
+            If True, overwrite any existing wavelengths/spectrum. If False, raise an error
+            if wavelengths or spectrum is not None.
+
+        Attributes
+        ----------
+          wavelengths :: `astropy.Quantity` array
+            The wavelengths of the spectrum, in angstroms.
+
+          spectrum :: array of floats
+            Stellar spectrum in arbitrary units, normalized such that it is equal to 1 at
+            5556 angstrom.
+
+        Returns
+        -------
+          None
+
+        Table of valid `spectral_class` inputs
+        -------------------------------------
+        ```text
+          spectral_class      Description (& wavelength range)
+          --------------      --------------------------------
+          "a0i"               A0 I     (1150-10620 A)
+          "a0iii"             A0 III   (1150-10620 A)
+          "a0iv"              A0 IV    (1150-10620 A)
+          "a0v"               A0 V     (1150-10620 A)
+          "a2i"               A2 I     (1150-10620 A)
+          "a2v"               A2 V     (1150-10620 A)
+          "a3iii"             A3 III   (1150-10620 A)
+          "a3v"               A3 V     (1150-10620 A)
+          "a47iv"             A4-7 IV  (1150-10620 A)
+          "a5iii"             A5 III   (1150-10620 A)
+          "a5v"               A5 V     (1150-10620 A)
+          "a7iii"             A7 III   (1150-10620 A)
+          "a7v"               A7 V     (1150-10620 A)
+          "b0i"               B0 I     (1150-10620 A)
+          "b0v"               B0 V     (1150-10620 A)
+          "b12iii"            B1-2 III (1150-10620 A)
+          "b1i"               B1 I     (1150-10620 A)
+          "b1v"               B1 V     (1150-10620 A)
+          "b2ii"              B2 II    (1150-10620 A)
+          "b2iv"              B2 IV    (1150-10620 A)
+          "b3i"               B3 I     (1150-10620 A)
+          "b3iii"             B3 III   (1150-10620 A)
+          "b3v"               B3 V     (1150-10620 A)
+          "b57v"              B5-7 V   (1150-10620 A)
+          "b5i"               B5 I     (1150-10620 A)
+          "b5ii"              B5 II    (1150-10620 A)
+          "b5iii"             B5 III   (1150-10620 A)
+          "b6iv"              B6 IV    (1150-10620 A)
+          "b8i"               B8 I     (1150-10620 A)
+          "b8v"               B8 V     (1150-10620 A)
+          "b9iii"             B9 III   (1150-10620 A)
+          "b9v"               B9 V     (1150-10620 A)
+          "f02iv"             F0-2 IV  (1150-10620 A)
+          "f0i"               F0 I     (1150-10620 A)
+          "f0ii"              F0 II    (1150-10620 A)
+          "f0iii"             F0 III   (1150-10620 A)
+          "f0v"               F0 V     (1150-10620 A)
+          "f2ii"              F2 II    (1150-10620 A)
+          "f2iii"             F2 III   (1150-10620 A)
+          "f2v"               F2 V     (1150-10620 A)
+          "f5i"               F5 I     (1150-10620 A)
+          "f5iii"             F5 III   (1150-10620 A)
+          "f5iv"              F5 IV    (1150-10620 A)
+          "f5v"               F5 V     (1150-10620 A)
+          "f6v"               F6 V     (1150-10620 A)
+          "f8i"               F8 I     (1150-10620 A)
+          "f8iv"              F8 IV    (1150-10620 A)
+          "f8v"               F8 V     (1150-10620 A)
+          "g0i"               G0 I     (1150-10620 A)
+          "g0iii"             G0 III   (1150-10620 A)
+          "g0iv"              G0 IV    (1150-10620 A)
+          "g0v"               G0 V     (1150-10620 A)
+          "g2i"               G2 I     (1150-10620 A)
+          "g2iv"              G2 IV    (1150-10620 A)
+          "g2v"               G2 V     (1150-10620 A)
+          "g5i"               G5 I     (1150-10620 A)
+          "g5ii"              G5 II    (1150-10620 A)
+          "g5iii"             G5 III   (1150-10620 A)
+          "g5iv"              G5 IV    (1150-10620 A)
+          "g5v"               G5 V     (1150-10620 A)
+          "g8i"               G8 I     (1150-10620 A)
+          "g8iii"             G8 III   (1150-10620 A)
+          "g8iv"              G8 IV    (1150-10620 A)
+          "g8v"               G8 V     (1150-10620 A)
+          "k01ii"             K0-1 II  (1150-10620 A)
+          "k0iii"             K0 III   (1150-10620 A)
+          "k0iv"              K0 IV    (1150-10620 A)
+          "k0v"               K0 V     (1150-10620 A)
+          "k1iii"             K1 III   (1150-10620 A)
+          "k1iv"              K1 IV    (1150-10620 A)
+          "k2i"               K2 I     (1150-10620 A)
+          "k2iii"             K2 III   (1150-10620 A)
+          "k2v"               K2 V     (1150-10620 A)
+          "k34ii"             K3-4 II  (1150-10620 A)
+          "k3i"               K3 I     (1150-10620 A)
+          "k3iii"             K3 III   (1150-10620 A)
+          "k3iv"              K3 IV    (1150-10620 A)
+          "k3v"               K3 V     (1150-10620 A)
+          "k4i"               K4 I     (1150-10620 A)
+          "k4iii"             K4 III   (1150-10620 A)
+          "k4v"               K4 V     (1150-10620 A)
+          "k5iii"             K5 III   (1150-10620 A)
+          "k5v"               K5 V     (1150-10620 A)
+          "k7v"               K7 V     (1150-10620 A)
+          "m0iii"             M0 III   (1150-10620 A)
+          "m0v"               M0 V     (1150-10620 A)
+          "m10iii"            M10 III  (1150-10620 A)
+          "m1iii"             M1 III   (1150-10620 A)
+          "m1v"               M1 V     (1150-10620 A)
+          "m2i"               M2 I     (1150-10620 A)
+          "m2iii"             M2 III   (1150-10620 A)
+          "m2p5v"             M2.5 V   (1150-10620 A)
+          "m2v"               M2 V     (1150-10620 A)
+          "m3ii"              M3 II    (1150-10620 A)
+          "m3iii"             M3 III   (1150-10620 A)
+          "m3v"               M3 V     (1150-10620 A)
+          "m4iii"             M4 III   (1150-10620 A)
+          "m4v"               M4 V     (1150-10620 A)
+          "m5iii"             M5 III   (1150-10620 A)
+          "m5v"               M5 V     (1150-10620 A)
+          "m6iii"             M6 III   (1150-10620 A)
+          "m6v"               M6 V     (1150-10620 A)
+          "m7iii"             M7 III   (1150-10620 A)
+          "m8iii"             M8 III   (1150-10620 A)
+          "m9iii"             M9 III   (1150-10620 A)
+          "o5v"               O5 V     (1150-10620 A)
+          "o8iii"             O8 III   (1150-10620 A)
+          "o9v"               O9 V     (1150-10620 A)
+          "rf6v"              metal-rich F6 V    (1150-10620 A)
+          "rf8v"              metal-rich F8 V    (1150-10620 A)
+          "rg0v"              metal-rich G0 V    (1150-10620 A)
+          "rg5iii"            metal-rich G5 III  (1150-10620 A)
+          "rg5v"              metal-rich G5 V    (1150-10620 A)
+          "rk0iii"            metal-rich K0 III  (1150-10620 A)
+          "rk0v"              metal-rich K0 V    (1150-10620 A)
+          "rk1iii"            metal-rich K1 III  (1150-10620 A)
+          "rk2iii"            metal-rich K2 III  (1150-10620 A)
+          "rk3iii"            metal-rich K3 III  (1150-10620 A)
+          "rk4iii"            metal-rich K4 III  (1150-10620 A)
+          "rk5iii"            metal-rich K5 III  (1150-10620 A)
+          "uka0i"             A0 I     (1150-25000 A)
+          "uka0iii"           A0 III   (1150-25000 A)
+          "uka0iv"            A0 IV    (1150-25000 A)
+          "uka0v"             A0 V     (1150-25000 A)
+          "uka2i"             A2 I     (1150-25000 A)
+          "uka2v"             A2 V     (1150-25000 A)
+          "uka3iii"           A3 III   (1150-25000 A)
+          "uka3v"             A3 V     (1150-25000 A)
+          "uka47iv"           A4-7 IV  (1150-25000 A)
+          "uka5iii"           A5 III   (1150-25000 A)
+          "uka5v"             A5 V     (1150-25000 A)
+          "uka7iii"           A7 III   (1150-25000 A)
+          "uka7v"             A7 V     (1150-25000 A)
+          "ukb0i"             B0 I     (1150-25000 A)
+          "ukb0v"             B0 V     (1150-25000 A)
+          "ukb12iii"          B1-2 III (1150-25000 A)
+          "ukb1i"             B1 I     (1150-25000 A)
+          "ukb1v"             B1 V     (1150-25000 A)
+          "ukb2ii"            B2 II    (1150-25000 A)
+          "ukb2iv"            B2 IV    (1150-25000 A)
+          "ukb3i"             B3 I     (1150-25000 A)
+          "ukb3iii"           B3 III   (1150-25000 A)
+          "ukb3v"             B3 V     (1150-25000 A)
+          "ukb57v"            B5-7 V   (1150-25000 A)
+          "ukb5i"             B5 I     (1150-25000 A)
+          "ukb5ii"            B5 II    (1150-25000 A)
+          "ukb5iii"           B5 III   (1150-25000 A)
+          "ukb6iv"            B6 IV    (1150-25000 A)
+          "ukb8i"             B8 I     (1150-25000 A)
+          "ukb8v"             B8 V     (1150-25000 A)
+          "ukb9iii"           B9 III   (1150-25000 A)
+          "ukb9v"             B9 V     (1150-25000 A)
+          "ukf02iv"           F0-2 IV  (1150-25000 A)
+          "ukf0i"             F0 I     (1150-25000 A)
+          "ukf0ii"            F0 II    (1150-25000 A)
+          "ukf0iii"           F0 III   (1150-25000 A)
+          "ukf0v"             F0 V     (1150-25000 A)
+          "ukf2ii"            F2 II    (1150-25000 A)
+          "ukf2iii"           F2 III   (1150-25000 A)
+          "ukf2v"             F2 V     (1150-25000 A)
+          "ukf5i"             F5 I     (1150-25000 A)
+          "ukf5iii"           F5 III   (1150-25000 A)
+          "ukf5iv"            F5 IV    (1150-25000 A)
+          "ukf5v"             F5 V     (1150-25000 A)
+          "ukf6v"             F6 V     (1150-25000 A)
+          "ukf8i"             F8 I     (1150-25000 A)
+          "ukf8iv"            F8 IV    (1150-25000 A)
+          "ukf8v"             F8 V     (1150-25000 A)
+          "ukg0i"             G0 I     (1150-25000 A)
+          "ukg0iii"           G0 III   (1150-25000 A)
+          "ukg0iv"            G0 IV    (1150-25000 A)
+          "ukg0v"             G0 V     (1150-25000 A)
+          "ukg2i"             G2 I     (1150-25000 A)
+          "ukg2iv"            G2 IV    (1150-25000 A)
+          "ukg2v"             G2 V     (1150-25000 A)
+          "ukg5i"             G5 I     (1150-25000 A)
+          "ukg5ii"            G5 II    (1150-25000 A)
+          "ukg5iii"           G5 III   (1150-25000 A)
+          "ukg5iv"            G5 IV    (1150-25000 A)
+          "ukg5v"             G5 V     (1150-25000 A)
+          "ukg8i"             G8 I     (1150-25000 A)
+          "ukg8iii"           G8 III   (1150-25000 A)
+          "ukg8iv"            G8 IV    (1150-25000 A)
+          "ukg8v"             G8 V     (1150-25000 A)
+          "ukk01ii"           K0-1 II  (1150-25000 A)
+          "ukk0iii"           K0 III   (1150-25000 A)
+          "ukk0iv"            K0 IV    (1150-25000 A)
+          "ukk0v"             K0 V     (1150-25000 A)
+          "ukk1iii"           K1 III   (1150-25000 A)
+          "ukk1iv"            K1 IV    (1150-25000 A)
+          "ukk2i"             K2 I     (1150-25000 A)
+          "ukk2iii"           K2 III   (1150-25000 A)
+          "ukk2v"             K2 V     (1150-25000 A)
+          "ukk34ii"           K3-4 II  (1150-25000 A)
+          "ukk3i"             K3 I     (1150-25000 A)
+          "ukk3iii"           K3 III   (1150-25000 A)
+          "ukk3iv"            K3 IV    (1150-25000 A)
+          "ukk3v"             K3 V     (1150-25000 A)
+          "ukk4i"             K4 I     (1150-25000 A)
+          "ukk4iii"           K4 III   (1150-25000 A)
+          "ukk4v"             K4 V     (1150-25000 A)
+          "ukk5iii"           K5 III   (1150-25000 A)
+          "ukk5v"             K5 V     (1150-25000 A)
+          "ukk7v"             K7 V     (1150-25000 A)
+          "ukm0iii"           M0 III   (1150-25000 A)
+          "ukm0v"             M0 V     (1150-25000 A)
+          "ukm10iii"          M10 III  (1150-25000 A)
+          "ukm1iii"           M1 III   (1150-25000 A)
+          "ukm1v"             M1 V     (1150-25000 A)
+          "ukm2i"             M2 I     (1150-25000 A)
+          "ukm2iii"           M2 III   (1150-25000 A)
+          "ukm2p5v"           M2.5 V   (1150-25000 A)
+          "ukm2v"             M2 V     (1150-25000 A)
+          "ukm3ii"            M3 II    (1150-25000 A)
+          "ukm3iii"           M3 III   (1150-25000 A)
+          "ukm3v"             M3 V     (1150-25000 A)
+          "ukm4iii"           M4 III   (1150-25000 A)
+          "ukm4v"             M4 V     (1150-25000 A)
+          "ukm5iii"           M5 III   (1150-25000 A)
+          "ukm5v"             M5 V     (1150-25000 A)
+          "ukm6iii"           M6 III   (1150-25000 A)
+          "ukm6v"             M6 V     (1150-25000 A)
+          "ukm7iii"           M7 III   (1150-25000 A)
+          "ukm8iii"           M8 III   (1150-25000 A)
+          "ukm9iii"           M9 III   (1150-25000 A)
+          "uko5v"             O5 V     (1150-25000 A)
+          "uko8iii"           O8 III   (1150-25000 A)
+          "uko9v"             O9 V     (1150-25000 A)
+          "ukrf6v"            metal-rich F6 V    (1150-25000 A)
+          "ukrf8v"            metal-rich F8 V    (1150-25000 A)
+          "ukrg0v"            metal-rich G0 V    (1150-25000 A)
+          "ukrg5iii"          metal-rich G5 III  (1150-25000 A)
+          "ukrg5v"            metal-rich G5 V    (1150-25000 A)
+          "ukrk0iii"          metal-rich K0 III  (1150-25000 A)
+          "ukrk0v"            metal-rich K0 V    (1150-25000 A)
+          "ukrk1iii"          metal-rich K1 III  (1150-25000 A)
+          "ukrk2iii"          metal-rich K2 III  (1150-25000 A)
+          "ukrk3iii"          metal-rich K3 III  (1150-25000 A)
+          "ukrk4iii"          metal-rich K4 III  (1150-25000 A)
+          "ukrk5iii"          metal-rich K5 III  (1150-25000 A)
+          "ukwf5v"            metal-weak F5 V    (1150-25000 A)
+          "ukwf8v"            metal-weak F8 V    (1150-25000 A)
+          "ukwg0v"            metal-weak G0 V    (1150-25000 A)
+          "ukwg5iii"          metal-weak G5 III  (1150-25000 A)
+          "ukwg5v"            metal-weak G5 V    (1150-25000 A)
+          "ukwg8iii"          metal-weak G8 III  (1150-25000 A)
+          "ukwk0iii"          metal-weak K0 III  (1150-25000 A)
+          "ukwk1iii"          metal-weak K1 III  (1150-25000 A)
+          "ukwk2iii"          metal-weak K2 III  (1150-25000 A)
+          "ukwk3iii"          metal-weak K3 III  (1150-25000 A)
+          "ukwk4iii"          metal-weak K4 III  (1150-25000 A)
+          "wf5v"              metal-weak F5 V    (1150-10620 A)
+          "wf8v"              metal-weak F8 V    (1150-10620 A)
+          "wg0v"              metal-weak G0 V    (1150-10620 A)
+          "wg5iii"            metal-weak G5 III  (1150-10620 A)
+          "wg5v"              metal-weak G5 V    (1150-10620 A)
+          "wg8iii"            metal-weak G8 III  (1150-10620 A)
+          "wk0iii"            metal-weak K0 III  (1150-10620 A)
+          "wk1iii"            metal-weak K1 III  (1150-10620 A)
+          "wk2iii"            metal-weak K2 III  (1150-10620 A)
+          "wk3iii"            metal-weak K3 III  (1150-10620 A)
+          "wk4iii"            metal-weak K4 III  (1150-10620 A)
+        ```
+        """
+        #
+        # Check inputs
+        #
+        valid_spectral_classes = [
+            "a0i",
+            "a0iii",
+            "a0iv",
+            "a0v",
+            "a2i",
+            "a2v",
+            "a3iii",
+            "a3v",
+            "a47iv",
+            "a5iii",
+            "a5v",
+            "a7iii",
+            "a7v",
+            "b0i",
+            "b0v",
+            "b12iii",
+            "b1i",
+            "b1v",
+            "b2ii",
+            "b2iv",
+            "b3i",
+            "b3iii",
+            "b3v",
+            "b57v",
+            "b5i",
+            "b5ii",
+            "b5iii",
+            "b6iv",
+            "b8i",
+            "b8v",
+            "b9iii",
+            "b9v",
+            "f02iv",
+            "f0i",
+            "f0ii",
+            "f0iii",
+            "f0v",
+            "f2ii",
+            "f2iii",
+            "f2v",
+            "f5i",
+            "f5iii",
+            "f5iv",
+            "f5v",
+            "f6v",
+            "f8i",
+            "f8iv",
+            "f8v",
+            "g0i",
+            "g0iii",
+            "g0iv",
+            "g0v",
+            "g2i",
+            "g2iv",
+            "g2v",
+            "g5i",
+            "g5ii",
+            "g5iii",
+            "g5iv",
+            "g5v",
+            "g8i",
+            "g8iii",
+            "g8iv",
+            "g8v",
+            "k01ii",
+            "k0iii",
+            "k0iv",
+            "k0v",
+            "k1iii",
+            "k1iv",
+            "k2i",
+            "k2iii",
+            "k2v",
+            "k34ii",
+            "k3i",
+            "k3iii",
+            "k3iv",
+            "k3v",
+            "k4i",
+            "k4iii",
+            "k4v",
+            "k5iii",
+            "k5v",
+            "k7v",
+            "m0iii",
+            "m0v",
+            "m10iii",
+            "m1iii",
+            "m1v",
+            "m2i",
+            "m2iii",
+            "m2p5v",
+            "m2v",
+            "m3ii",
+            "m3iii",
+            "m3v",
+            "m4iii",
+            "m4v",
+            "m5iii",
+            "m5v",
+            "m6iii",
+            "m6v",
+            "m7iii",
+            "m8iii",
+            "m9iii",
+            "o5v",
+            "o8iii",
+            "o9v",
+            "rf6v",
+            "rf8v",
+            "rg0v",
+            "rg5iii",
+            "rg5v",
+            "rk0iii",
+            "rk0v",
+            "rk1iii",
+            "rk2iii",
+            "rk3iii",
+            "rk4iii",
+            "rk5iii",
+            "uka0i",
+            "uka0iii",
+            "uka0iv",
+            "uka0v",
+            "uka2i",
+            "uka2v",
+            "uka3iii",
+            "uka3v",
+            "uka47iv",
+            "uka5iii",
+            "uka5v",
+            "uka7iii",
+            "uka7v",
+            "ukb0i",
+            "ukb0v",
+            "ukb12iii",
+            "ukb1i",
+            "ukb1v",
+            "ukb2ii",
+            "ukb2iv",
+            "ukb3i",
+            "ukb3iii",
+            "ukb3v",
+            "ukb57v",
+            "ukb5i",
+            "ukb5ii",
+            "ukb5iii",
+            "ukb6iv",
+            "ukb8i",
+            "ukb8v",
+            "ukb9iii",
+            "ukb9v",
+            "ukf02iv",
+            "ukf0i",
+            "ukf0ii",
+            "ukf0iii",
+            "ukf0v",
+            "ukf2ii",
+            "ukf2iii",
+            "ukf2v",
+            "ukf5i",
+            "ukf5iii",
+            "ukf5iv",
+            "ukf5v",
+            "ukf6v",
+            "ukf8i",
+            "ukf8iv",
+            "ukf8v",
+            "ukg0i",
+            "ukg0iii",
+            "ukg0iv",
+            "ukg0v",
+            "ukg2i",
+            "ukg2iv",
+            "ukg2v",
+            "ukg5i",
+            "ukg5ii",
+            "ukg5iii",
+            "ukg5iv",
+            "ukg5v",
+            "ukg8i",
+            "ukg8iii",
+            "ukg8iv",
+            "ukg8v",
+            "ukk01ii",
+            "ukk0iii",
+            "ukk0iv",
+            "ukk0v",
+            "ukk1iii",
+            "ukk1iv",
+            "ukk2i",
+            "ukk2iii",
+            "ukk2v",
+            "ukk34ii",
+            "ukk3i",
+            "ukk3iii",
+            "ukk3iv",
+            "ukk3v",
+            "ukk4i",
+            "ukk4iii",
+            "ukk4v",
+            "ukk5iii",
+            "ukk5v",
+            "ukk7v",
+            "ukm0iii",
+            "ukm0v",
+            "ukm10iii",
+            "ukm1iii",
+            "ukm1v",
+            "ukm2i",
+            "ukm2iii",
+            "ukm2p5v",
+            "ukm2v",
+            "ukm3ii",
+            "ukm3iii",
+            "ukm3v",
+            "ukm4iii",
+            "ukm4v",
+            "ukm5iii",
+            "ukm5v",
+            "ukm6iii",
+            "ukm6v",
+            "ukm7iii",
+            "ukm8iii",
+            "ukm9iii",
+            "uko5v",
+            "uko8iii",
+            "uko9v",
+            "ukrf6v",
+            "ukrf8v",
+            "ukrg0v",
+            "ukrg5iii",
+            "ukrg5v",
+            "ukrk0iii",
+            "ukrk0v",
+            "ukrk1iii",
+            "ukrk2iii",
+            "ukrk3iii",
+            "ukrk4iii",
+            "ukrk5iii",
+            "ukwf5v",
+            "ukwf8v",
+            "ukwg0v",
+            "ukwg5iii",
+            "ukwg5v",
+            "ukwg8iii",
+            "ukwk0iii",
+            "ukwk1iii",
+            "ukwk2iii",
+            "ukwk3iii",
+            "ukwk4iii",
+            "wf5v",
+            "wf8v",
+            "wg0v",
+            "wg5iii",
+            "wg5v",
+            "wg8iii",
+            "wk0iii",
+            "wk1iii",
+            "wk2iii",
+            "wk3iii",
+            "wk4iii",
+        ]
+        if spectral_class not in valid_spectral_classes:
+            raise ValueError(f"{spectral_class} is not a valid `spectral_class`.")
+        try:
+            data = pd.read_fwf(
+                join(DATAPATH, "pickles_spectra", "dat", f"{spectral_class}.dat"),
+                colspecs=[(0, 7), (7, 17)],
+                header=None,
+            )
+            self.wavelengths = data[0].values * u.AA
+            self.spectrum = data[1].values
+        except Exception:
+            raise RuntimeError(
+                "Could not load the Pickles data for some reason (probably a formatting "
+                + "quirk in the file). Please contact the developer with a minimal "
+                + "working example."
+            )
 
     def show_spectrum(self, plot=True):
         """
