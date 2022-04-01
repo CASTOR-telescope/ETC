@@ -1,9 +1,82 @@
 """
-Generate and handle spectral data and normalizations. Includes:
-  - blackbody radiation, power-law spectrum, Gaussian spectrum
-  - stellar spectral types (TODO)
-  - user-input spectrum (TODO)
-  - normalizations (LIST THEM)
+Generate and handle spectral data and normalizations.
+
+Includes:
+  - redshifting wavelengths
+  - blackbody radiation, power-law spectrum generation
+  - user-input spectrum
+  - Gaussian and Lorentzian emission/absorption lines
+  - generic spiral and elliptical galaxy spectra
+  - stellar spectra from Pickles (TODO)
+  - normalization functions:
+    - normalize a blackbody spectrum to a star of given radius and distance
+    - normalize a spectrum to some average value or AB magnitude, either within a passband
+      or over the whole spectrum
+    - normalize a spectrum to a given bolometric luminosity and distance
+    - calculate the average value of a spectrum (erg/s/cm^2/A or AB mag) either within a
+      passband or over the whole spectrum
+
+---
+
+        GNU General Public License v3 (GNU GPLv3)
+
+(c) 2022.                            (c) 2022.
+Government of Canada                 Gouvernement du Canada
+National Research Council            Conseil national de recherches
+Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+All rights reserved                  Tous droits réservés
+
+NRC disclaims any warranties,        Le CNRC dénie toute garantie
+expressed, implied, or               énoncée, implicite ou légale,
+statutory, of any kind with          de quelque nature que ce
+respect to the software,             soit, concernant le logiciel,
+including without limitation         y compris sans restriction
+any warranty of merchantability      toute garantie de valeur
+or fitness for a particular          marchande ou de pertinence
+purpose. NRC shall not be            pour un usage particulier.
+liable in any event for any          Le CNRC ne pourra en aucun cas
+damages, whether direct or           être tenu responsable de tout
+indirect, special or general,        dommage, direct ou indirect,
+consequential or incidental,         particulier ou général,
+arising from the use of the          accessoire ou fortuit, résultant
+software. Neither the name           de l'utilisation du logiciel. Ni
+of the National Research             le nom du Conseil National de
+Council of Canada nor the            Recherches du Canada ni les noms
+names of its contributors may        de ses  participants ne peuvent
+be used to endorse or promote        être utilisés pour approuver ou
+products derived from this           promouvoir les produits dérivés
+software without specific prior      de ce logiciel sans autorisation
+written permission.                  préalable et particulière
+                                     par écrit.
+
+This file is part of the             Ce fichier fait partie du projet
+FORECASTOR ETC project.              FORECASTOR ETC.
+
+FORECASTOR ETC is free software:     FORECASTOR ETC est un logiciel
+you can redistribute it and/or       libre ; vous pouvez le redistribuer
+modify it under the terms of         ou le modifier suivant les termes de
+the GNU General Public               la "GNU General Public
+License as published by the          License" telle que publiée
+Free Software Foundation,            par la Free Software Foundation :
+either version 3 of the              soit la version 3 de cette
+License, or (at your option)         licence, soit (à votre gré)
+any later version.                   toute version ultérieure.
+
+FORECASTOR ETC is distributed        FORECASTOR ETC est distribué
+in the hope that it will be          dans l'espoir qu'il vous
+useful, but WITHOUT ANY WARRANTY;    sera utile, mais SANS AUCUNE
+without even the implied warranty    GARANTIE : sans même la garantie
+of MERCHANTABILITY or FITNESS FOR    implicite de COMMERCIALISABILITÉ
+A PARTICULAR PURPOSE. See the        ni d'ADÉQUATION À UN OBJECTIF
+GNU General Public License for       PARTICULIER. Consultez la Licence
+more details.                        Générale Publique GNU pour plus
+                                     de détails.
+
+You should have received             Vous devriez avoir reçu une
+a copy of the GNU General            copie de la Licence Générale
+Public License along with            Publique GNU avec FORECASTOR ETC ;
+FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
+<http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
 import warnings
@@ -14,6 +87,7 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from astropy.io import fits
 from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
@@ -720,16 +794,21 @@ class SpectrumMixin:
 
     def use_custom_spectrum(self, filepath, wavelength_unit=u.AA, overwrite=False):
         """
-        Use custom spectrum from an ASCII file.
+        Use custom spectrum from an ASCII or FITS file.
 
         Parameters
         ----------
           filepath :: str
-            The absolute path to the file containing the spectrum. The files should be in
-            ASCII format with the first column containing the wavelengths in
-            `wavelength_units` and the second column containing the spectrum in flam
-            (erg/s/cm^2/A); the columns should be separated by a constant number of
-            spaces. Lines starting with a hash (#) will be ignored.
+            The absolute path to the file containing the spectrum.
+            If the file is in ASCII format, the first column should contain the
+            wavelengths in `wavelength_units` and the second column containing the
+            spectrum in flam (erg/s/cm^2/A); the columns should be separated by a constant
+            number of spaces. Lines starting with a hash (#) will be ignored. The file
+            extension must not be .fit or .fits.
+            If the file is in FITS format, the first field (index 0) should contain the
+            wavelengths in `wavelength_units` and the second field (index 1) should
+            contain the spectrum in flam (erg/s/cm^2/A). The file extension must be .fit
+            or .fits.
 
           wavelength_unit :: `astropy.Quantity` length unit
             The unit of the wavelengths in the file (e.g., u.AA for angstrom, u.nm for
@@ -761,17 +840,32 @@ class SpectrumMixin:
             _ = wavelength_unit.to(u.AA)
         except Exception:
             raise TypeError("wavelength_units must be an `astropy.Quantity` length unit.")
-        data = pd.read_csv(
-            filepath,
-            sep=" +",
-            header=None,
-            comment="#",
-            engine="python",
-        )  # sep=" +" is Python regex to match a variable number of spaces
-        self.wavelengths = (data[0].values * wavelength_unit).to(u.AA)
-        self.spectrum = data[1].values
+        #
+        # Load spectrum
+        #
+        file_ext = filepath.split(".")[-1].lower()
+        try:
+            if file_ext == "fit" or file_ext == "fits":
+                data = fits.getdata(filepath)
+                self.wavelengths = (data.field(0) * wavelength_unit).to(u.AA)
+                self.spectrum = data.field(1)
+            else:
+                data = pd.read_csv(
+                    filepath,
+                    sep=" +",
+                    header=None,
+                    comment="#",
+                    engine="python",
+                )  # sep=" +" is Python regex to match a variable number of spaces
+                self.wavelengths = (data[0].values * wavelength_unit).to(u.AA)
+                self.spectrum = data[1].values
+        except Exception:
+            raise RuntimeError(
+                "Could not read spectrum from file. File must be in ASCII or FITS format "
+                + "and adhere to the guidelines specified in the docstring."
+            )
 
-    def use_galaxy_spectrum(self, type, overwrite=False):
+    def use_galaxy_spectrum(self, gal_type, overwrite=False):
         """
         Use one of the predefined galaxy spectra. These non-uniformly sampled spectra are
         from Fioc & Rocca-Volmerange (1997)
@@ -784,7 +878,7 @@ class SpectrumMixin:
 
         Parameters
         ----------
-          type :: "elliptical" or "spiral"
+          gal_type :: "elliptical" or "spiral"
             The galaxy morphology. The elliptical galaxy (class T=-5, -4) and spiral
             galaxy (type Sc, class T=5) spectra both run from 22-10000 nm.
 
@@ -809,8 +903,8 @@ class SpectrumMixin:
         # Check inputs
         #
         self._check_existing_spectrum(overwrite)
-        if type == "elliptical" or type == "spiral":
-            filepath = join(DATAPATH, "galaxy_spectra", f"{type}_galaxy.txt")
+        if gal_type == "elliptical" or gal_type == "spiral":
+            filepath = join(DATAPATH, "galaxy_spectra", f"{gal_type}_galaxy.txt")
         else:
             raise ValueError("Galaxy type must be 'elliptical' or 'spiral'")
         data = pd.read_csv(
@@ -857,6 +951,8 @@ class SpectrumMixin:
 class NormMixin:
     """
     Mixin for normalizing spectra.
+
+    TODO: Make normalize to a specific value at a given wavelength
     """
 
     @staticmethod
@@ -907,16 +1003,18 @@ class NormMixin:
     def norm_to_value(
         self,
         value,
-        value_type="flux",
+        value_type="mag",
         passband=None,
+        telescopeObj=None,
         passband_lims=None,
         pivot_wavelength=None,
     ):
         """
-        Normalize the spectrum so that it's average flux density (in erg/s/cm^2/A) or AB
-        magnitude is equal to the given value, either over the whole wavelength range or
-        within a passband. The `Source` object should have its spectrum in units of flam
-        (erg/s/cm^2/A) and wavelengths in angstrom.
+        Normalize the spectrum so that it's average flux density (in units of "flam",
+        erg/s/cm^2/A) or AB magnitude (based on mean flux density, erg/s/cm^2/A) is equal
+        to the given value, either over the whole wavelength range or within a passband.
+        The `Source` object should have its spectrum in units of flam (erg/s/cm^2/A) and
+        wavelengths in angstrom.
 
         The higher the resolution of the spectrum, the more accurate the normalization.
         Also, if passband or passband_lims is not None, note that some wavelength/spectrum
@@ -924,39 +1022,51 @@ class NormMixin:
         normalization due to limited floating point precision. Typically, the relative
         error should be less than 2%.
 
+        To normalize over the whole spectrum, do not specify any passband, passband_lims,
+        or pivot_wavelength. To normalize in a passband, either specify:
+          - both passband + telescopeObj, or
+          - passband_lims and/or pivot_wavelength (useful for normalizing in arbitrary
+            passbands).
+
         Parameters
         ----------
           value :: int or float
             The value to which the average value of the spectrum should equal. This value
             should be in the same units as the spectrum.
 
-          value_type :: "flux" or "mag"
+          value_type :: "flam" or "mag"
             Flux density (erg/s/cm^2/A) or AB magnitude (mag).
 
-          passband :: "uv", "u", "g", or None
-            If not None, normalize the spectrum such that the flux within the given
-            (predefined) CASTOR passband is equal to the specified value. At most one of
-            passband or passband_lims can be specified; if both passband and passband_lims
-            are None, normalize the spectrum such that the total flux is equal to the
-            specified value. Note that if your `Telescope` object uses custom passbands,
-            you should use the passband_lims argument instead (i.e., pass in
-            `passband_limits` attribute to passband_lims).
+          passband :: valid `Telescope` passband string (e.g., "uv", "u", "g") or None
+            If not None, normalize the spectrum such that the average flux density within
+            the given telescopeObj passband is equal to the specified value; also requires
+            the telescopeObj parameter. Otherwise, normalize the spectrum such that the
+            mean flux density is equal to the specified value (after converting to the
+            correct units). Note that if the value_type is "mag" and passband is None,
+            then the passband response is taken to be unity for the purposes of
+            calculating a pivot wavelength. The pivot wavelength is required for this
+            normalization otherwise a different normalization factor would apply at each
+            wavelength.
+
+          telescopeObj :: `Telescope` object
+            The `Telescope` object containing the passband limits and pivot wavelengths of
+            each passband. Requires the passband parameter. Only relevant if passband is
+            not None.
 
           passband_lims :: 2-element `astropy.Quantity` array or None
             If not None, this gives the [lower, upper] bounds of the passband, inclusive.
             In this case, the function will normalize the spectrum such that the flux
-            within the given passband_lims is equal to the specified value. At most one of
-            passband or passband_lims can be specified; if both passband and passband_lims
-            are None, normalize the spectrum such that the total flux is equal to the
-            specified value.
+            density within the given passband_lims is equal to the specified value. This
+            cannot be specified if telescopeObj or passband is given. if both passband and
+            passband_lims are None, normalize with respect to the entire spectrum.
 
           pivot_wavelength :: scalar, `astropy.Quantity` length, or None
-            The pivot wavelength of the passband/passband_lims. If a scalar, this is
-            assumed to be in angstrom. This parameter is only relevant (and must not be
-            None) if value_type is "mag"; the only exception is if passband and
-            passband_lims are both None so that the normalization applies to the
-            bolometric flux---in this case, the "passband response" is taken to be unity.
-            Also see the `castor_etc.Telescope.calc_pivot_wavelength()` function or the
+            The pivot wavelength of the passband_lims. If a scalar, this is assumed to be
+            in angstrom. This parameter is only relevant if value_type is "mag". This
+            cannot be specified if telescopeObj or passband is given. If both passband and
+            passband_lims are None, the normalization applies to the entire spectrum; in
+            this case, the "passband response" is taken to be unity. Also see the
+            `castor_etc.Telescope.calc_pivot_wavelength()` function or the
             `passband_pivots` attribute in the `Telescope` instance.
 
         Attributes
@@ -970,6 +1080,8 @@ class NormMixin:
         """
 
         def _get_norm_factor(_value, _flam, _wavelengths, _lims):
+            # _tot_flam = simpson(y=_flam, x=_wavelengths, even="avg")  # erg/s/cm^2
+            # _avg_flam = _tot_flam / (_lims[1] - _lims[0])  # erg/s/cm^2/A
             _avg_flam = simpson(y=_flam, x=_wavelengths, even="avg") / (
                 _lims[1] - _lims[0]
             )  # erg/s/cm^2/A
@@ -980,26 +1092,41 @@ class NormMixin:
         #
         if self.spectrum is None or self.wavelengths is None:
             raise ValueError("Please generate a spectrum before normalizing.")
-        if passband is not None and passband_lims is not None:
-            raise ValueError("At most one of passband and passband_lims can be not None.")
-        if value_type not in ["flux", "mag"]:
-            raise ValueError("value_type must be either 'flux' or 'mag'.")
-        if value_type == "mag" and pivot_wavelength is None:
-            if passband is None and passband_lims is None:
-                pivot_wavelength = (
-                    Telescope.calc_pivot_wavelength(
-                        self.wavelengths.value,
-                        np.ones(np.shape(self.wavelengths), dtype=float),
-                    )
-                    * self.wavelengths.unit
-                )
-            else:
+        if value_type not in ["flam", "mag"]:
+            raise ValueError("value_type must be either 'flam' or 'mag'.")
+        if (passband is not None or telescopeObj is not None) and (
+            passband_lims is not None or pivot_wavelength is not None
+        ):
+            raise ValueError(
+                "passband/telescopeObj cannot be simultaneously specified with "
+                + "passband_lims or pivot_wavelength."
+            )
+        if passband is not None:
+            if telescopeObj is None:
                 raise ValueError(
-                    "pivot_wavelength must be specified if "
-                    + "passband/passband_lims is not None and value_type is 'mag'."
+                    "A `Telescope` object must be given if normalizing within a passband."
                 )
+            try:
+                passband_lims = telescopeObj.passband_limits[passband]
+                pivot_wavelength = telescopeObj.passband_pivots[passband]
+            except Exception:
+                raise AttributeError("Desired passband not found in given telescopeObj.")
         if isinstance(pivot_wavelength, u.Quantity):
             pivot_wavelength = pivot_wavelength.to(self.wavelengths.unit)
+        if value_type == "mag" and pivot_wavelength is None:
+            if passband_lims is None:
+                in_passband = np.full(np.shape(self.wavelengths), True)
+            else:
+                in_passband = (self.wavelengths >= passband_lims[0]) & (
+                    self.wavelengths <= passband_lims[1]
+                )
+            pivot_wavelength = (
+                Telescope.calc_pivot_wavelength(
+                    self.wavelengths.value[in_passband],
+                    np.ones(np.shape(self.wavelengths[passband_lims]), dtype=float),
+                )
+                * self.wavelengths.unit
+            )
         #
         # Calculate normalization factor
         #
@@ -1165,91 +1292,3 @@ class NormMixin:
                 else:
                     result[band] = avg_flam
         return result
-
-
-# ------------------------------------ OLD FUNCTIONS ----------------------------------- #
-
-
-def generate_gaussian(center, wavelengths, fwhm, peak=None, tot_flux=None):
-    """
-    Generates a spectrum in the shape of a Gaussian. This is useful for representing
-    emission lines (i.e., by adding a Gaussian source) or absorption lines (i.e., by
-    subtracting a Gaussian source).
-
-    The spectrum can be represented by the following formulae:
-    ```math
-                spectrum = peak / exp[(wavelengths - center)^2 / (2 * sigma^2)]
-    ```
-    and
-    ```math
-                sigma = fwhm / [2 * sqrt(2 * ln2)]
-    ```
-    and
-    ```math
-                peak = tot_flux / sqrt(2 * pi * sigma^2)
-    ```
-    where:
-      - spectrum is the spectrum's flux in some arbitrary unit
-      - peak is the flux at the center of the Gaussian (i.e., the central wavelength)
-      - center is the central wavelength of the Gaussian
-      - wavelengths is the array of wavelengths over which to calculate the spectrum
-      - fwhm is the full-width at half-maximum of the Gaussian
-      - tot_flux is the total flux of the Gaussian under the curve
-
-    Parameters
-    ----------
-      center :: scalar or `astropy.Quantity`
-        The central wavelength of the Gaussian. If an `astropy.Quantity` object, it must
-        have the same units as the wavelengths array.
-
-      wavelengths :: array of floats or `astropy.Quantity` array
-        The wavelengths over which to calculate the Gaussian spectrum. If an
-        `astropy.Quantity` array, it must have the same units as the center parameter.
-
-      fwhm :: scalar or `astropy.Quantity`
-        The full-width at half-maximum of the Gaussian. If an `astropy.Quantity` object,
-        it must have the same units as the wavelengths array.
-
-      peak :: scalar or `astropy.Quantity`
-        The peak flux of the Gaussian (i.e., the flux at the center wavelength). This
-        determines the unit of the returned spectrum. Exactly one of peak or tot_flux must
-        be specified.
-
-      tot_flux :: scalar or `astropy.Quantity`
-        The total flux under the curve. This implicitly determines the unit of the
-        returned spectrum. Exactly one of peak or tot_flux must be specified.
-
-    Returns
-    -------
-      spectrum :: array of floats or `astropy.Quantity` array
-        The flux of the source in the shape of a Gaussian curve.
-    """
-    #
-    # Check inputs
-    #
-    if np.size(center) != 1:
-        raise ValueError("center must be a single scalar or `astropy.Quantity`.")
-    if isinstance(wavelengths, u.Quantity) and isinstance(center, u.Quantity):
-        if wavelengths.unit != center.unit:
-            raise ValueError("wavelengths and center must have the same units.")
-    if np.size(fwhm) != 1:
-        raise ValueError("fwhm must be a single scalar or `astropy.Quantity`.")
-    if isinstance(fwhm, u.Quantity):
-        if isinstance(center, u.Quantity) and center.unit != fwhm.unit:
-            raise ValueError("center and fwhm must have the same units.")
-        if isinstance(wavelengths, u.Quantity) and wavelengths.unit != fwhm.unit:
-            raise ValueError("wavelengths and fwhm must have the same units.")
-    if (peak is None and tot_flux is None) or (peak is not None and tot_flux is not None):
-        raise ValueError("Exactly one of peak or tot_flux must be specified.")
-    if peak is not None and np.size(peak) != 1:
-        raise ValueError("peak must be a single scalar or `astropy.Quantity`.")
-    elif np.size(tot_flux) != 1:
-        raise ValueError("tot_flux must be a single scalar or `astropy.Quantity`.")
-    #
-    # Gaussian spectrum
-    #
-    sigma = fwhm / (2 * np.sqrt(2 * np.log(2)))
-    if peak is None:
-        peak = tot_flux / (np.sqrt(2 * np.pi) * sigma)
-    spectrum = peak / np.exp((wavelengths - center) ** 2 / (2 * sigma ** 2))
-    return spectrum
