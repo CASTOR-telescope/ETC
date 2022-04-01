@@ -107,14 +107,14 @@ class Background:
             The absolute path to the file containing the Earthshine data. It must be a
             FITS file with the first field (index zero) containing the wavelengths in
             angstroms and the second field (index one) containing the Earthshine flux in
-            flam (erg/cm^2/s/A). If None, omit Earthshine component. If mags_per_sq_arcsec
-            provided, the data from this file will not be used.
+            flam (erg/cm^2/s/A) per sq. arcsec. If None, omit Earthshine component. If
+            mags_per_sq_arcsec provided, the data from this file will not be used.
 
           zodi_file :: str or None
             The absolute path to the file containing the zodiacal light data. It must be a
             FITS file with the first field (index zero) containing the wavelengths in
             angstroms and the second field (index one) containing the Earthshine flux in
-            flam (erg/cm^2/s/A). If None, omit zodiacal light component. If
+            flam (erg/cm^2/s/A) per sq. arcsec. If None, omit zodiacal light component. If
             mags_per_sq_arcsec provided, the data from this file will not be used.
 
           mags_per_sq_arcsec :: dict of floats or None
@@ -289,44 +289,38 @@ class Background:
         if not isinstance(TelescopeObj, Telescope):
             raise TypeError("TelescopeObj must be a `castor_etc.Telescope` object.")
 
-        def _sum_flam(wavelengths, flam):
-            for band in avg_sky_flam:
+        def _add_avg_flam(wavelengths, flam):
+            for band in avg_sky_flam_per_sq_arcsec:
                 in_passband = (wavelengths >= passband_limits_AA[band][0]) & (
                     wavelengths <= passband_limits_AA[band][1]
                 )
                 passband_range = passband_limits_AA[band][1] - passband_limits_AA[band][0]
-                # Mean value of the flux density in the passband
-                avg_sky_flam[band] += (
+                # Mean value of the flux density per sq. arcsec in the passband
+                avg_sky_flam_per_sq_arcsec[band] += (
                     simpson(y=flam[in_passband], x=wavelengths[in_passband], even="avg")
                     / passband_range
-                )  # erg/cm^2/s/A
+                )  # erg/cm^2/s/A/arcsec^2
 
         passband_limits_AA = {
             band: limits.to(u.AA).value
             for band, limits in TelescopeObj.passband_limits.items()
         }
-        avg_sky_flam = dict.fromkeys(
+        avg_sky_flam_per_sq_arcsec = dict.fromkeys(
             TelescopeObj.passband_limits, 0.0
-        )  # average flam through band
+        )  # average flam per sq. arcsec through band
 
         if self.earthshine_wavelengths is not None and self.earthshine_flam is not None:
-            _sum_flam(self.earthshine_wavelengths, self.earthshine_flam)
+            _add_avg_flam(self.earthshine_wavelengths, self.earthshine_flam)
         if self.zodi_wavelengths is not None and self.zodi_flam is not None:
-            _sum_flam(self.zodi_wavelengths, self.zodi_flam)
-        avg_sky_mags = dict.fromkeys(TelescopeObj.passband_limits, np.nan)
-        for band in avg_sky_flam:
+            _add_avg_flam(self.zodi_wavelengths, self.zodi_flam)
+        avg_sky_mags_per_sq_arcsec = dict.fromkeys(TelescopeObj.passband_limits, np.nan)
+        for band in avg_sky_flam_per_sq_arcsec:
             # (No need to return uncertainty)
-            avg_sky_mags[band] = convert_electron_flux_mag(
-                avg_sky_flam[band],
+            avg_sky_mags_per_sq_arcsec[band] = convert_electron_flux_mag(
+                avg_sky_flam_per_sq_arcsec[band],
                 "flam",
                 "mag",
                 wavelengths=TelescopeObj.passband_pivots[band],
             )[0]
 
-        # REVIEW:
-        # At this point, although the sky background magnitudes are technically just AB
-        # magnitudes (converted from erg/s/cm^2/A), these sky backgrounds only make sense
-        # if they are in units of AB mags per square arcsecond (recall the sky background
-        # values assumed by Dr. Patrick Côté). Thus we will just assume these values are
-        # in AB mags per sq. arcsec...
-        self.mags_per_sq_arcsec = avg_sky_mags
+        self.mags_per_sq_arcsec = avg_sky_mags_per_sq_arcsec
