@@ -1,6 +1,69 @@
 """
 Utilities to characterize the telescope parameters.
+
+---
+
+        GNU General Public License v3 (GNU GPLv3)
+
+(c) 2022.                            (c) 2022.
+Government of Canada                 Gouvernement du Canada
+National Research Council            Conseil national de recherches
+Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+All rights reserved                  Tous droits réservés
+
+NRC disclaims any warranties,        Le CNRC dénie toute garantie
+expressed, implied, or               énoncée, implicite ou légale,
+statutory, of any kind with          de quelque nature que ce
+respect to the software,             soit, concernant le logiciel,
+including without limitation         y compris sans restriction
+any warranty of merchantability      toute garantie de valeur
+or fitness for a particular          marchande ou de pertinence
+purpose. NRC shall not be            pour un usage particulier.
+liable in any event for any          Le CNRC ne pourra en aucun cas
+damages, whether direct or           être tenu responsable de tout
+indirect, special or general,        dommage, direct ou indirect,
+consequential or incidental,         particulier ou général,
+arising from the use of the          accessoire ou fortuit, résultant
+software. Neither the name           de l'utilisation du logiciel. Ni
+of the National Research             le nom du Conseil National de
+Council of Canada nor the            Recherches du Canada ni les noms
+names of its contributors may        de ses  participants ne peuvent
+be used to endorse or promote        être utilisés pour approuver ou
+products derived from this           promouvoir les produits dérivés
+software without specific prior      de ce logiciel sans autorisation
+written permission.                  préalable et particulière
+                                     par écrit.
+
+This file is part of the             Ce fichier fait partie du projet
+FORECASTOR ETC project.              FORECASTOR ETC.
+
+FORECASTOR ETC is free software:     FORECASTOR ETC est un logiciel
+you can redistribute it and/or       libre ; vous pouvez le redistribuer
+modify it under the terms of         ou le modifier suivant les termes de
+the GNU General Public               la "GNU General Public
+License as published by the          License" telle que publiée
+Free Software Foundation,            par la Free Software Foundation :
+either version 3 of the              soit la version 3 de cette
+License, or (at your option)         licence, soit (à votre gré)
+any later version.                   toute version ultérieure.
+
+FORECASTOR ETC is distributed        FORECASTOR ETC est distribué
+in the hope that it will be          dans l'espoir qu'il vous
+useful, but WITHOUT ANY WARRANTY;    sera utile, mais SANS AUCUNE
+without even the implied warranty    GARANTIE : sans même la garantie
+of MERCHANTABILITY or FITNESS FOR    implicite de COMMERCIALISABILITÉ
+A PARTICULAR PURPOSE. See the        ni d'ADÉQUATION À UN OBJECTIF
+GNU General Public License for       PARTICULIER. Consultez la Licence
+more details.                        Générale Publique GNU pour plus
+                                     de détails.
+
+You should have received             Vous devriez avoir reçu une
+a copy of the GNU General            copie de la Licence Générale
+Public License along with            Publique GNU avec FORECASTOR ETC ;
+FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
+<http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
+
 
 import warnings
 from copy import deepcopy
@@ -15,7 +78,7 @@ from scipy.interpolate import interp1d
 from . import parameters as params
 from .conversions import fnu_to_photlam, mag_to_flux
 
-# TODO: add PSF
+# TODO: add PSF (Moffat and Gaussian? Need to get data file first)
 
 
 def secant_method(f, x0, x1, tol=1e-6, max_iter=100):
@@ -104,8 +167,6 @@ def bisection_method(f, x0, x1, tol=1e-6, max_iter=100):
 class Telescope:
     """
     Telescope class containing the parameters of the imaging system.
-
-    TODO: add PSF (Moffat and Gaussian)
     """
 
     def __init__(
@@ -115,8 +176,6 @@ class Telescope:
         passband_response_filepaths=params.PASSBAND_FILEPATHS,
         passband_response_fileunits=params.PASSBAND_FILEUNITS,
         passband_resolution=params.PASSBAND_RESOLUTION,
-        # passband_pivots=params.PASSBAND_PIVOTS,
-        # phot_zpts=params.PHOT_ZPTS,
         passband_pivots=None,  # force auto-calculation of passband_pivots
         phot_zpts=None,  # force auto-calculation of phot_zpts
         phot_zpts_kwargs={
@@ -127,20 +186,17 @@ class Telescope:
         },
         fwhm=params.FWHM,
         px_scale=params.PX_SCALE,
-        ifov_dimen=params.IFOV_DIMEN,
-        mp=params.MP,
+        ifov_dimen=params.IFOV_DIMEN,  # not currently used for any calculations
+        mp=params.MP,  # not currently used for any calculations
         mirror_diameter=params.MIRROR_DIAMETER,
         dark_current=params.DARK_CURRENT,
-        bias=params.BIAS,
+        bias=params.BIAS,  # not currently used for any calculations
         read_noise=params.READ_NOISE,
-        gain=params.GAIN,
+        gain=params.GAIN,  # not currently used for any calculations
         redleak_thresholds=params.REDLEAK_THRESHOLDS,
         show_warnings=True,
     ):
         """
-        TODO: if passband_pivots or phot_zpts provided, override auto-calculation from
-        passband_response
-
         Create a Telescope instance.
 
         Parameters
@@ -150,9 +206,10 @@ class Telescope:
             and "g", but other passband names are allowed.
 
           passband_limits :: dict of 2-element `astropy.Quantity` arrays
-            The lower and upper wavelength limits for each passband. Each element should
-            be an `astropy.Quantity` array of length 2 (e.g., `{"uv": [0.150, 0.300] *
-            u.um, "u": [0.300, 0.400] * u.um, "g": [0.400, 0.550] * u.um]}`).
+            Dictionary containing the lower and upper wavelength limits for each passband.
+            Each element should be an `astropy.Quantity` array of length 2 (e.g., `{"uv":
+            [0.150, 0.300] * u.um, "u": [0.300, 0.400] * u.um, "g": [0.400, 0.550] *
+            u.um]}`).
 
           passband_response_filepaths :: dict of str
             The absolute paths to the files containing the passband response curves. The
@@ -162,24 +219,24 @@ class Telescope:
             starting with a hash (#) will be ignored. Note that the passband response
             values should account for quantum efficiency.
 
-          passband_resolution :: `astropy.Quantity`
-            The desired linear interpolation resolution of the passband response curves.
-
           passband_response_fileunits :: dict of `astropy.Quantity` lengths
             The units of the wavelength columns in the passband response files.
 
-          passband_pivots :: dict of `astropy.Quantity` or None
+          passband_resolution :: `astropy.Quantity` length
+            The desired linear interpolation resolution of the passband response curves.
+
+          passband_pivots :: dict of `astropy.Quantity` wavelengths or None
             The pivot wavelengths for each passband. If None, calculate the passband
             pivots based on the given passband limits and passband response files.
 
-          phot_zpts :: dict of float or None
-            The photometric zero points for each passband. If None, automatically
-            calculate the photometric zero points from the given passband response files
-            (also see `phot_zpts_kwargs`). The photometric zero point of a passband is
+          phot_zpts :: dict of int/float or None
+            The photometric zero-points for each passband. If None, automatically
+            calculate the photometric zero-points from the given passband response files
+            (also see `phot_zpts_kwargs`). The photometric zero-point of a passband is
             defined as the AB magnitude which produces 1 electron/s in the passband.
 
           phot_zpts_kwargs :: dict of kwargs
-            The keyword arguments for finding the photometric zero points via
+            The keyword arguments for finding the photometric zero-points via
             `calc_phot_zpts()`. Namely: 'ab_mags', 'method', 'tol', and 'max_iter'.
             Following is a description of each parameter:
             - ab_mags :: dict of 2-element list of floats
@@ -189,7 +246,7 @@ class Telescope:
                 for the latter, the lower bound must produce < 1 electron/s and the upper
                 bound must produce > 1 electron/s.
             - method :: "secant" or "bisection"
-                The method to use for calculating the photometric zero points. The secant
+                The method to use for calculating the photometric zero-points. The secant
                 method has faster convergence and does not depend on knowing upper/lower
                 bounds for the photometric zero-point, but is not guaranteed to converge
                 and you must provide two initial guesses for the zero-point. The bisection
@@ -197,68 +254,164 @@ class Telescope:
                 for the zero-point, but is guaranteed to converge (given suitable
                 upper/lower bounds) and does not require two good initial guesses.
             - tol :: float
-                The desired accuracy of the photometric zero points.
+                The desired accuracy of the photometric zero-points.
             - max_iter :: int
                 The maximum number of iterations to use for finding each photometric zero
                 point.
 
+          fwhm :: `astropy.Quantity` angle
+            The angular full-width at half-maximum of the telescope's PSF (e.g., 0.15
+            arcsec).
+
+          px_scale :: `astropy.Quantity` angle
+            The linear angle subtended by each square pixel in the detector (e.g., 0.1
+            arcsec). This will be used to calculate the solid angle subtended by each
+            square pixel in the detector (e.g., 0.01 arcsec).
+
+          ifov_dimen :: 2-element `astropy.Quantity` angle array
+            The angular dimensions of the telescope's instantaneous field of view (IFOV).
+            This will be used to calculate the area covered by the telescope's IFOV. Note
+            that this must be an `astropy.Quantity` array (e.g., `[0.44, 0.56] * u.deg`),
+            not a list of `astropy.Quantity` objects (not, e.g., `[0.44 * u.deg, 0.56 *
+            u.deg]`).
+            Not currently used for any calculations (other than calculating area of IFOV).
+
+          mp :: int or float
+            The telescope detector's number of megapixels (million pixels).
+            Not currently used for any calculations.
+
+          mirror_diameter :: `astropy.Quantity` length
+            The diameter of the telescope's primary circular mirror (e.g., 100 cm). This
+            will be used to calculate the area of the primary mirror.
+
+          dark_current :: int or float
+            The dark current of the telescope's detector in electron/s/pixel. For example,
+            at CASTOR's operating temperature of 180 K, the dark current is ~1e-4
+            electron/s/pixel.
+
+          bias :: int or float
+            The bias of the telescope's detector in units of electron (e.g., 100
+            electrons).
+            Not currently used for any calculations.
+
+          read_noise :: int or float
+            The telescope detector's read noise in units of electron/pixel (e.g., 2
+            electrons/pixel at high gain).
+
+          gain :: int or float
+            The gain setting of the telescope's detector in units of electron/ADU (e.g.,
+            2.0 electrons/ADU).
+            Not currently used for any calculations.
+
           redleak_thresholds :: dict of `astropy.Quantity` wavelengths
-            The redleak thresholds for each passband. Flux longward of the threshold is
-            considered red leak.
+            The redleak thresholds for each passband
+            (e.g., `{"uv": 3880 * u.AA, "u": 4730 * u.AA, "g": 5660 * u.AA}`).
+            Flux longward of the threshold is considered red leak.
 
           show_warnings :: bool
-            If True, print a warning when passband_limits, passband_pivots, or phot_zpts
-            contain keys that are not in passbands.
+            If True, print a warning when `passband_limits`,
+            `passband_response_filepaths`, `passband_response_fileunits`,
+            `passband_pivots` (if not None), `phot_zpts` (if not None), or
+            `redleak_thresholds` contain keys that are not in `passbands`.
 
         Attributes
         ----------
-          passbands ::
+          passbands :: list of str
+            The telescope filter (i.e., passband) names.
 
-          passband_limits ::
+          passband_limits :: dict of 2-element `astropy.Quantity` arrays
+            Dictionary containing the lower and upper wavelength limits for each passband.
 
-          passband_tot_limits ::
+          passband_resolution :: `astropy.Quantity` length
+            The desired linear interpolation resolution of the passband response curves.
 
-          passband_resolution ::
+          passband_pivots :: dict of `astropy.Quantity` wavelengths
+            Dictionary containing the pivot wavelength of each passband.
 
-          passband_pivots ::
+          phot_zpts :: dict of int/float
+            Dictionary containing the photometric zero-point of each passband. The
+            photometric zero-point of a passband is defined as the AB magnitude which
+            produces 1 electron/s in the passband.
 
-          passband_curves ::
+          passband_curves :: dict of dicts
+            Dictionary containing the passband response curves for each passband
+            interpolated to the given `passband_resolution`, only spanning the wavelength
+            range of each passband. The dictionary keys are the passband names and each
+            key is a dictionary containing the passband wavelengths (key: "wavelength",
+            value: `astropy.Quantity` array) and the passband response (key: "response",
+            value: array of floats). An example structure is:
+            ```python
+            passband_curves = {
+                "uv": {
+                    "wavelength": <`astropy.Quantity` array>,
+                    "response": <array of floats>,
+                },
+                "u": {
+                    "wavelength": <`astropy.Quantity` array>,
+                    "response": <array of floats>,
+                },
+                "g": {
+                    "wavelength": <`astropy.Quantity` array>,
+                    "response": <array of floats>,
+                },
+            }
+            ```
 
-          full_passband_curves ::
+          full_passband_curves :: dict of dicts
+            Like `passband_curves`, except each passband contains the whole passband
+            response curve (wavelengths and passband response from
+            `passband_response_filepaths`) and interpolated to the given
+            `passband_resolution`.
 
-          phot_zpts ::
+          fwhm :: `astropy.Quantity` angle
+            The angular full-width at half-maximum of the telescope's PSF.
 
-          fwhm ::
+          px_scale :: `astropy.Quantity` angle
+            The linear angle subtended by each square pixel in the detector.
 
-          px_scale ::
+          px_area :: `astropy.Quantity` angle
+            The solid angle (i.e., angular area) subtended by each square pixel in the
+            detector.
 
-          px_area ::
+          ifov_dimen :: 2-element `astropy.Quantity` angle array
+            The angular dimensions of the telescope's instantaneous field of view.
+            Not currently used for any calculations.
 
-          ifov_dimen ::
+          ifov_area :: `astropy.Quantity` angle
+            The angular area covered by the telescope's instantaneous field of view.
+            Not currently used for any calculations.
 
-          ifov_area ::
+          mp :: int or float
+            The telescope detector's number of megapixels.
+            Not currently used for any calculations.
 
-          mp ::
+          mirror_diameter :: `astropy.Quantity` length
+            The diameter of the telescope's primary circular mirror.
 
-          mirror_diameter ::
+          mirror_area :: `astropy.Quantity` length
+            The area of the telescope's primary circular mirror.
 
-          mirror_area ::
+          dark_current :: int or float
+            The telescope detector's dark current in electron/s/pixel.
 
-          dark_current ::
+          bias :: int or float
+            The telescope detector's bias in units of electron.
+            Not currently used for any calculations.
 
-          bias ::
+          read_noise :: int or float
+            The telescope detector's read noise in electron/pixel.
 
-          read_noise ::
+          gain :: int or float
+            The telescope detector's gain in units of electron/ADU.
+            Not currently used for any calculations.
 
-          gain ::
-
-          redleak_thresholds ::
+          redleak_thresholds :: dict of `astropy.Quantity` wavelengths
+            Dictionary containing the redleak threshold of each passband. Flux longward of
+            the threshold is considered red leak.
 
         Returns
         -------
           `Telescope` instance
-
-          TODO: finish docstring
         """
 
         def _check_dict(d, d_name, value_types, value_types_str):
@@ -340,52 +493,52 @@ class Telescope:
             )
         passband_limits = _check_dict(
             passband_limits,
-            "passband_limits",
+            "`passband_limits`",
             u.Quantity,
             "`astropy.Quantity` lengths (e.g., u.nm)",
         )
         passband_response_filepaths = _check_dict(
             passband_response_filepaths,
-            "passband_response_filepaths",
+            "`passband_response_filepaths`",
             str,
             "absolute file path strings",
         )
         passband_response_fileunits = _check_dict(
             passband_response_fileunits,
-            "passband_response_fileunits",
+            "`passband_response_fileunits`",
             u.Quantity,
             "`astropy.Quantity` lengths (e.g., u.um)",
         )
         if passband_pivots is not None:
             passband_pivots = _check_dict(
                 passband_pivots,
-                "passband_pivots",
+                "`passband_pivots`",
                 u.Quantity,
                 "`astropy.Quantity` lengths (e.g., u.nm)",
             )
             print(
-                "INFO: passband_pivots and passband response files both provided. "
-                + "Will use user-supplied passband_pivots rather than calculating pivots."
+                "INFO: `passband_pivots` and passband response files both provided. Will "
+                + "use user-supplied `passband_pivots` rather than calculating pivots."
             )
         redleak_thresholds = _check_dict(
             redleak_thresholds,
-            "redleak_thresholds",
+            "`redleak_thresholds`",
             u.Quantity,
             "`astropy.Quantity` lengths (e.g., u.AA)",
         )
         if phot_zpts is not None:
             phot_zpts = _check_dict(
                 phot_zpts,
-                "phot_zpts",
+                "`phot_zpts`",
                 Number,
                 "int or float",
             )
             print(
-                "INFO: phot_zpts and passband response files both provided. "
-                + "Will use user-supplied phot_zpts rather than calculating zero-points."
+                "INFO: `phot_zpts` and passband response files both provided. Will use "
+                + "user-supplied `phot_zpts` rather than calculating zero-points."
             )
-        angles = [fwhm, px_scale, ifov_dimen]
-        angles_str = ["fwhm", "px_scale", "ifov_dimen"]
+        angles = [fwhm, px_scale]
+        angles_str = ["fwhm", "px_scale"]
         for angle, angle_str in zip(angles, angles_str):
             try:
                 _ = angle.to(u.arcsec)
@@ -393,6 +546,18 @@ class Telescope:
                 raise TypeError(
                     f"{angle_str} must be an `astropy.Quantity` angle (e.g., u.arcsec)"
                 )
+        try:
+            if ifov_dimen.shape != (2,):
+                raise ValueError(
+                    f"ifov_dimen must be a 2-element `astropy.Quantity` angle array "
+                    + "(e.g., [0.44, 0.56] * u.deg)"
+                )
+            _ = ifov_dimen.to(u.arcsec)
+        except Exception:
+            raise TypeError(
+                f"ifov_dimen must be a 2-element `astropy.Quantity` angle array "
+                + "(e.g., [0.44, 0.56] * u.deg)"
+            )
         try:
             _ = mirror_diameter.to(u.cm)
         except Exception:
@@ -409,13 +574,15 @@ class Telescope:
         #
         self.passbands = passbands
         self.passband_limits = passband_limits
-        self.passband_tot_limits = [
-            min(passband_limits.values(), key=lambda x: x[0])[0],
-            max(passband_limits.values(), key=lambda x: x[1])[1],
-        ]  # total wavelength range spanned by the passbands
+        # self.passband_tot_limits = [
+        #     min(passband_limits.values(), key=lambda x: x[0])[0],
+        #     max(passband_limits.values(), key=lambda x: x[1])[1],
+        # ]  # total wavelength range spanned by the passbands
         self.passband_resolution = passband_resolution
 
-        # TODO: change passband_curves to full_passband_curves (will need to change a lot of other stuff!)
+        # TODO: deprecate passband_curves to only use full_passband_curves?
+        # Less memory at the cost of slighly slower performance?
+        # (will need to change a lot of other stuff!)
         self.passband_curves = Telescope.load_passbands(
             passband_response_filepaths,
             passband_limits,
@@ -423,7 +590,8 @@ class Telescope:
             resolution=passband_resolution,
         )
 
-        self.full_passband_curves = Telescope.load_passbands(  # needed for redleak calcs
+        # Full passband curves needed for red leak calculations
+        self.full_passband_curves = Telescope.load_passbands(
             passband_response_filepaths,
             None,  # load all wavelengths from the file for each passband
             passband_response_fileunits,
@@ -440,6 +608,7 @@ class Telescope:
                 mirror_area=self.mirror_area.to(u.cm ** 2).value,
                 **phot_zpts_kwargs,
             )
+        self.phot_zpts = phot_zpts
 
         if passband_pivots is None:
             passband_pivots = dict.fromkeys(passbands)
@@ -453,29 +622,18 @@ class Telescope:
                 )
         self.passband_pivots = passband_pivots
 
-        # Photometric zeropoints for the different filters
-        self.phot_zpts = phot_zpts
-
-        # The PSF full-width at half-maximum
-        self.fwhm = fwhm
-
-        # The angular dimension covered by each pixel
         self.px_scale = px_scale
-        # The angular area of each pixel
         self.px_area = px_scale * px_scale
 
-        # Instantaneous field of view
         self.ifov_dimen = ifov_dimen
         self.ifov_area = ifov_dimen[0] * ifov_dimen[1]
 
-        # Number of pixels of CCD (x 1 million)
+        self.fwhm = fwhm
         self.mp = mp
-
         self.dark_current = dark_current
         self.bias = bias
         self.read_noise = read_noise
         self.gain = gain
-
         self.redleak_thresholds = redleak_thresholds
 
     def copy(self):
@@ -701,8 +859,6 @@ class Telescope:
         photometric zero-point is defined to be the AB magnitude which produces 1
         electron/s in a passband.
 
-        TODO: finish docstring and check inputs
-
         Parameters
         ----------
           passband_curves :: dict of dicts
@@ -725,7 +881,7 @@ class Telescope:
             The area of the Telescope's primary mirror in square cm.
 
           method :: "secant" or "bisection"
-            The method to use for calculating the photometric zeropoints. The secant
+            The method to use for calculating the photometric zero-points. The secant
             method has faster convergence and does not depend on knowing upper/lower
             bounds for the photometric zero-point, but is not guaranteed to converge and
             you must provide two initial guesses for the zero-point. The bisection method
@@ -744,7 +900,7 @@ class Telescope:
         Returns
         -------
           zpts :: dict of `astropy.Quantity` length arrays
-            The photometric zeropoints for each passband.
+            The photometric zero-points for each passband.
         """
         #
         # Check inputs
@@ -764,7 +920,7 @@ class Telescope:
         if not isinstance(max_iter, (int, np.integer)):
             raise ValueError("max_iter must be an integer")
         #
-        # Find photometric zero points
+        # Find photometric zero-points
         #
         zpts = dict.fromkeys(passband_curves)
         for band in zpts:
@@ -775,7 +931,7 @@ class Telescope:
 
             def f(ab_mag):
                 """
-                Internal function to help find photometric zero points. Converts ab_mag to
+                Internal function to help find photometric zero-points. Converts ab_mag to
                 electron/s and returns (electron/s - 1) so that f(x) = 0 when x is the
                 photometric zero-point.
                 """
