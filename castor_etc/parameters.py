@@ -1,5 +1,67 @@
 """
 Contains parameters for CASTOR imaging chain.
+
+---
+
+        GNU General Public License v3 (GNU GPLv3)
+
+(c) 2022.                            (c) 2022.
+Government of Canada                 Gouvernement du Canada
+National Research Council            Conseil national de recherches
+Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+All rights reserved                  Tous droits réservés
+
+NRC disclaims any warranties,        Le CNRC dénie toute garantie
+expressed, implied, or               énoncée, implicite ou légale,
+statutory, of any kind with          de quelque nature que ce
+respect to the software,             soit, concernant le logiciel,
+including without limitation         y compris sans restriction
+any warranty of merchantability      toute garantie de valeur
+or fitness for a particular          marchande ou de pertinence
+purpose. NRC shall not be            pour un usage particulier.
+liable in any event for any          Le CNRC ne pourra en aucun cas
+damages, whether direct or           être tenu responsable de tout
+indirect, special or general,        dommage, direct ou indirect,
+consequential or incidental,         particulier ou général,
+arising from the use of the          accessoire ou fortuit, résultant
+software. Neither the name           de l'utilisation du logiciel. Ni
+of the National Research             le nom du Conseil National de
+Council of Canada nor the            Recherches du Canada ni les noms
+names of its contributors may        de ses  participants ne peuvent
+be used to endorse or promote        être utilisés pour approuver ou
+products derived from this           promouvoir les produits dérivés
+software without specific prior      de ce logiciel sans autorisation
+written permission.                  préalable et particulière
+                                     par écrit.
+
+This file is part of the             Ce fichier fait partie du projet
+FORECASTOR ETC project.              FORECASTOR ETC.
+
+FORECASTOR ETC is free software:     FORECASTOR ETC est un logiciel
+you can redistribute it and/or       libre ; vous pouvez le redistribuer
+modify it under the terms of         ou le modifier suivant les termes de
+the GNU General Public               la "GNU General Public
+License as published by the          License" telle que publiée
+Free Software Foundation,            par la Free Software Foundation :
+either version 3 of the              soit la version 3 de cette
+License, or (at your option)         licence, soit (à votre gré)
+any later version.                   toute version ultérieure.
+
+FORECASTOR ETC is distributed        FORECASTOR ETC est distribué
+in the hope that it will be          dans l'espoir qu'il vous
+useful, but WITHOUT ANY WARRANTY;    sera utile, mais SANS AUCUNE
+without even the implied warranty    GARANTIE : sans même la garantie
+of MERCHANTABILITY or FITNESS FOR    implicite de COMMERCIALISABILITÉ
+A PARTICULAR PURPOSE. See the        ni d'ADÉQUATION À UN OBJECTIF
+GNU General Public License for       PARTICULIER. Consultez la Licence
+more details.                        Générale Publique GNU pour plus
+                                     de détails.
+
+You should have received             Vous devriez avoir reçu une
+a copy of the GNU General            copie de la Licence Générale
+Public License along with            Publique GNU avec FORECASTOR ETC ;
+FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
+<http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
 from math import pi
@@ -22,24 +84,27 @@ PASSBAND_LIMITS = {
 }  # microns
 
 # Total wavelength range spanned by the passbands
-PASSBAND_TOT_LIMITS = [
-    min(PASSBAND_LIMITS.values(), key=lambda x: x[0])[0],
-    max(PASSBAND_LIMITS.values(), key=lambda x: x[1])[1],
-]
+# PASSBAND_TOT_LIMITS = [
+#     min(PASSBAND_LIMITS.values(), key=lambda x: x[0])[0],
+#     max(PASSBAND_LIMITS.values(), key=lambda x: x[1])[1],
+# ]
 
 # Resolution of the passband response curves
 PASSBAND_RESOLUTION = 1 << u.nm  # nanometres
 
 # Photometric zero-points for the different filters
-PHOT_ZPTS = {"uv": 24.23, "u": 24.71, "g": 24.78}  # AB mag for 1 electron/s
+# CASTOR SMS values (scaled from HST effective area curves)
+# PHOT_ZPTS = {"uv": 24.23, "u": 24.71, "g": 24.78}  # AB mag for 1 electron/s
+# My calculations (from root-finding)
 # PHOT_ZPTS = {"uv": 24.463, "u": 24.511, "g": 24.766}  # AB mag for 1 electron/s
 
-# Passband pivot wavelengths (CASTOR SMS values)
-PASSBAND_PIVOTS = {"uv": 226 << u.nm, "u": 345 << u.nm, "g": 478 << u.nm}  # nanometres
-# REVIEW: Passband pivot wavelengths, EE (my calculations)
+# Passband pivot wavelengths
+# (CASTOR SMS values)
+# PASSBAND_PIVOTS = {"uv": 226 << u.nm, "u": 345 << u.nm, "g": 478 << u.nm}  # nanometres
+# My calculations (EE convention)
 # PASSBAND_PIVOTS = {"uv": 225 << u.nm, "u": 346 << u.nm, "g": 475 << u.nm}  # nanometres
-# REVIEW: Passband pivot wavelengths, QE (my calculations)
-# PASSBAND_PIVOTS = {"uv": 220 << u.nm, "u": 344 << u.nm, "g": 471 << u.nm}
+# My calculations (QE convention)
+# PASSBAND_PIVOTS = {"uv": 220 << u.nm, "u": 344 << u.nm, "g": 471 << u.nm}  # nanometres
 
 # Filepaths to the passband response curves
 PASSBAND_FILEPATHS = {
@@ -53,7 +118,7 @@ PASSBAND_FILEUNITS = {"uv": u.um, "u": u.um, "g": u.um}
 FWHM = 0.15 << u.arcsec  # arcsec
 
 # The angular dimension covered by each pixel
-PX_SCALE = 0.1 << u.arcsec  # arcsec (or arcsec/pixel), for Table 3-6. ? UPDATE ?
+PX_SCALE = 0.1 << u.arcsec  # arcsec (or arcsec/pixel)
 
 # The angular area of each pixel
 PX_AREA = PX_SCALE * PX_SCALE  # arcsec^2
@@ -71,13 +136,17 @@ MIRROR_DIAMETER = 100 << u.cm  # cm
 # Aperture area
 MIRROR_AREA = pi * (0.5 * MIRROR_DIAMETER) * (0.5 * MIRROR_DIAMETER)  # cm^2
 
-DARK_CURRENT = 0.01  # electrons/pixel/s
+# (Teledyne e2v CMOS detector)
+# Dark current is 0.01 electrons/s/pixel at -50°C and halves for every reduction of 5-6°C.
+# CASTOR operates at 180 K, implying:
+# dark current = 0.5^((223.15K - 180K) / 6) * 0.01 ~ 1e-4 electrons/s/pixel (negligible)
+DARK_CURRENT = 1e-4  # electrons/s/pixel
 
-BIAS = 100  # electrons
+BIAS = 100  # electron
 
-READ_NOISE = 2.0  # electrons
+READ_NOISE = 2.0  # electron/pixel (high-gain). Read noise is 30 electrons for high-gain
 
-GAIN = 2.0  # electrons/ADU
+GAIN = 2.0  # electron/ADU
 
 # Wavelength threshold for red leak. Flux longward of this is considered to be red leak
 REDLEAK_THRESHOLDS = {"uv": 3880 << u.AA, "u": 4730 << u.AA, "g": 5660 << u.AA}
