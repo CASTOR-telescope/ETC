@@ -1,5 +1,67 @@
 """
 Utilities for photometric calculations.
+
+---
+
+        GNU General Public License v3 (GNU GPLv3)
+
+(c) 2022.                            (c) 2022.
+Government of Canada                 Gouvernement du Canada
+National Research Council            Conseil national de recherches
+Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+All rights reserved                  Tous droits réservés
+
+NRC disclaims any warranties,        Le CNRC dénie toute garantie
+expressed, implied, or               énoncée, implicite ou légale,
+statutory, of any kind with          de quelque nature que ce
+respect to the software,             soit, concernant le logiciel,
+including without limitation         y compris sans restriction
+any warranty of merchantability      toute garantie de valeur
+or fitness for a particular          marchande ou de pertinence
+purpose. NRC shall not be            pour un usage particulier.
+liable in any event for any          Le CNRC ne pourra en aucun cas
+damages, whether direct or           être tenu responsable de tout
+indirect, special or general,        dommage, direct ou indirect,
+consequential or incidental,         particulier ou général,
+arising from the use of the          accessoire ou fortuit, résultant
+software. Neither the name           de l'utilisation du logiciel. Ni
+of the National Research             le nom du Conseil National de
+Council of Canada nor the            Recherches du Canada ni les noms
+names of its contributors may        de ses  participants ne peuvent
+be used to endorse or promote        être utilisés pour approuver ou
+products derived from this           promouvoir les produits dérivés
+software without specific prior      de ce logiciel sans autorisation
+written permission.                  préalable et particulière
+                                     par écrit.
+
+This file is part of the             Ce fichier fait partie du projet
+FORECASTOR ETC project.              FORECASTOR ETC.
+
+FORECASTOR ETC is free software:     FORECASTOR ETC est un logiciel
+you can redistribute it and/or       libre ; vous pouvez le redistribuer
+modify it under the terms of         ou le modifier suivant les termes de
+the GNU General Public               la "GNU General Public
+License as published by the          License" telle que publiée
+Free Software Foundation,            par la Free Software Foundation :
+either version 3 of the              soit la version 3 de cette
+License, or (at your option)         licence, soit (à votre gré)
+any later version.                   toute version ultérieure.
+
+FORECASTOR ETC is distributed        FORECASTOR ETC est distribué
+in the hope that it will be          dans l'espoir qu'il vous
+useful, but WITHOUT ANY WARRANTY;    sera utile, mais SANS AUCUNE
+without even the implied warranty    GARANTIE : sans même la garantie
+of MERCHANTABILITY or FITNESS FOR    implicite de COMMERCIALISABILITÉ
+A PARTICULAR PURPOSE. See the        ni d'ADÉQUATION À UN OBJECTIF
+GNU General Public License for       PARTICULIER. Consultez la Licence
+more details.                        Générale Publique GNU pour plus
+                                     de détails.
+
+You should have received             Vous devriez avoir reçu une
+a copy of the GNU General            copie de la Licence Générale
+Public License along with            Publique GNU avec FORECASTOR ETC ;
+FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
+<http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
 import warnings
@@ -18,19 +80,12 @@ from .conversions import calc_photon_energy, convert_electron_flux_mag, mag_to_f
 from .sources import ExtendedSource, PointSource, Source
 from .telescope import Telescope
 
-# TODO: deprecate self.npix
-# TODO: convolve with PSF
-# TODO: dithering? Maybe just a simple dither_factor=0.75 parameter to simulate oversampling?
+# TODO: convolve with PSF (waiting for data file)
 
 
 class Photometry:
     """
     Photometry class.
-
-    Attributes
-    ----------
-      aperture :: int or float or `astropy.Quantity`
-        The aperture area. If an int or float, aperture is in pixel units.
     """
 
     def __init__(self, TelescopeObj, SourceObj, BackgroundObj):
@@ -49,6 +104,17 @@ class Photometry:
           BackgroundObj :: `castor_etc.Background` object
             The `castor_etc.Background` object containing the background parameters.
             Dictionary keys must match the TelescopeObj.passbands keys.
+
+        Attributes
+        ----------
+          TelescopeObj :: `castor_etc.Telescope` object
+            The `castor_etc.Telescope` object containing the telescope parameters.
+
+          SourceObj :: `castor_etc.Source` object
+            The `castor_etc.Source` object contaning the target source parameters.
+
+          BackgroundObj :: `castor_etc.Background` object
+            The `castor_etc.Background` object containing the background parameters.
 
         Returns
         -------
@@ -70,20 +136,23 @@ class Photometry:
         self.TelescopeObj = TelescopeObj
         self.SourceObj = SourceObj
         self.BackgroundObj = BackgroundObj
-
-        self.aperture = None
-        self.npix = None  # ! DEPRECATED number of pixels in aperture.
-
-        self.aper_xs = None
-        self.aper_ys = None
-        self._aper_mask = None
-        self._eff_npix = None
-        self._aper_extent = None
+        #
+        # Initialize attributes that will be used in the future
+        #
+        # Weights for each pixel in aperture. NaNs are excluded from all calculations
         self.source_weights = None
         self.sky_background_weights = None
         self.dark_current_weights = None
         self.redleak_weights = None
-
+        # Attributes for internal use
+        self._aper_area = None  # exact area of the aperture from given aperture params
+        self._aper_xs = None  # array containing x-coordinates of pixels
+        self._aper_ys = None  # array containing y-coordinates of pixels
+        self._aper_mask = None  # photutils aperture mask
+        self._exact_npix = None  # number of pixels calculated from given aperture params
+        self._eff_npix = None  # number of pixels calculated from photutils mask
+        self._aper_extent = None  # the [xmin, xmax, ymin, ymax] extent of the imshow plot
+        # Optimal aperture dimensions for a point source
         self._optimal_aperture_dimen = self._calc_optimal_aperture_dimen(
             SourceObj.angle_a, SourceObj.angle_b, print_info=False
         )  # only valid for point sources
@@ -130,8 +199,9 @@ class Photometry:
         ! DEPRECATED
         Internal function. Calculate the number of pixels in the aperture.
         """
-        self.npix = (
-            self.aperture.to(u.arcsec ** 2) / self.TelescopeObj.px_area.to(u.arcsec ** 2)
+        self._exact_npix = (
+            self._aper_area.to(u.arcsec ** 2)
+            / self.TelescopeObj.px_area.to(u.arcsec ** 2)
         ).value
 
     def _create_aper_arrs(self, half_x, half_y, center):
@@ -214,7 +284,7 @@ class Photometry:
         # xs = np.arange(-half_x, half_x + half_res, resolution) + center[0]  # length N
         # ys = np.arange(-half_y, half_y + half_res, resolution) + center[1]  # length M
 
-        self.aper_xs, self.aper_ys = np.meshgrid(xs, ys, sparse=False, indexing="xy")
+        self._aper_xs, self._aper_ys = np.meshgrid(xs, ys, sparse=False, indexing="xy")
         self._aper_extent = [
             xs[0] - half_res + center[0],
             xs[-1] + half_res + center[0],
@@ -224,11 +294,11 @@ class Photometry:
 
         # For now, assume uniform background noise
         if self.sky_background_weights is None:
-            self.sky_background_weights = np.ones_like(self.aper_xs)
+            self.sky_background_weights = np.ones_like(self._aper_xs)
         if self.dark_current_weights is None:
-            self.dark_current_weights = np.ones_like(self.aper_xs)
+            self.dark_current_weights = np.ones_like(self._aper_xs)
         if self.redleak_weights is None:
-            self.redleak_weights = np.ones_like(self.aper_xs)
+            self.redleak_weights = np.ones_like(self._aper_xs)
 
     @staticmethod
     def calc_source_weights(profile, aper_xs, aper_ys, center):
@@ -516,7 +586,7 @@ class Photometry:
             factor=factor,
             print_info=(not quiet),
         )
-        self.aperture = np.pi * aper_dimen[0] * aper_dimen[1]
+        self._aper_area = np.pi * aper_dimen[0] * aper_dimen[1]
         self._assign_npix()
 
         #
@@ -526,7 +596,7 @@ class Photometry:
         center = center.to(u.arcsec).value
         self._create_aper_arrs(aper_dimen[0].value, aper_dimen[1].value, center)
         source_weights = Photometry.calc_source_weights(
-            self.SourceObj.profile, self.aper_xs, self.aper_ys, center
+            self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
@@ -551,7 +621,7 @@ class Photometry:
         self.dark_current_weights *= aper_mask
         self.redleak_weights *= aper_mask
         self._eff_npix = np.nansum(aper_mask)
-        if abs(self._eff_npix - self.npix) > 0.1:
+        if abs(self._eff_npix - self._exact_npix) > 0.1:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
@@ -609,7 +679,7 @@ class Photometry:
         rotation = np.deg2rad(rotation)
         abs_sin_rotate, abs_cos_rotate = abs(np.sin(rotation)), abs(np.cos(rotation))
 
-        self.aperture = np.pi * a * b  # area of ellipse
+        self._aper_area = np.pi * a * b  # area of ellipse
         self._assign_npix()
 
         #
@@ -624,7 +694,7 @@ class Photometry:
         y = y if y >= b.value else b.value
         self._create_aper_arrs(x, y, center)
         source_weights = Photometry.calc_source_weights(
-            self.SourceObj.profile, self.aper_xs, self.aper_ys, center
+            self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
@@ -652,7 +722,7 @@ class Photometry:
         self.dark_current_weights *= aper_mask
         self.redleak_weights *= aper_mask
         self._eff_npix = np.nansum(aper_mask)
-        if abs(self._eff_npix - self.npix) > 0.1:
+        if abs(self._eff_npix - self._exact_npix) > 0.1:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
@@ -724,7 +794,7 @@ class Photometry:
         #
         # Generate aperture
         #
-        self.aperture = length * width
+        self._aper_area = length * width
         self._assign_npix()
 
         #
@@ -738,7 +808,7 @@ class Photometry:
             center,
         )
         source_weights = Photometry.calc_source_weights(
-            self.SourceObj.profile, self.aper_xs, self.aper_ys, center
+            self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
@@ -763,7 +833,7 @@ class Photometry:
         self.dark_current_weights *= aper_mask
         self.redleak_weights *= aper_mask
         self._eff_npix = np.nansum(aper_mask)
-        if abs(self._eff_npix - self.npix) > 0.1:
+        if abs(self._eff_npix - self._exact_npix) > 0.1:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
@@ -789,16 +859,102 @@ class Photometry:
             b_in = b_out * (a_in / a_out)
         raise NotImplementedError("Not yet implemented")
 
+    def calc_redleak_frac(self):
+        """
+        Calculate a source's red leak fraction. The red leak fraction is defined to be the
+        ratio of red leak electron/s to total electron/s.
+
+        Parameters
+        ----------
+          None
+
+        Returns
+        -------
+          redleak_fracs :: dict of floats
+            Dictionary containing the red leak fraction in each passband.
+        """
+        #
+        # Calculate red leak fraction (red leak electron/s to total electron/s)
+        #
+        redleak_fracs = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
+
+        source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
+        source_photon_s_A = (  # photon/s/A
+            self.SourceObj.spectrum  # erg/s/cm^2/A
+            * self.TelescopeObj.mirror_area.to(u.cm ** 2).value  # cm^2
+            / calc_photon_energy(wavelength=source_wavelengths_AA)[0]  # photon/erg
+        )
+        source_interp = interp1d(
+            source_wavelengths_AA,
+            source_photon_s_A,
+            kind="linear",
+            bounds_error=False,
+            fill_value=np.nan,
+        )  # photon/s/A
+        for band in redleak_fracs:
+            full_response_curve_wavelengths_AA = (
+                self.TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
+            )
+            is_redleak = (
+                full_response_curve_wavelengths_AA
+                > self.TelescopeObj.redleak_thresholds[band].to(u.AA).value
+            )
+            redleak_wavelengths = full_response_curve_wavelengths_AA[is_redleak]
+            redleak_per_A = (
+                source_interp(redleak_wavelengths)
+                * self.TelescopeObj.full_passband_curves[band]["response"][is_redleak]
+            )  # electron/s/A
+            total_erate_per_A = (
+                source_interp(full_response_curve_wavelengths_AA)
+                * self.TelescopeObj.full_passband_curves[band]["response"]
+            )  # electron/s/A
+            isgood_redleak = np.isfinite(redleak_per_A)  # don't include NaNs
+            isgood_total = np.isfinite(total_erate_per_A)  # don't include NaNs
+            if not np.all(isgood_redleak) or not np.all(isgood_total):
+                warnings.warn(
+                    "Could not estimate red leak fraction "
+                    + f"at 1 or more wavelengths in {band}-band",
+                    RuntimeWarning,
+                )
+            try:
+                redleak_per_px = simpson(  # electron/s (per px)
+                    y=redleak_per_A[isgood_redleak],
+                    x=redleak_wavelengths[isgood_redleak],
+                    even="avg",
+                )
+                total_erate_per_px = simpson(  # electron/s (per px)
+                    y=total_erate_per_A[isgood_total],
+                    x=full_response_curve_wavelengths_AA[isgood_total],
+                    even="avg",
+                )
+                redleak_frac = redleak_per_px / total_erate_per_px
+            except Exception:
+                raise RuntimeError(
+                    f"Unable to calculate red leak fraction for {band}-band! "
+                    + "Please ensure there is at least 1 wavelength that is above "
+                    + "the red leak threshold."
+                )
+            if np.isfinite(redleak_frac):
+                redleak_fracs[band] = redleak_frac
+            else:
+                raise RuntimeError(
+                    "Source red leak fraction could not be calculated "
+                    + f"in {band}-band!"
+                )
+        return redleak_fracs
+
     def _calc_redleaks(self, source_erate, mirror_area_cm_sq, include_redleak=True):
         """
-        Calculate redleak of a source from its redleak fraction. The redleak fraction is
-        defined to be the ratio of redleak electron/s to in-passband electron/s.
+        Calculate the red leak of a source from its in-passband red leak fraction. The
+        in-passband red leak fraction is defined to be the ratio of red leak electron/s to
+        in-passband electron/s.
 
-        This is a more robust way to calculate redleaks that is independent of how
+        This is a more robust way to calculate red leaks that is independent of how
         source_erate is determined.
         """
         #
-        # Calculate redleak fraction (redleak electron/s to passband electron/s)
+        # Calculate in-passband redleak fraction (red leak electron/s to passband
+        # electron/s)
         #
         redleak_fracs = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
         if include_redleak:
@@ -850,7 +1006,7 @@ class Photometry:
                 isgood_passband = np.isfinite(passband_erate_per_A)  # don't include NaNs
                 if not np.all(isgood_redleak) or not np.all(isgood_passband):
                     warnings.warn(
-                        "Could not estimate redleak fraction "
+                        "Could not estimate in-passband red leak fraction "
                         + f"at 1 or more passband wavelengths in {band}-band",
                         RuntimeWarning,
                     )
@@ -868,19 +1024,19 @@ class Photometry:
                     redleak_frac = redleak_per_px / passband_erate_per_px
                 except Exception:
                     raise RuntimeError(
-                        f"Unable to calculate redleak fraction for {band}-band! "
-                        + "Please ensure there is at least 1 wavelength that is above "
-                        + "the redleak threshold."
+                        "Unable to calculate in-passband red leak fraction for "
+                        + f"{band}-band! Please ensure there is at least 1 wavelength "
+                        + "that is above the red leak threshold."
                     )
                 if np.isfinite(redleak_frac):
                     redleak_fracs[band] = redleak_frac * self.redleak_weights
                 else:
                     raise RuntimeError(
-                        "Source redleak fraction could not be calculated "
+                        "Source in-passband red leak fraction could not be calculated "
                         + f"in {band}-band!"
                     )
         #
-        # Calculate redleak from redleak fraction
+        # Calculate red leak from in-passband red leak fraction
         #
         redleaks = dict.fromkeys(self.TelescopeObj.passbands)
         for band in redleaks:
@@ -925,35 +1081,35 @@ class Photometry:
 
         Parameters
         ----------
-        t :: int or float
+          t :: int or float
             The integration time in seconds.
 
-        signal :: scalar or array of scalars
+          signal :: scalar or array of scalars
             The signals of the source in electron/s. These are the total electron rates over
             the whole npix (see below).
 
-        npix :: int
+          npix :: int
             The integer number of pixels occupied by the source. Only used for read noise.
 
-        totskynoise :: int or float
+          totskynoise :: int or float
             The total background noise due to Earthshine + zodiacal light + geocoronal
             emission (if applicable) in electron/s (per pixel).
 
-        readnoise :: int or float
+          readnoise :: int or float
             The CCD read noise in electron (per pixel).
 
-        darkcurrent :: int or float
+          darkcurrent :: int or float
             The CCD dark current in electron/s (per pixel).
 
-        redleak :: int or float
+          redleak :: int or float
             The CCD read leak due to the source in electron/s (per pixel).
 
-        nread :: int
+          nread :: int
             The number of CCD readouts.
 
         Returns
         -------
-        snr :: float or array of floats
+          snr :: float or array of floats
             The SNRs reach after t seconds.
         """
         #
@@ -1032,35 +1188,35 @@ class Photometry:
 
         Parameters
         ----------
-        snr :: int or float
+          snr :: int or float
             The target SNR.
 
-        signal :: scalar or array of scalars
+          signal :: scalar or array of scalars
             The signals of the source in electron/s. These are the total electron rates
             over the whole npix (see below).
 
-        npix :: int
+          npix :: int
             The integer number of pixels occupied by the source. Only used for read noise.
 
-        totskynoise :: int or float
+          totskynoise :: int or float
             The total background noise due to Earthshine + zodiacal light + geocoronal
             emission (if applicable) in electron/s (per pixel).
 
-        readnoise :: int or float
+          readnoise :: int or float
             The CCD read noise in electron (per pixel).
 
-        darkcurrent :: int or float
+          darkcurrent :: int or float
             The CCD dark current in electron/s (per pixel).
 
-        redleak :: int or float
+          redleak :: int or float
             The CCD read leak due to the source in electron/s (per pixel).
 
-        nread :: int
+          nread :: int
             The number of CCD readouts.
 
         Returns
         -------
-        t :: float or array of floats
+          t :: float or array of floats
             The times required to reach the given SNR in seconds.
         """
         variables = [snr, signal, totskynoise, readnoise, darkcurrent, redleak, nread]
@@ -1131,12 +1287,12 @@ class Photometry:
             redleak).
 
           extinction :: scalar or dict of scalars
-            The extinction in each passband. If a scalar, the same extinction value
-            (E(B-V)) will be applied across all the telescope passbands. If using a
-            dictionary of scalars, the dictionary keys must at least contain all the
-            telescope passband keys
-            (e.g., `extinction={"uv": 0.66, "u": 0.46, "g": 0.36}`).
-            REVIEW: maybe have extinction coefficients defined in `Telescope` class?
+            The extinction (AB magnitude) in each passband. If a scalar, the same
+            extinction AB magnitude will be applied across all the telescope passbands. If
+            using a dictionary of scalars, the dictionary keys must at least contain all
+            the telescope passband keys (e.g., `extinction={"uv": 0.66, "u": 0.46, "g":
+            0.36}`).
+            REVIEW: maybe have extinction coefficients defined in `Telescope` class and source-dependent extinction in `Source` class?
 
           nread :: int
             Number of detector readouts.
