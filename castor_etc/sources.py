@@ -1,5 +1,67 @@
 """
-Simulates different astronomical sources.
+Simulates different astronomical sources and contains different flux profiles.
+
+---
+
+        GNU General Public License v3 (GNU GPLv3)
+
+(c) 2022.                            (c) 2022.
+Government of Canada                 Gouvernement du Canada
+National Research Council            Conseil national de recherches
+Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
+All rights reserved                  Tous droits réservés
+
+NRC disclaims any warranties,        Le CNRC dénie toute garantie
+expressed, implied, or               énoncée, implicite ou légale,
+statutory, of any kind with          de quelque nature que ce
+respect to the software,             soit, concernant le logiciel,
+including without limitation         y compris sans restriction
+any warranty of merchantability      toute garantie de valeur
+or fitness for a particular          marchande ou de pertinence
+purpose. NRC shall not be            pour un usage particulier.
+liable in any event for any          Le CNRC ne pourra en aucun cas
+damages, whether direct or           être tenu responsable de tout
+indirect, special or general,        dommage, direct ou indirect,
+consequential or incidental,         particulier ou général,
+arising from the use of the          accessoire ou fortuit, résultant
+software. Neither the name           de l'utilisation du logiciel. Ni
+of the National Research             le nom du Conseil National de
+Council of Canada nor the            Recherches du Canada ni les noms
+names of its contributors may        de ses  participants ne peuvent
+be used to endorse or promote        être utilisés pour approuver ou
+products derived from this           promouvoir les produits dérivés
+software without specific prior      de ce logiciel sans autorisation
+written permission.                  préalable et particulière
+                                     par écrit.
+
+This file is part of the             Ce fichier fait partie du projet
+FORECASTOR ETC project.              FORECASTOR ETC.
+
+FORECASTOR ETC is free software:     FORECASTOR ETC est un logiciel
+you can redistribute it and/or       libre ; vous pouvez le redistribuer
+modify it under the terms of         ou le modifier suivant les termes de
+the GNU General Public               la "GNU General Public
+License as published by the          License" telle que publiée
+Free Software Foundation,            par la Free Software Foundation :
+either version 3 of the              soit la version 3 de cette
+License, or (at your option)         licence, soit (à votre gré)
+any later version.                   toute version ultérieure.
+
+FORECASTOR ETC is distributed        FORECASTOR ETC est distribué
+in the hope that it will be          dans l'espoir qu'il vous
+useful, but WITHOUT ANY WARRANTY;    sera utile, mais SANS AUCUNE
+without even the implied warranty    GARANTIE : sans même la garantie
+of MERCHANTABILITY or FITNESS FOR    implicite de COMMERCIALISABILITÉ
+A PARTICULAR PURPOSE. See the        ni d'ADÉQUATION À UN OBJECTIF
+GNU General Public License for       PARTICULIER. Consultez la Licence
+more details.                        Générale Publique GNU pour plus
+                                     de détails.
+
+You should have received             Vous devriez avoir reçu une
+a copy of the GNU General            copie de la Licence Générale
+Public License along with            Publique GNU avec FORECASTOR ETC ;
+FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
+<http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
 from abc import ABCMeta, abstractmethod
@@ -13,72 +75,6 @@ from photutils.aperture import EllipticalAperture
 
 from . import constants as const
 from .spectrum import NormMixin, SpectrumMixin
-
-
-def _rotate_ccw(x, y, theta, origin=(0, 0)):
-    """
-    Rotate a point/array counter-clockwise by theta degrees about the origin. Theta starts
-    at zero on the positive x-axis (right) and increases toward the positive y-axis (up).
-
-    Parameters
-    ----------
-      x, y :: float or array-like
-        The x- and y-coordinates of the point/array to rotate.
-
-      theta :: float or array-like
-        The angle of rotation in degrees.
-
-      origin :: 2-tuple of floats or array-like with shape (2, shape(x)) (optional)
-        The point about which to rotate. Default is (0, 0). If x and y are arrays, this
-        should be a 2D array where the first index (row) is the x-coordinate origin and
-        the second index (column) is the y-coordinate of the origin.
-
-    Returns
-    -------
-      x_rot, y_rot :: float or array-like
-        The rotated x- and y-coordinates of the point/array.
-    """
-    theta = np.deg2rad(theta)
-    xnew = x - origin[0]
-    ynew = y - origin[1]
-    xnew2 = np.cos(theta) * xnew - np.sin(theta) * ynew
-    ynew2 = np.sin(theta) * xnew + np.cos(theta) * ynew
-    x_rot = xnew2 + origin[0]
-    y_rot = ynew2 + origin[1]
-    return x_rot, y_rot
-
-
-def _rotate_cw(x, y, theta, origin=(0, 0)):
-    """
-    Rotate a point/array clockwise by theta degrees about the origin. Theta starts at zero
-    on the positive x-axis (right) and increases toward the negative y-axis (down).
-
-    Parameters
-    ----------
-      x, y :: float or array-like
-        The x- and y-coordinates of the point/array to rotate.
-
-      theta :: float or array-like
-        The angle of rotation in degrees.
-
-      origin :: 2-tuple of floats or array-like with shape (2, shape(x)) (optional)
-        The point about which to rotate. Default is (0, 0). If x and y are arrays, this
-        should be a 2D array where the first index (row) is the x-coordinate origin and
-        the second index (column) is the y-coordinate of the origin.
-
-    Returns
-    -------
-      x_rot, y_rot :: float or array-like
-        The rotated x- and y-coordinates of the point/array.
-    """
-    theta = np.deg2rad(theta)
-    xnew = x - origin[0]
-    ynew = y - origin[1]
-    xnew2 = np.cos(theta) * xnew + np.sin(theta) * ynew
-    ynew2 = -np.sin(theta) * xnew + np.cos(theta) * ynew
-    x_rot = xnew2 + origin[0]
-    y_rot = ynew2 + origin[1]
-    return x_rot, y_rot
 
 
 class Profiles:
@@ -177,15 +173,18 @@ class Profiles:
         angle=0,
     ):
         """
-        Exponentially-decaying elliptical profile with arbitrary rotation. Please set the
-        center of the ellipse in when creating the aperture.
+        Exponentially-decaying elliptical profile with arbitrary rotation. The center of
+        the ellipse is always at (0, 0), but the aperture center relative to this ellipse
+        center (set in the `castor_etc.Photometry` object) can be set to arbitrary
+        coordinates.
 
         Parametric equation of ellipse from: <https://math.stackexchange.com/q/2645689>.
         Also see this visualization: <https://www.desmos.com/calculator/xyiew6ioct>.
 
         The weights are calculated as:
         ```math
-                    weights = exp[-((x / a0)^2 + (y / b0)^2)]
+                    weights = [INSERT CORRECT WEIGHTS FORMULA HERE]
+                    https://docs.astropy.org/en/stable/api/astropy.modeling.functional_models.Ellipse2D.html#astropy.modeling.functional_models.Ellipse2D
         ```
         TODO: explain docstring better
 
