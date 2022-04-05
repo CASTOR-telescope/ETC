@@ -1,6 +1,16 @@
 """
 Simulates different astronomical sources and contains different flux profiles.
 
+Predefined flux profiles:
+  - uniform
+  - ellipse (exponentially-decaying flux with tunable scale lengths along the major and
+    minor axes)
+  - sersic
+
+Predefined source types:
+  - point (e.g., for stars)
+  - extended (e.g., for supernova remnants, galaxies)
+
 ---
 
         GNU General Public License v3 (GNU GPLv3)
@@ -89,7 +99,9 @@ class Profiles:
     def uniform(a=None, b=None, angle=0):
         """
         Uniform flux profile within some elliptical region or over the entire aperture
-        (note that the aperture will still have fractional pixel weighting).
+        (note that the aperture will still have fractional pixel weighting). This profile
+        is typically used for a point source, hence the default values should be
+        appropriate (and likely the best choices) in most cases.
 
         Parameters
         ----------
@@ -101,7 +113,7 @@ class Profiles:
 
           angle :: scalar
             The counter-clockwise angle to rotate the ellipse, in degrees. At an angle of
-            0, a0 and b0 are aligned with the x- and y-axes, respectively.
+            0, a and b are aligned with the x- and y-axes, respectively.
 
         Returns
         -------
@@ -128,14 +140,22 @@ class Profiles:
 
         def _uniform_ellipse(x, y, center):
             """
+            Uniform flux profile over an ellipse (with fractional pixel weighting).
+
             Parameters
             ----------
               x, y :: 2D arrays of floats
-                Elements are angular distance from aperture center.
+                Elements are angular distance, in arcsec, from aperture center.
 
               center :: 2-element 1D array of floats
-                The x- and y-angular offset of the aperture center from the source center.
+                The x- and y-angular offset, in arcsec, of the aperture center from the
+                source center.
                 Not needed for this function but required to have this as a parameter.
+
+            Returns
+            -------
+              weights :: 2D array of floats
+                The flux at each pixel relative to the flux at the source center.
             """
             px_scale_x = (x[0][-1] - x[0][0]) / (len(x) - 1)  # arcsec per pixel
             px_scale_y = (y[-1][-1] - y[0][0]) / (len(y) - 1)  # arcsec per pixel
@@ -149,15 +169,22 @@ class Profiles:
 
         def _uniform_aper(x, y, center):
             """
+            Uniform flux profile over the entire aperture.
+
             Parameters
             ----------
               x, y :: 2D arrays of floats
-                Elements are angular distance from aperture center.
-                Not needed for this function but required to have this as a parameter.
+                Elements are angular distance, in arcsec, from aperture center.
 
               center :: 2-element 1D array of floats
-                The x- and y-angular offset of the aperture center from the source center.
+                The x- and y-angular offset, in arcsec, of the aperture center from the
+                source center.
                 Not needed for this function but required to have this as a parameter.
+
+            Returns
+            -------
+              weights :: 2D array of floats
+                The flux at each pixel relative to the flux at the source center.
             """
             return np.ones(x.shape, dtype=float)
 
@@ -173,20 +200,32 @@ class Profiles:
         angle=0,
     ):
         """
-        Exponentially-decaying elliptical profile with arbitrary rotation. The center of
-        the ellipse is always at (0, 0), but the aperture center relative to this ellipse
-        center (set in the `castor_etc.Photometry` object) can be set to arbitrary
-        coordinates.
-
-        Parametric equation of ellipse from: <https://math.stackexchange.com/q/2645689>.
-        Also see this visualization: <https://www.desmos.com/calculator/xyiew6ioct>.
+        Exponentially-decaying elliptical profile with arbitrary rotation. This profile is
+        designed such that the center of the ellipse is always at (0, 0) but the aperture
+        center (specified in the `castor_etc.Photometry` object) relative to this ellipse
+        center can be set to arbitrary coordinates.
 
         The weights are calculated as:
         ```math
-                    weights = [INSERT CORRECT WEIGHTS FORMULA HERE]
-                    https://docs.astropy.org/en/stable/api/astropy.modeling.functional_models.Ellipse2D.html#astropy.modeling.functional_models.Ellipse2D
+                weights = exp[-( (source_a/a0)^2 + (source_b/b0)^2 )]
         ```
-        TODO: explain docstring better
+        where
+        ```math
+                source_a = (x + x0) * cos(angle) + (y + y0) * sin(angle)
+        ```
+        and
+        ```math
+                source_b = (y + y0) * cos(angle) - (x + x0) * sin(angle)
+        ```
+        - x and y are the x- and y-coordinates of the aperture pixel (in arcsec)
+        relative to the aperture (not source) center,
+        - x0 and y0 are the x- and y-coordinates of the aperture center relative to the
+        source center, in arcsec,
+        - angle is the counter-clockwise rotation of the ellipse, in degrees. At an
+        angle of 0, the semimajor axis (corresponding to the same line as a0) is
+        aligned with the x-axis and the semiminor axis (corresponding to the same line
+        as b0) is aligned with the y-axis.
+
 
         Parameters
         ----------
@@ -204,8 +243,6 @@ class Profiles:
         -------
           profile :: function
             Function that generates an exponentially-decaying elliptical profile.
-
-        TODO: make sure docstring is accurate
         """
         if isinstance(a0, u.Quantity):
             try:
@@ -226,13 +263,21 @@ class Profiles:
 
         def _ellipse(x, y, center):
             """
+            Exponentially-decaying elliptical flux profile.
+
             Parameters
             ----------
               x, y :: 2D arrays of floats
-                Elements are angular distance from aperture center.
+                Elements are angular distance, in arcsec, from aperture center.
 
               center :: 2-element 1D array of floats
-                The x- and y-angular offset of the aperture center from the source center.
+                The x- and y-angular offset, in arcsec, of the aperture center from the
+                source center.
+
+            Returns
+            -------
+              weights :: 2D array of floats
+                The flux at each pixel relative to the flux at the source center.
             """
             source_x = ((x + center[0]) * cos_angle + (y + center[1]) * sin_angle) / a0
             source_y = ((y + center[1]) * cos_angle - (x + center[0]) * sin_angle) / b0
@@ -244,11 +289,10 @@ class Profiles:
     @staticmethod
     def sersic(r_eff, n=4, e=0, angle=0):
         """
-        Wrapper function for astropy's Sersic2D model
+        2D Sersic profile for describing how the flux of a galaxy changes as a function of
+        distance from its center. This is actually just a wrapper function for astropy's
+        Sersic2D model
         (<https://docs.astropy.org/en/stable/api/astropy.modeling.functional_models.Sersic2D.html>).
-
-        This function is for describing how the flux of a source (i.e., a galaxy) changes
-        with distance from its center.
 
         The following docstring is adapted from the astropy Sersic2D docstring.
 
@@ -288,13 +332,21 @@ class Profiles:
 
         def _sersic(x, y, center):
             """
+            2D Sersic profile.
+
             Parameters
             ----------
               x, y :: 2D arrays of floats
-                Elements are angular distance from aperture center.
+                Elements are angular distance, in arcsec, from aperture center.
 
               center :: 2-element 1D array of floats
-                The x- and y-angular offset of the aperture center from the source center.
+                The x- and y-angular offset, in arcsec, of the aperture center from the
+                source center.
+
+            Returns
+            -------
+              weights :: 2D array of floats
+                The flux at each pixel relative to the flux at the source center.
             """
             model = Sersic2D(
                 amplitude=1,  # arbitrary. We only care about relative weights
@@ -321,44 +373,68 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
     @abstractmethod
     def __init__(self, profile):
         """
-        REVIEW: ENSURE THIS DOCSTRING IS CORRECT. CURRENTLY OUTDATED. CENTER AND ANGLE?
+        Abstract method for all Source subclasses.
 
         Parameters
         ----------
-          profile :: function with header `(x, y, aper_center) -> (2D array of floats, float)`
+          profile :: function with a header of
+                     `(x, y, aper_center) -> (2D array of floats)`
+
             `profile` is a function that describes how the flux of the source varies as a
-            function of x- & y-axis distance from the center of the source (units of
-            arcsec) relative to the flux at the center.
+            function of x- & y-axis distance (in arcsec) from the center of the source
+            relative to the flux at the source's center.
 
             The function signature for `profile` must have exactly 3 positional arguments,
-            `(x, y, aper_center)`, and return an array of floats. That is, the profile
-            function should give the relative weights of the flux as it varies with x- and
-            y- Cartesian coordinates (origin is at the center of the array). Note that
-            the parameters `x` and `y` will be 2D arrays of floats with the same shape and
-            have (implied) units of arcsec. `aper_center` is a 2-element 1D array of
-            floats specifying the (x, y) center of the aperture relative to the center of
-            the source, in (implied) units of arcsec.
+            `(x, y, aper_center)`, and return an array of floats.
+              - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
+              of each pixel from the aperture's center,
+              - `aper_center` is a 2-element 1D array of floats representing the x- and y-
+              coordinates of the aperture's center relative to the source's center,
+              respectively.
+
+            Given these three arguments, the `profile` function should return a 2D array
+            of the same shape as `x` and `y`, where each element is the flux at that pixel
+            relative to the flux at the center of the source (not aperture). It may be
+            helpful to look at how some of the predefined profiles are implemented (e.g.,
+            `Profiles.ellipse`).
+
+        Attributes
+        ----------
+          profile :: function with a header of
+                     `(x, y, aper_center) -> (2D array of floats)`
+            The 2D profile function specifying how the flux changes as a function of pixel
+            coordinates.
+
+        Returns
+        -------
+          Instance of a base `Source` object
         """
+        #
+        # Check profile
+        #
         try:
-            _in_arr = np.arange(4, dtype=float).reshape((2, 2))
-            _result = profile(_in_arr, _in_arr, np.array([0.0, 0.0]))
-            if not isinstance(_result, np.ndarray) or (
-                np.shape(_result) != np.shape(_in_arr)
+            _test_arr = np.arange(4, dtype=float).reshape((2, 2))
+            _test_result = profile(_test_arr, _test_arr, np.array([0.0, 0.0]))
+            if not isinstance(_test_result, np.ndarray) or (
+                np.shape(_test_result) != np.shape(_test_arr)
             ):
                 # TODO: relax the check for shape...
                 raise TypeError(
-                    "profile should return a 2D np.ndarray like the (future) inputs. "
+                    "`profile` should return a 2D array of floats. "
                     + "See the docstring below for more details.\n"
                     + Source.__init__.__doc__
                 )
         except Exception:
             raise ValueError(
                 "profile may not be of the correct form. "
-                + "profile must be a function with 3 positional arguments (x, y, center) "
-                + "and return an array of floats with the same shape as x and y. "
-                + "Also check the traceback for more details."
+                + "profile must be a function with 3 positional arguments "
+                + "`(x, y, aper_center)` and return a 2D array of floats with the same "
+                + "shape as x and y. Also check the traceback for more details."
             )
         self.profile = profile
+        #
+        # Initialize some potential future attributes
+        #
         self.spectrum = None
         self.wavelengths = None
         self.a = None
@@ -390,63 +466,69 @@ class PointSource(Source):
 
     def __init__(self, profile, angle=None, radius=None, dist=None):
         """
-        Generate a circular point source given either:
-          1. the angle subtended by the source's diamater,
-          2. radius & distance.
+        Generate a circular point source (e.g., a star) given either:
+          1. the angle subtended by the diameter of the source, or
+          2. the physical radius (i.e., with units of length) of the source & distance to
+          the source.
 
-        If item 2, calculate the angle subtended by a circular source of a given radius at
-        a certain distance.
+        If item 2, this will calculate the angle subtended by a circular source of a given
+        radius at a certain distance.
 
         Parameters
         ----------
-          profile :: function with signature `profile(a, b, center)`
-            Function with 3 positional parameters that describes how the flux of the
-            source (arbitrary units) varies as a function of semimajor (`a`) and semiminor
-            (`b`) axis distance from the center of the aperture (arcsec units). The
-            `center` parameter is the (x, y) center of the aperture relative to the source
-            in arcsec.
+          profile :: function with a header of `profile(x, y, aper_center)`
+            Function with 3 positional parameters that describes the flux of the
+            source at each aperture pixel relative to the flux at the source center.
+              - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
+              of each pixel from the aperture's center,
+              - `aper_center` is a 2-element 1D array of floats representing the x- and y-
+              coordinates of the aperture's center relative to the source's center,
+              respectively.
 
-          angle :: int or float or `astropy.Quantity`
+          angle :: int or float or `astropy.Quantity` or None
             The angle subtended by the circular point source's diameter. If a scalar,
-            angle is assumed to be in arcsec. If given, radius and dist must both be None.
-            If not given, radius and dist must both be provided. This will be assigned to
-            the `angle_a` and `angle_b` attributes.
+            angle is assumed to be in arcsec. If angle is given, radius and dist must both
+            be None. If not given, radius and dist must both be provided. Internally, this
+            will be assigned to the `angle_a` and `angle_b` attributes.
 
-          radius :: int or float or `astropy.Quantity`
+          radius :: int or float or `astropy.Quantity` or None
             The physical radius of the circular point source. If a scalar, radius is
-            assumed to be in units of solar radii. If given, dist must also be provided
-            and angle must be None. If not given, angle must be provided. This will be
-            assigned to the `a` (semimajor axis) and `b` (semiminor axis) attributes.
+            assumed to be in units of solar radii. If radius is given, dist must also be
+            provided and angle must be None. If not given, angle must be provided.
+            Internally, this will be assigned to the `a` (semimajor axis) and `b`
+            (semiminor axis) attributes as well as used to calculate the `angle_a` and
+            `angle_b` attributes.
 
-          dist :: int or float or `astropy.Quantity`
+          dist :: int or float or `astropy.Quantity` or None
             The distance to the source. If a scalar, dist is assumed to be in units of
-            kpc. If given, radius must also be provided and angle must be None. If not
-            given, angle must be provided. This will be assigned to the `dist` attribute.
+            kpc. If dist is given, radius must also be provided and angle must be None. If
+            not given, angle must be provided. Internally, this will be assigned to the
+            `dist` attribute as well as used to calculate the `angle_a` and `angle_b`
+            attributes.
 
         Attributes
         ----------
-          profile ::
+          profile :: function with a header of
+                     `(x, y, aper_center) -> (2D array of floats)`
+            The 2D profile function specifying how the flux changes as a function of pixel
+            coordinates.
 
-          spectrum ::
+          a, b :: `astropy.Quantity` lengths or None
+            The physical semimajor and semiminor axis lengths of the circular point
+            source; since this source is circular, these will be equal. If radius was not
+            specified, these attributes will be None.
 
-          wavelengths ::
+          dist :: `astropy.Quantity` lengths or None
+            The distance to the source. If dist was not specified, this attribute will be
+            None.
 
-          a ::
-
-          b ::
-
-          dist ::
-
-          angle_a ::
-
-          angle_b ::
-
+          angle_a, angle_b :: `astropy.Quantity` angles
+            The angles subtended by the circular point source's radius. Since this source
+            is circular, these will be equal.
 
         Returns
         -------
           `PointSource` instance
-
-        TODO: finish docstring
         """
         super().__init__(profile)
         #
@@ -456,8 +538,7 @@ class PointSource(Source):
             angle is not None and (radius is not None or dist is not None)
         ):
             raise ValueError(
-                "Either both radius and dist must be provided "
-                + "or only npix must be provided"
+                "`angle` and `radius`/`dist` cannot both be simultaneously specified."
             )
         #
         # Calculate angular area of source
@@ -471,7 +552,7 @@ class PointSource(Source):
             self.dist = dist
             radius = radius.to(u.AU).value
             dist = dist.to(u.pc).value
-            # Calculate the angle subtended by source radius from definition of parsec
+            # Calculate the angle subtended by source radius (from definition of parsec)
             angle = np.arctan(radius.value / dist.value) * u.arcsec
         else:
             if not isinstance(angle, u.Quantity):
@@ -488,20 +569,23 @@ class ExtendedSource(Source):
     def __init__(self, profile, angle_a=None, angle_b=None, a=None, b=None, dist=None):
         """
         Generate an extended source given either:
-          1. the angle subtended by the source's semimajor (`angle_a`) and semiminor
-             (`angle_b`) axes,
-          2. semimajor (`a`) and semiminor (`b`) axes and distance (`dist`).
+          1. the angles subtended by the source's semimajor (`angle_a`) and semiminor
+          (`angle_b`) axes,
+          2. the physical semimajor (`a`) and semiminor (`b`) axis lengths and distance
+          (`dist`) to the source.
 
         Note that the orientation of the source can be specified in the `profile` function.
 
         Parameters
         ----------
-          profile :: function with signature `profile(a, b, center)`
-            Function with 3 positional parameters that describes how the flux of the
-            source (arbitrary units) varies as a function of semimajor (`a`) and semiminor
-            (`b`) axis distance from the center of the aperture (arcsec units). The
-            `center` parameter is the (x, y) center of the aperture relative to the source
-            in arcsec.
+          profile :: function with a header of `profile(x, y, aper_center)`
+            Function with 3 positional parameters that describes the flux of the
+            source at each aperture pixel relative to the flux at the source center.
+              - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
+              of each pixel from the aperture's center,
+              - `aper_center` is a 2-element 1D array of floats representing the x- and y-
+              coordinates of the aperture's center relative to the source's center,
+              respectively.
 
           angle_a, angle_b :: int or float or `astropy.Quantity`
             The angle subtended by the extended source's semimajor and semiminor axes,
@@ -513,30 +597,34 @@ class ExtendedSource(Source):
             The physical semimajor and semiminor axes of the extended source,
             respectively. If scalars, they are assumed to be in units of kpc. If given,
             `dist` must also be provided and `angle_a` & `angle_b` must both be None. If
-            not given, `angle_a` and `angle_b` must both be provided.
+            not given, `angle_a` and `angle_b` must both be provided. Internally, these
+            values along with the distance will be used to calculate the `angle_a` and
+            `angle_b` attributes.
 
           dist :: int or float or `astropy.Quantity`
             The distance to the source. If a scalar, `dist` is assumed to be in units of
             kpc. If given, `a` & `b` must also be provided and `angle_a` & `angle_b` must
             both be None. If not given, `angle_a` & `angle_b` must both be provided.
+            Internally, these values along with the semimajor and semiminor axis lengths
+            will be used to calculate the `angle_a` and `angle_b` attributes.
 
         Attributes
         ----------
-          profile ::
+          profile :: function with a header of
+                     `(x, y, aper_center) -> (2D array of floats)`
+            The 2D profile function specifying how the flux changes as a function of pixel
+            coordinates.
 
-          spectrum ::
+          a, b :: `astropy.Quantity` lengths or None
+            The physical semimajor and semiminor axis lengths of the extended source. If
+            parameters `a` and `b` were not specified, these attributes will be None.
 
-          wavelengths ::
+          dist :: `astropy.Quantity` lengths or None
+            The distance to the source. If the parameter `dist` was not specified, this
+            attribute will be None.
 
-          a ::
-
-          b ::
-
-          dist ::
-
-          angle_a ::
-
-          angle_b ::
+          angle_a, angle_b :: `astropy.Quantity` angles
+            The angles subtended by the extended source's semimajor and semiminor axes.
 
         Returns
         -------
