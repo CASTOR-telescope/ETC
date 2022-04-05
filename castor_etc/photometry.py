@@ -71,13 +71,13 @@ from numbers import Number
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
-from photutils.aperture import EllipticalAnnulus, EllipticalAperture, RectangularAperture
+from photutils.aperture import EllipticalAperture, RectangularAperture
 from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from .background import Background
 from .conversions import calc_photon_energy, convert_electron_flux_mag, mag_to_flux
-from .sources import ExtendedSource, PointSource, Source
+from .sources import PointSource, Source
 from .telescope import Telescope
 
 # TODO: convolve with PSF (waiting for data file)
@@ -91,6 +91,9 @@ class Photometry:
     def __init__(self, TelescopeObj, SourceObj, BackgroundObj):
         """
         Initialize class for photometry calculations.
+
+        Note that the `Source` object (i.e., the `SourceObj` parameter) should have its
+        spectrum in units of flam (erg/s/cm^2/A).
 
         Parameters
         ----------
@@ -154,7 +157,7 @@ class Photometry:
         self._aper_extent = None  # the [xmin, xmax, ymin, ymax] extent of the imshow plot
         # Optimal aperture dimensions for a point source
         self._optimal_aperture_dimen = self._calc_optimal_aperture_dimen(
-            SourceObj.angle_a, SourceObj.angle_b, print_info=False
+            SourceObj.angle_a, SourceObj.angle_b, TelescopeObj.fwhm, print_info=False
         )  # only valid for point sources
 
     def copy(self):
@@ -172,7 +175,7 @@ class Photometry:
         """
         return deepcopy(self)
 
-    def _assign_npix(self):
+    def _assign_exact_npix(self):
         """
         Internal function. Calculate the exact number of pixels in the aperture based on
         user parameters. Will compare this value to photutils' number of pixels.
@@ -211,77 +214,53 @@ class Photometry:
 
         Attributes
         ----------
-          TODO: update attribute docstring (no longer sparse)
-          aper_xs :: (1 x N) sparse array of floats
-            The aperture array containing the x-coordinates (in arcsec) of the aperture.
-            The origin (0, 0) is defined to be at the center of the source. The element at
-            the center of this array is the center of the aperture (i.e., at
-            `[aper_xs.shape[0]//2, aper_xs.shape[1]//2]`). Together with `aper_ys`, this
-            sparse array can easily broacast into a full (i.e., M x N) 2D array (e.g.,
-            `arr = aper_xs + aper_ys` will produce a full (M x N) 2D array). The center of
-            the aperture in the full 2D array is located at `[arr.shape[0]//2,
-            arr.shape[1]//2]`.
-            REVIEW: The last statement not always true depending on how I make the array.
+          aper_xs :: (M x N) 2D array of floats
+            The aperture array containing the x-coordinates (in arcsec) relative to the
+            center of the aperture.
 
-          TODO: update attribute docstring (no longer sparse)
-          aper_ys :: (M x 1) sparse array of floats
-            The aperture array containing the y-coordinates (in arcsec) of the aperture.
-            The origin (0, 0) is defined to be at the center of the source. The element at
-            the center of this array is the center of the aperture (i.e., at
-            `[aper_ys.shape[0]//2, aper_ys.shape[1]//2]`). Together with `aper_xs`, this
-            sparse array can easily broacast into a full (i.e., M x N) 2D array (e.g.,
-            `arr = aper_xs + aper_ys` will produce a full (M x N) 2D array). The center of
-            the aperture in the full 2D array is located at `[arr.shape[0]//2,
-            arr.shape[1]//2]`.
-            REVIEW: The last statement not always true depending on how I make the array.
+          aper_ys :: (M x N) 2D array of floats
+            The aperture array containing the y-coordinates (in arcsec) relative to the
+            center of the aperture.
 
           _aper_extent :: 4-element 1D list of floats
             The [xmin, xmax, ymin, ymax] extent of the aperture in arcsec (for plotting
             the weight arrays).
 
-        If any of the following have not been set (i.e., are None), then the array will be
-        created with uniform weights:
+        If any of the following have not been set (i.e., are None), then that attribute
+        will be created with uniform weights:
 
           sky_background_weights :: (M x N) 2D array of floats
             The pixel weights for the sky background (incl. Earthshine, zodiacal light,
-            geocoronal emission). This is currently all ones (1) (i.e., uniform noise).
+            geocoronal emission). This is currently all ones (1) (i.e., uniform noise) if
+            not previously set.
 
           dark_current_weights :: (M x N) 2D array of floats
             The pixel weights for the dark current. This is currently all ones (1) (i.e.,
-            uniform noise).
+            uniform noise) if not previously set.
 
           redleak_weights :: (M x N) 2D array of floats
             The pixel weights for the redleak. This is currently all ones (1) (i.e.,
-            uniform noise).
+            uniform noise) if not previously set.
+
+        Returns
+        -------
+          None
         """
-        resolution = self.TelescopeObj.px_scale.to(u.arcsec).value
-        half_res = 0.5 * resolution
+        px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
+        half_px_scale = 0.5 * px_scale_arcsec  # to ensure correct arange/extent
 
-        # Ensure center of aperture corresponds to center (i.e., shape // 2) pixel
-        # xs_left = np.arange(-half_x, 0.0, resolution)
-        # xs_right = np.arange(0.0, half_x + half_res, resolution)
-        # # xs = np.concatenate((xs_left, xs_right)) + center[0]  # length N
-        # xs = np.concatenate((xs_left, xs_right))  # length N
-        # ys_left = np.arange(-half_y, 0.0, resolution)
-        # ys_right = np.arange(0.0, half_y + half_res, resolution)
-        # # ys = np.concatenate((ys_left, ys_right)) + center[1]  # length M
-        # ys = np.concatenate((ys_left, ys_right)) # length M
-
-        # (The following does not guarantee center of aperture gets its own pixel)
-        xs = np.arange(-half_x, half_x + half_res, resolution)  # length N
-        ys = np.arange(-half_y, half_y + half_res, resolution)  # length M
-        # xs = np.arange(-half_x, half_x + half_res, resolution) + center[0]  # length N
-        # ys = np.arange(-half_y, half_y + half_res, resolution) + center[1]  # length M
+        xs = np.arange(-half_x, half_x + half_px_scale, px_scale_arcsec)  # length N
+        ys = np.arange(-half_y, half_y + half_px_scale, px_scale_arcsec)  # length M
 
         self._aper_xs, self._aper_ys = np.meshgrid(xs, ys, sparse=False, indexing="xy")
         self._aper_extent = [
-            xs[0] - half_res + center[0],
-            xs[-1] + half_res + center[0],
-            ys[0] - half_res + center[1],
-            ys[-1] + half_res + center[1],
-        ]  # +/- half_res will center tickmarks on pixels
+            xs[0] - half_px_scale + center[0],
+            xs[-1] + half_px_scale + center[0],
+            ys[0] - half_px_scale + center[1],
+            ys[-1] + half_px_scale + center[1],
+        ]  # we use +/- half_px_scale to center matplotlib tickmarks on pixels
 
-        # For now, assume uniform background noise
+        # Assume uniform background noise, dark current, and red leak if not set
         if self.sky_background_weights is None:
             self.sky_background_weights = np.ones_like(self._aper_xs)
         if self.dark_current_weights is None:
@@ -290,38 +269,57 @@ class Photometry:
             self.redleak_weights = np.ones_like(self._aper_xs)
 
     @staticmethod
-    def calc_source_weights(profile, aper_xs, aper_ys, center):
+    def _calc_source_weights(profile, aper_xs, aper_ys, center):
         """
         Calculate the source weights for the given profile.
 
         Parameters
         ----------
-          profile :: function
-            TODO: explain call signature and purpose (weight function)
+          profile :: function with a header of `profile(x, y, aper_center)`
+            Function with 3 positional parameters that describes the flux of the
+            source at each aperture pixel relative to the flux at the source center.
+              - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
+              of each pixel from the aperture's center,
+              - `aper_center` is a 2-element 1D array of floats representing the x- and y-
+              coordinates of the aperture's center relative to the source's center,
+              respectively.
 
           half_x, half_y :: floats
-            The half-widths of the aperture in x and y directions in arcsec.
+            The half-widths of the aperture in x- and y- directions in arcsec. (e.g.,
+            semimajor/semiminor axes, half of a rectangle's length/width, etc.)
 
           center :: 2-element 1D array of floats
             The (x, y) center of the aperture relative to the center of the source in
             arcsec. Positive values means the source is displaced to the bottom/left
             relative to the aperture center.
 
-          res :: float
-            The resolution of the weight map in arcsec.
-
         Returns
         -------
-          aper_extent :: 4-element 1D list of floats
+          source_weights :: (M x N) 2D array of floats
+            The source weights for each pixel in the aperture. These represent the flux of
+            the source at each pixel relative to the flux at the center of the source.
 
-        TODO: finish docstring
+          center_px :: 2-element 1D list of floats
+            The (x, y) center index of the source_weights array. To be very explicit, this
+            is not (0, 0) but rather the center of the 2D array.
         """
         source_weights = profile(aper_xs, aper_ys, center)
-        return source_weights
+        center_px = [
+            0.5 * (source_weights.shape[1] - 1),  # x-coordinate in pixel units
+            0.5 * (source_weights.shape[0] - 1),  # y-coordinate in pixel units
+        ]
+        return source_weights, center_px
 
     def show_source_weights(self, mark_source=False, source_markersize=4, plot=True):
         """
-        Plot the source as seen through the aperture's FOV.
+        Plot the source as seen through the photometry aperture. The pixels are colored by
+        the flux of the source at each pixel relative to the flux at the center of the
+        source. Coloring also includes the effects of fractional pixel weights (i.e., from
+        the aperture mask, visualized using `show_aper_weights()`). These two effects
+        combined give the "source weights".
+
+        The "effective number of aperture pixels" is the sum of the aperture mask weights.
+        See the docstring of `show_aper_weights()` for more details.
 
         Parameters
         ----------
@@ -337,12 +335,15 @@ class Photometry:
 
         Returns
         -------
-          None (if plot is True)
+        If plot is True:
+          None
 
-          fig, ax, cbar (if plot is False) :: `matplotlib.figure.Figure`,
-                                              `matplotlib.axes.Axes`,
-                                              `matplotlib.colorbar.Colorbar`
-            The figure, axis, and colorbar instance associated with the plot.
+        If plot is False:
+          fig, ax :: `matplotlib.figure.Figure` and `matplotlib.axes.Axes` objects
+            The figure and axis instance associated with the plot.
+
+          cbar :: `matplotlib.colorbar.Colorbar` object
+            The colorbar instance associated with the plot.
         """
         if self.source_weights is None or self._aper_extent is None:
             raise ValueError("Please select an aperture first.")
@@ -362,7 +363,7 @@ class Photometry:
             cbar = fig.colorbar(img)
             if mark_source:
                 ax.plot(0, 0, "co", ms=source_markersize)
-            cbar.set_label("Relative Flux to Center of Source")
+            cbar.set_label("Flux Relative to Center of Source")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
             ax.set_title(
@@ -375,7 +376,18 @@ class Photometry:
 
     def show_aper_weights(self, plot=True):
         """
-        Plot the telescope's aperture mask.
+        Plot the aperture photometry mask. The aperture mask shows the fractional overlap
+        between the aperture and the pixel, ranging from (0, 1]. A pixel that is wholly
+        contained in the aperture has an aperture weight equal to 1. Similarly, a pixel
+        that is partially contained in the aperture has a weight between 0 and 1
+        (exclusive) directly proportional to the area of the aperture that overlaps the
+        pixel. A pixel that is wholly outside the aperture is assigned a weight of NaN.
+
+        The "effective number of aperture pixels" is the sum of these pixel values
+        (excluding all NaNs). This approach using fractional pixel weights gives a more
+        accurate pixel count for non-rectangular aperture shapes while maintaning the
+        benefit of allowing pixel-by-pixel modifications, if desired. This is to emulate
+        the physical process of reading out and summing up each pixel in the aperture.
 
         Parameters
         ----------
@@ -385,12 +397,15 @@ class Photometry:
 
         Returns
         -------
-          None (if plot is True)
+        If plot is True:
+          None
 
-          fig, ax, cbar (if plot is False) :: `matplotlib.figure.Figure`,
-                                              `matplotlib.axes.Axes`,
-                                              `matplotlib.colorbar.Colorbar`
-            The figure, axis, and colorbar instance associated with the plot.
+        If plot is False:
+          fig, ax :: `matplotlib.figure.Figure` and `matplotlib.axes.Axes` objects
+            The figure and axis instance associated with the plot.
+
+          cbar :: `matplotlib.colorbar.Colorbar` object
+            The colorbar instance associated with the plot.
         """
         if self._aper_mask is None or self._aper_extent is None:
             raise ValueError("Please select an aperture first.")
@@ -421,20 +436,45 @@ class Photometry:
 
     def set_background_weights(self, sky_background_weights):
         """
-        Set the weights for the sky background.
+        Set the pixel weights for the sky background. The value of these weights represent
+        the amount of sky background noise at each pixel. By default, the sky background
+        weights are uniform (i.e., equal to 1.0) over the aperture (except at the aperture
+        edges, where there may be fractional pixel weighting as described in the
+        `show_aper_weights()` docstring).
+
+        When doing photometry calculations, these sky background weights will be
+        multiplied with the calculated sky background noise per pixel (includes
+        Earthshine, zodiacal light, and geocoronal emission) and summed pixel-by-pixel to
+        determine the total background noise contribution; any pixels with a value of NaN
+        are excluded from the summation.
+
+        No restrictions are placed on the value of the sky background weights, but the
+        user is responsible for ensuring they make sense in the relevant context. For
+        example, if one pixel in the aperture has double the sky background noise while
+        the rest of the pixels have ordinary levels of background noise, the user should
+        set that one pixel to have a background weight of 2.0 and keep the other
+        background weights at 1.0 (as opposed to setting that one pixel weight to 1.0
+        while changing the other weights to 0.5). As a reminder, this is because the total
+        sky background noise is based on multiplying the sky background noise per pixel by
+        these background weights---the latter scenario would decrease the total sky
+        background noise as opposed to slightly increasing it...
 
         Parameters
         ----------
           sky_background_weights :: (M x N) 2D array of floats
             The pixel weights for the sky background (incl. Earthshine, zodiacal light,
             geocoronal emission). The shape must match the shape of the aperture array
-            (see `source_weights` attribute).
+            (see the `source_weights` attribute).
 
         Attributes
         -------
           sky_background_weights :: (M x N) 2D array of floats
-            The pixel weights for the sky background (incl. Earthshine, zodiacal light,
-            geocoronal emission).
+            The pixel weights for the sky background. Note that the sky background
+            includes Earthshine, zodiacal light, and geocoronal emission.
+
+        Returns
+        -------
+          None
         """
         if self.source_weights is None:
             raise ValueError("Please select an aperture first.")
@@ -446,7 +486,27 @@ class Photometry:
 
     def set_dark_current_weights(self, dark_current_weights):
         """
-        Set the weights for the dark current.
+        Set the pixel weights for the dark current. The value of these weights represent
+        the amount of dark current noise at each pixel. By default, the dark current
+        weights are uniform (i.e., equal to 1.0) over the aperture (except at the aperture
+        edges, where there may be fractional pixel weighting as described in the
+        `show_aper_weights()` docstring).
+
+        When doing photometry calculations, these dark current weights will be multiplied
+        with the dark current value per pixel (specified in the `Telescope` object) and
+        summed pixel-by-pixel to determine the total dark current contribution; any pixels
+        with a value of NaN are excluded from the summation.
+
+        No restrictions are placed on the value of the dark current weights, but the user
+        is responsible for ensuring they make sense in the relevant context. For example,
+        if one pixel in the aperture has double the dark current while the rest of the
+        pixels have the nominal dark current, the user should set that one pixel to have a
+        dark current weight of 2.0 and keep the other dark current weights at 1.0 (as
+        opposed to setting that one pixel weight to 1.0 while changing the other weights
+        to 0.5). As a reminder, this is because the total dark current noise is based on
+        multiplying the dark current per pixel by these dark current weights---the latter
+        scenario would decrease the total dark current noise as opposed to slightly
+        increasing it...
 
         Parameters
         ----------
@@ -469,7 +529,27 @@ class Photometry:
 
     def set_redleak_weights(self, redleak_weights):
         """
-        Set the weights for the redleak.
+        Set the pixel weights for the red leak. The value of these weights represent the
+        amount of red leak contamination in each pixel. By default, the red leak weights
+        are uniform (i.e., equal to 1.0) over the aperture. Unlike all the other pixel
+        weights, the red leak weights do NOT include fractional pixel weighting based on
+        the aperture mask to prevent double-counting of the aperture weights during the
+        red leak calculation.
+
+        When doing photometry calculations, these red leak weights will be multiplied with
+        the calculated red leak value per pixel and summed pixel-by-pixel to determine the
+        total red leak noise; any pixels with a value of NaN are excluded from the
+        summation.
+
+        No restrictions are placed on the value of the red leak weights, but the user is
+        responsible for ensuring they make sense in the relevant context. For example, if
+        one pixel in the aperture has double the red leak flux while the rest of the
+        pixels have the average red leak value, the user should set that one pixel to have
+        a red leak weight of 2.0 and keep the other red leak weights at 1.0 (as opposed to
+        setting that one pixel weight to 1.0 while changing the other weights to 0.5). As
+        a reminder, this is because the total red leak contamination is based on
+        multiplying the red leak per pixel by these red leak weights---the latter scenario
+        would decrease the total red leak value as opposed to slightly increasing it...
 
         Parameters
         ----------
@@ -490,11 +570,13 @@ class Photometry:
             )
         self.redleak_weights = redleak_weights
 
-    def _calc_optimal_aperture_dimen(self, a, b, factor=1.4, print_info=True):
+    @staticmethod
+    def _calc_optimal_aperture_dimen(a, b, fwhm, factor=1.4, print_info=True):
         """
-        Calculates the "ideal/optimal" circular/elliptical aperture dimensions given the
-        angular dimensions of a source. Note that if a dimension is smaller than half the
-        telescope's FWHM, the half-FWHM value should be used for that dimension instead.
+        Calculates the "ideal/optimal" circular/elliptical aperture dimensions from the
+        angular dimensions of a (point) source. Note that if a dimension is smaller than
+        half the telescope's FWHM, the half-FWHM value should be used for that dimension
+        instead.
 
         Parameters
         ----------
@@ -502,6 +584,9 @@ class Photometry:
             The angle subtended by the semimajor and semiminor axes of the source,
             respectively. Note that if a dimension is smaller than half the telescope's
             FWHM, the half-FWHM should be used for that dimension instead.
+
+          fwhm :: `astropy.Quantity` angle
+            The telescope PSF's full-width at half-maximum.
 
           factor :: int or float
             The factor by which to scale the source's angular size along each dimension.
@@ -519,15 +604,15 @@ class Photometry:
         if factor <= 0:
             raise ValueError("factor must be a positive scalar")
 
-        half_fwhm = 0.5 * self.TelescopeObj.fwhm
-        if self.SourceObj.angle_a < half_fwhm:
+        half_fwhm = 0.5 * fwhm
+        if a < half_fwhm:
             if print_info:
                 print(
                     "INFO: Source's semimajor axis (a) or radius subtends angle < "
                     + "1/2 of the FWHM of the telescope's PSF. Using 1/2 of FWHM instead."
                 )
             a = half_fwhm
-        if self.SourceObj.angle_b < half_fwhm:
+        if b < half_fwhm:
             if print_info:
                 print(
                     "INFO: Source's semiminor axis (b) or radius subtends angle < "
@@ -535,18 +620,23 @@ class Photometry:
                 )
             b = half_fwhm
 
-        aper_dimen = [factor * a.to(u.arcsec), factor * b.to(u.arcsec)]
-        return aper_dimen
+        return [factor * a.to(u.arcsec), factor * b.to(u.arcsec)]
 
     def use_optimal_aperture(self, factor=1.4, center=[0, 0] << u.arcsec, quiet=False):
         """
-        Uses the "optimal" circular/elliptical aperture given a source's angular size and
+        Uses the "optimal" circular aperture calculated from a source's angular size and
         the telescope's FWHM. Note that this is only valid for point sources.
+
+        When calculating the size of the optimal aperture, if the point source subtends an
+        angle smaller than half the telescope's FWHM, half of the FWHM value is used as
+        the reference value for this calculation instead.
 
         Parameters
         ----------
           factor :: int or float
-            The factor by which to scale the source's angular size along each dimension.
+            The factor by which to scale the source's angular size---or if the angular
+            size is less than the telescope's FWHM, the telescope's FWHM---along each
+            dimension.
 
           center :: 2-element `astropy.Quantity` angles array
             The (x, y) center of the aperture relative to the center of the source.
@@ -557,10 +647,27 @@ class Photometry:
             If False, print a message if an aperture dimension is based on the FWHM of the
             telescope's PSF instead of the point source's dimensions.
 
+        Attributes
+        ----------
+          source_weights :: (M x N) 2D array of floats
+            The pixel weights for the source.
+
+          sky_background_weights :: (M x N) 2D array of floats
+            The pixel weights for the sky background.
+
+          dark_current_weights :: (M x N) 2D array of floats
+            The pixel weights for the dark current.
+
+          redleak_weights :: (M x N) 2D array of floats
+            The pixel weights for the red leak.
+
         Returns
         -------
           None
         """
+        #
+        # Check inputs
+        #
         if not isinstance(self.SourceObj, PointSource):
             raise TypeError(
                 "Only point sources are supported for optimal aperture. "
@@ -568,32 +675,30 @@ class Photometry:
             )
         if factor <= 0:
             raise ValueError("factor must be a positive number")
-
-        aper_dimen = self._calc_optimal_aperture_dimen(
+        #
+        # Calculate the optimal aperture dimensions, aperture area, and exact # pixels
+        #
+        aper_dimen = Photometry._calc_optimal_aperture_dimen(
             self.SourceObj.angle_a,
             self.SourceObj.angle_b,
+            self.TelescopeObj.fwhm,
             factor=factor,
             print_info=(not quiet),
-        )
+        )  # each dimension an `astropy.Quantity` in arcsec
         self._aper_area = np.pi * aper_dimen[0] * aper_dimen[1]
-        self._assign_npix()
-
+        self._assign_exact_npix()
         #
-        # Account for arbitrary source flux profiles through aperture
+        # Create source weights with arbitrary source flux profile through aperture
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
         self._create_aper_arrs(aper_dimen[0].value, aper_dimen[1].value, center)
-        source_weights = Photometry.calc_source_weights(
+        source_weights, center_px = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
         #
-        center_px = [
-            0.5 * (source_weights.shape[1] - 1),  # x-coordinate in pixel units
-            0.5 * (source_weights.shape[0] - 1),  # y-coordinate in pixel units
-        ]
         aper_dimen_px = [
             (dimen / self.TelescopeObj.px_scale.to(u.arcsec)).value
             for dimen in aper_dimen
@@ -608,8 +713,15 @@ class Photometry:
         self.source_weights = source_weights * aper_mask
         self.sky_background_weights *= aper_mask
         self.dark_current_weights *= aper_mask
-        self.redleak_weights *= aper_mask
+        # (Do NOT include fractional pixel weights for red leak weights to prevent
+        # double-counting of fractional pixel weights in `_calc_redleaks()`)
+        self.redleak_weights *= np.ma.masked_where(
+            np.isfinite(aper_mask), aper_mask, copy=True
+        ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
+        #
+        # Final sanity check
+        #
         if abs(self._eff_npix - self._exact_npix) > 0.1:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
@@ -626,8 +738,7 @@ class Photometry:
         ----------
           a, b :: int or float or `astropy.Quantity` angle
             The angular length of the semimajor and semiminor axes of the aperture,
-            respectively. If int or float, a/b is assumed to be in pixel units. Otherwise,
-            a/b must be an `astropy.Quantity` angle.
+            respectively. If int or float, a/b is assumed to be in pixel units.
 
           center :: 2-element `astropy.Quantity` angles array
             The (x, y) center of the aperture relative to the center of the source.
@@ -639,10 +750,27 @@ class Photometry:
             axis from the positive x-axis. If rotation is 0, the semimajor axis is along
             the x-axis and the semiminor axis is along the y-axis.
 
+        Attributes
+        ----------
+          source_weights :: (M x N) 2D array of floats
+            The pixel weights for the source.
+
+          sky_background_weights :: (M x N) 2D array of floats
+            The pixel weights for the sky background.
+
+          dark_current_weights :: (M x N) 2D array of floats
+            The pixel weights for the dark current.
+
+          redleak_weights :: (M x N) 2D array of floats
+            The pixel weights for the red leak.
+
         Returns
         -------
           None
         """
+        #
+        # Check inputs and
+        #
         if isinstance(a, u.Quantity):
             try:
                 a = a.to(u.arcsec)
@@ -665,33 +793,31 @@ class Photometry:
             b = b * self.TelescopeObj.px_scale.to(u.arcsec)
         if not isinstance(rotation, Number):
             raise TypeError("rotation must be an int or float")
-        rotation = np.deg2rad(rotation)
-        abs_sin_rotate, abs_cos_rotate = abs(np.sin(rotation)), abs(np.cos(rotation))
-
-        self._aper_area = np.pi * a * b  # area of ellipse
-        self._assign_npix()
-
         #
-        # Account for arbitrary source flux profiles through aperture
+        # Calculate exact aperture area and number of pixels in aperture
+        #
+        self._aper_area = np.pi * a * b  # area of ellipse
+        self._assign_exact_npix()
+        #
+        # Create source weights with arbitrary source flux profile through aperture
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
-        # Modified rotation matrix to ensure full aperture is covered in 2D arrays
+        # Below is modified rotation matrix to ensure full aperture is covered in arrays
+        rotation = np.deg2rad(rotation)
+        abs_sin_rotate, abs_cos_rotate = abs(np.sin(rotation)), abs(np.cos(rotation))
         x = (abs_cos_rotate * a + abs_sin_rotate * b).value
         y = (abs_sin_rotate * a + abs_cos_rotate * b).value
         x = x if x >= a.value else a.value
         y = y if y >= b.value else b.value
+        #
         self._create_aper_arrs(x, y, center)
-        source_weights = Photometry.calc_source_weights(
+        source_weights, center_px = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
         #
-        center_px = [
-            0.5 * (source_weights.shape[1] - 1),  # x-coordinate in pixel units
-            0.5 * (source_weights.shape[0] - 1),  # y-coordinate in pixel units
-        ]
         aper_dimen_px = [
             (a / self.TelescopeObj.px_scale.to(u.arcsec)).value,
             (b / self.TelescopeObj.px_scale.to(u.arcsec)).value,
@@ -709,8 +835,15 @@ class Photometry:
         self.source_weights = source_weights * aper_mask
         self.sky_background_weights *= aper_mask
         self.dark_current_weights *= aper_mask
-        self.redleak_weights *= aper_mask
+        # (Do NOT include fractional pixel weights for red leak weights to prevent
+        # double-counting of fractional pixel weights in `_calc_redleaks()`)
+        self.redleak_weights *= np.ma.masked_where(
+            np.isfinite(aper_mask), aper_mask, copy=True
+        ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
+        #
+        # Final sanity checks
+        #
         if abs(self._eff_npix - self._exact_npix) > 0.1:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
@@ -718,7 +851,6 @@ class Photometry:
                 + "Contact the developer with a minimal working example please. Thanks!",
                 RuntimeWarning,
             )
-
         if isinstance(self.SourceObj, PointSource):
             aper_threshold = min(self._optimal_aperture_dimen)
             if a < aper_threshold or b < aper_threshold:
@@ -735,15 +867,27 @@ class Photometry:
         Parameters
         ----------
           width, length :: int or float or `astropy.Quantity` angle
-            The width (the direction along the source's semimajor axis) and length (the
-            direction along the source's semiminor axis) of the rectangular aperture. If
-            int or float, length/width is assumed to be in pixel units.
-            TODO: explain length/width above better
+            The width (along the x-axis) and length (along the y-axis) of the rectangular
+            aperture. If int or float, length/width is assumed to be in pixel units.
 
           center :: 2-element `astropy.Quantity` angles array
             The (x, y) center of the aperture relative to the center of the source.
             Positive values means the source is displaced to the bottom/left relative to
             the aperture center.
+
+        Attributes
+        ----------
+          source_weights :: (M x N) 2D array of floats
+            The pixel weights for the source.
+
+          sky_background_weights :: (M x N) 2D array of floats
+            The pixel weights for the sky background.
+
+          dark_current_weights :: (M x N) 2D array of floats
+            The pixel weights for the dark current.
+
+          redleak_weights :: (M x N) 2D array of floats
+            The pixel weights for the red leak.
 
         Returns
         -------
@@ -781,13 +925,12 @@ class Photometry:
                 "aperture dimensions larger than telescope's IFOV dimensions"
             )
         #
-        # Generate aperture
+        # Calculate exact aperture area and number of pixels in aperture
         #
         self._aper_area = length * width
-        self._assign_npix()
-
+        self._assign_exact_npix()
         #
-        # Account for arbitrary source flux profiles through aperture
+        # Create source weights with arbitrary source flux profile through aperture
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
@@ -796,16 +939,12 @@ class Photometry:
             0.5 * length.value,  # length is along y
             center,
         )
-        source_weights = Photometry.calc_source_weights(
+        source_weights, center_px = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
         #
-        center_px = [
-            0.5 * (source_weights.shape[1] - 1),  # x-coordinate in pixel units
-            0.5 * (source_weights.shape[0] - 1),  # y-coordinate in pixel units
-        ]
         aper_dimen_px = [
             (width / self.TelescopeObj.px_scale.to(u.arcsec)).value,
             (length / self.TelescopeObj.px_scale.to(u.arcsec)).value,
@@ -820,8 +959,15 @@ class Photometry:
         self.source_weights = source_weights * aper_mask
         self.sky_background_weights *= aper_mask
         self.dark_current_weights *= aper_mask
-        self.redleak_weights *= aper_mask
+        # (Do NOT include fractional pixel weights for red leak weights to prevent
+        # double-counting of fractional pixel weights in `_calc_redleaks()`)
+        self.redleak_weights *= np.ma.masked_where(
+            np.isfinite(aper_mask), aper_mask, copy=True
+        ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
+        #
+        # Final sanity checks
+        #
         if abs(self._eff_npix - self._exact_npix) > 0.1:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
@@ -829,7 +975,6 @@ class Photometry:
                 + "Contact the developer with a minimal working example please. Thanks!",
                 RuntimeWarning,
             )
-
         if isinstance(self.SourceObj, PointSource):
             aper_threshold = min(self._optimal_aperture_dimen) * 2
             if (length < aper_threshold) or (width < aper_threshold):
@@ -842,7 +987,9 @@ class Photometry:
 
     def use_annular_aperture(self, a_out, b_out, a_in=0, b_in=None):
         """
-        TODO: implement this? Maybe?
+        Not implemented!
+
+        TODO: maybe implement this if enough demand?
         """
         if b_in is None:
             b_in = b_out * (a_in / a_out)
@@ -851,7 +998,8 @@ class Photometry:
     def calc_redleak_frac(self, quiet=False):
         """
         Calculate a source's red leak fraction. The red leak fraction is defined to be the
-        ratio of red leak electron/s to total electron/s.
+        ratio of the electron rate (i.e., electron/s) induced by red leak flux to the
+        total electron rate induced by the entire spectrum.
 
         Parameters
         ----------
@@ -867,7 +1015,9 @@ class Photometry:
         # Calculate red leak fraction (red leak electron/s to total electron/s)
         #
         redleak_fracs = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
-
+        #
+        # Make useful source spectrum-derived quantities
+        #
         source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
         source_photon_s_A = (  # photon/s/A
             self.SourceObj.spectrum  # erg/s/cm^2/A
@@ -881,6 +1031,9 @@ class Photometry:
             bounds_error=False,
             fill_value=np.nan,
         )  # photon/s/A
+        #
+        # Find red leak fraction per band
+        #
         for band in redleak_fracs:
             full_response_curve_wavelengths_AA = (
                 self.TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
@@ -942,17 +1095,36 @@ class Photometry:
         self, source_erate, mirror_area_cm_sq, include_redleak=True, quiet=False
     ):
         """
-        Calculate the red leak of a source from its in-passband red leak fraction. The
-        in-passband red leak fraction is defined to be the ratio of red leak electron/s to
-        in-passband electron/s.
+        Calculate the red leak of a source (in electron/s) from its in-passband red leak
+        fraction. The in-passband red leak fraction is defined to be the ratio of red leak
+        electron/s to in-passband electron/s.
 
-        This is a more robust way to calculate red leaks that is independent of how
-        source_erate is determined.
+        This is a robust way to calculate red leaks that is independent of how
+        source_erate is determined and independent of any normalizations. It simply scales
+        each pixel's electron rate (i.e., electron/s) in each passband by its respective
+        in-passband red leak fraction to get the red leak electron rate.
 
         Parameters
         ----------
+          source_erate :: dict of 2D arrays
+            Dictionary containing the pixel-by-pixel electron rate (i.e., electron/s)
+            induced by the source in each passband. In other words, this is the
+            pixel-by-pixel signal in each passband.
+
+          mirror_area_cm_sq :: float
+            The area of the telescope's mirror in square centimeters.
+
+          include_redleak :: bool
+            If False, do not include red leak (i.e., the returned dictionary will be
+            zeroes).
+
           quiet :: bool
             If True, suppress warnings from in-passband red leak fraction calculations.
+
+        Returns
+        -------
+          redleaks :: dict of 2D arrays
+            Dictionary containing the pixel-by-pixel red leak values (in electron/s).
         """
         #
         # Calculate in-passband redleak fraction (red leak electron/s to passband
@@ -960,6 +1132,9 @@ class Photometry:
         #
         redleak_fracs = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
         if include_redleak:
+            #
+            # Make useful source spectrum-derived quantities
+            #
             source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
             source_photon_s_A = (  # photon/s/A
                 self.SourceObj.spectrum  # erg/s/cm^2/A
@@ -973,6 +1148,9 @@ class Photometry:
                 bounds_error=False,
                 fill_value=np.nan,
             )  # photon/s/A
+            #
+            # Find in-passband redleak fraction per band
+            #
             for band in redleak_fracs:
                 full_response_curve_wavelengths_AA = (
                     self.TelescopeObj.full_passband_curves[band]["wavelength"]
@@ -1039,6 +1217,10 @@ class Photometry:
                         + "that is above the red leak threshold."
                     )
                 if np.isfinite(redleak_frac):
+                    # Important: note that redleak_weights should not have fractional
+                    # pixel weighting based on the aperture mask or else the aperture
+                    # weights will be double-counted when the redleak_fracs arrays are
+                    # multiplied by the source_erates...
                     redleak_fracs[band] = redleak_frac * self.redleak_weights
                 else:
                     raise RuntimeError(
@@ -1050,6 +1232,7 @@ class Photometry:
         #
         redleaks = dict.fromkeys(self.TelescopeObj.passbands)
         for band in redleaks:
+            # (Recall source_erate includes fractional pixel weighting from aperture mask)
             redleaks[band] = redleak_fracs[band] * source_erate[band]
         #
         return redleaks
@@ -1058,35 +1241,41 @@ class Photometry:
     def _calc_snr_from_t(
         t,
         signal,
-        npix,
         totskynoise,
-        readnoise,
         darkcurrent,
         redleak,
+        readnoise,
+        read_npix,
         nread=1,
     ):
         """
-        Calculate the signal-to-noise ratio (SNR) reached given an integration time. Based on
-        <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-6-estimating-exposure-times>.
-
-        TODO: docstring outdated! Inputs should be arrays except for t/readnoise/npix!
+        Calculate the signal-to-noise ratio (SNR) reached given an integration time.
 
         The equation to calculate the SNR is:
         ```math
-                    SNR = (Q*t) / sqrt(Q*t + N_pix*t*Poisson + N_pix*N_read*Read^2)
+                    SNR = (Q*t) / sqrt(Q*t + N_pix*t*Other_Poisson + N_pix*N_read*Read^2)
         ```
         where:
-        - SNR is the signal-to-noise ratio
-        - t is the integration time in seconds
-        - Q is the total signal due to the source in electrons/s
-        - N_pix is the number of pixels occupied by the source on the detector
-        FIXME: change name to Background or something, not Poisson
-        - Poisson = (B_Earthshine + B_zodiacal + B_geocoronal + Darkcurrent + Redleak) is
-            the total Poisson noise due to the sky backgorund (Earthshine, zodiacal light,
-            and geocoronal emission), dark current, and red leak in electrons/s (per
-            pixel)
-        - N_read is the number of detector readouts
-        - Read is the detector read noise in electrons (per pixel)
+          - SNR is the signal-to-noise ratio
+          - t is the integration time in seconds
+          - Q is the total signal due to the source in electrons/s
+          - N_pix is the number of pixels occupied by the source on the detector
+          - Other_Poisson = (B_Earthshine + B_zodi + B_geocoronal + Darkcurrent + Redleak)
+          is the total Poisson noise due to the sky backgorund (Earthshine, zodiacal
+          light, and geocoronal emission), dark current, and red leak in electrons/s (per
+          pixel)
+          - N_read is the number of detector readouts
+          - Read is the detector read noise in electrons (per pixel)
+        The equation above is based on the formula detailed here:
+        <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-6-estimating-exposure-times>.
+
+        In practice, the calculation takes in 2D arrays for the source signal, sky
+        background, dark current, and red leak. The factor of N_pix is already included
+        for these arrays since they have fractional pixel weighting. Therefore, simply
+        summing up these arrays (excluding NaNs) is enough to calculate the total
+        contribution from that element without further multiplying by N_pix. The only
+        exception is N_read and the read noise, which are scalars and must be multiplied
+        by an integer number of pixels.
 
 
         Parameters
@@ -1094,33 +1283,41 @@ class Photometry:
           t :: int or float
             The integration time in seconds.
 
-          signal :: scalar or array of scalars
-            The signals of the source in electron/s. These are the total electron rates over
-            the whole npix (see below).
+          signal :: (M x N) 2D array of scalars
+            2D array giving the signal of the source (in electron/s) for each pixel in the
+            aperture. This should include fractional pixel weighting from the aperture
+            mask.
 
-          npix :: int
-            The integer number of pixels occupied by the source. Only used for read noise.
+          totskynoise :: (M x N) 2D array of scalars
+            2D array giving the total background noise due to Earthshine + zodiacal light
+            + geocoronal emission (if applicable) in electron/s for each pixel in the
+            aperture. This should include fractional pixel weighting from the aperture
+            mask.
 
-          totskynoise :: int or float
-            The total background noise due to Earthshine + zodiacal light + geocoronal
-            emission (if applicable) in electron/s (per pixel).
+          darkcurrent :: (M x N) 2D array of scalars
+            2D array giving the detector dark current in electron/s for each pixel in the
+            aperture. This should include fractional pixel weighting from the aperture
+            mask.
+
+          darkcurrent :: (M x N) 2D array of scalars
+            2D array giving the red leak in electron/s for each pixel in the
+            aperture. This should include fractional pixel weighting from the aperture
+            mask.
 
           readnoise :: int or float
-            The CCD read noise in electron (per pixel).
+            The detector read noise in electron (per pixel).
 
-          darkcurrent :: int or float
-            The CCD dark current in electron/s (per pixel).
-
-          redleak :: int or float
-            The CCD read leak due to the source in electron/s (per pixel).
+          read_npix :: int
+            The integer number of pixels in the aperture. Only used for multiplying with
+            the read noise and number of detector readouts.
 
           nread :: int
-            The number of CCD readouts.
+            The number of detector readouts.
 
         Returns
         -------
-          snr :: float or array of floats
-            The SNRs reach after t seconds.
+          snr :: float
+            The SNR reached after t seconds.
         """
         #
         # Check inputs
@@ -1131,8 +1328,8 @@ class Photometry:
                 "All inputs must be scalars or scalar arrays. "
                 + "`astropy.Quantity` objects are not supported."
             )
-        if not isinstance(npix, (int, np.integer)):
-            raise ValueError("npix must be an integer")
+        if not isinstance(read_npix, (int, np.integer)):
+            raise ValueError("read_npix must be an integer")
         if not isinstance(nread, (int, np.integer)):
             raise ValueError("nread must be an integer")
         #
@@ -1142,92 +1339,98 @@ class Photometry:
         noise = np.sqrt(
             signal_t
             + np.nansum(t * (totskynoise + darkcurrent + redleak))
-            + (npix * readnoise * readnoise * nread)
+            + (read_npix * readnoise * readnoise * nread)
         )  # electron
         snr = signal_t / noise
-        # signal_t = signal * t  # electron
-        # noise = np.sqrt(
-        #     signal_t
-        #     + (
-        #         t * (totskynoise + darkcurrent + redleak)
-        #         + (readnoise * readnoise * nread)
-        #     )
-        # )  # electron
-        # snr = np.nansum(signal_t) / np.nansum(noise)
         return snr
 
     @staticmethod
     def _calc_t_from_snr(
         snr,
         signal,
-        npix,
         totskynoise,
-        readnoise,
         darkcurrent,
         redleak,
+        readnoise,
+        read_npix,
         nread=1,
     ):
         """
-        Calculate the time required to reach a given signal-to-noise ratio (SNR). Based on
-        <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-6-estimating-exposure-times>.
+        Calculate the time required to reach a given signal-to-noise ratio (SNR).
 
-        TODO: docstring outdated! Inputs should be arrays except for snr/readnoise/npix!
-
-        The equation to calculate the time required to reach a given SNR is:
+        The theoretical equation to calculate the time required to reach a given SNR is:
         ```math
                     t = {
-                        SNR^2 * (Q + N_pix * Poisson)
+                        SNR^2 * (Q + N_pix * Other_Poisson)
                         + sqrt[
-                            SNR^4 * (Q + N_pix * Poisson)^2
+                            SNR^4 * (Q + N_pix * Other_Poisson)^2
                             + 4 * Q^2 * SNR^2 * N_pix * N_read * Read^2
                         ]
                     } / (2 * Q^2)
         ```
         where:
-        - SNR is the desired signal-to-noise ratio
-        - t is the integration time in seconds
-        - Q is the total signal due to the source in electrons/s
-        - N_pix is the number of pixels occupied by the source on the detector
-        FIXME: change name to Background or something, not Poisson
-        - Poisson = (B_Earthshine + B_zodiacal + B_geocoronal + Darkcurrent + Redleak) is
-            the total Poisson noise due to the sky backgorund (Earthshine, zodiacal light, and
-            geocoronal emission), dark current, and red leak in electrons/s (per pixel)
-        - N_read is the number of detector readouts
-        - Read is the detector read noise in electrons (per pixel)
-        Note that this is simply the quadratic formula applied to the generic SNR equation.
+          - SNR is the desired signal-to-noise ratio
+          - t is the integration time in seconds
+          - Q is the total signal due to the source in electrons/s
+          - N_pix is the number of pixels occupied by the source on the detector
+          - Other_Poisson = (B_Earthshine + B_zodi + B_geocoronal + Darkcurrent + Redleak)
+          is the total Poisson noise due to the sky backgorund (Earthshine, zodiacal
+          light, and geocoronal emission), dark current, and red leak in electrons/s (per
+          pixel)
+          - N_read is the number of detector readouts
+          - Read is the detector read noise in electrons (per pixel)
+        Note that this is simply the quadratic formula applied to the generic SNR
+        equation. Also, the equation above is based on the formula detailed here:
+        <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-6-estimating-exposure-times>.
+
+        In practice, the calculation takes in 2D arrays for the source signal, sky
+        background, dark current, and red leak. The factor of N_pix is already included
+        for these arrays since they have fractional pixel weighting. Therefore, simply
+        summing up these arrays (excluding NaNs) is enough to calculate the total
+        contribution from that element without further multiplying by N_pix. The only
+        exception is N_read and the read noise, which are scalars and must be multiplied
+        by an integer number of pixels.
 
         Parameters
         ----------
           snr :: int or float
             The target SNR.
 
-          signal :: scalar or array of scalars
-            The signals of the source in electron/s. These are the total electron rates
-            over the whole npix (see below).
+          signal :: (M x N) 2D array of scalars
+            2D array giving the signal of the source (in electron/s) for each pixel in the
+            aperture. This should include fractional pixel weighting from the aperture
+            mask.
 
-          npix :: int
-            The integer number of pixels occupied by the source. Only used for read noise.
+          totskynoise :: (M x N) 2D array of scalars
+            2D array giving the total background noise due to Earthshine + zodiacal light
+            + geocoronal emission (if applicable) in electron/s for each pixel in the
+            aperture. This should include fractional pixel weighting from the aperture
+            mask.
 
-          totskynoise :: int or float
-            The total background noise due to Earthshine + zodiacal light + geocoronal
-            emission (if applicable) in electron/s (per pixel).
+          darkcurrent :: (M x N) 2D array of scalars
+            2D array giving the detector dark current in electron/s for each pixel in the
+            aperture. This should include fractional pixel weighting from the aperture
+            mask.
+
+          darkcurrent :: (M x N) 2D array of scalars
+            2D array giving the red leak in electron/s for each pixel in the
+            aperture. This should include fractional pixel weighting from the aperture
+            mask.
 
           readnoise :: int or float
-            The CCD read noise in electron (per pixel).
+            The detector read noise in electron (per pixel).
 
-          darkcurrent :: int or float
-            The CCD dark current in electron/s (per pixel).
-
-          redleak :: int or float
-            The CCD read leak due to the source in electron/s (per pixel).
+          read_npix :: int
+            The integer number of pixels in the aperture. Only used for multiplying with
+            the read noise and number of detector readouts.
 
           nread :: int
-            The number of CCD readouts.
+            The number of detector readouts.
 
         Returns
         -------
-          t :: float or array of floats
-            The times required to reach the given SNR in seconds.
+          t :: float
+            The time required to reach the given SNR in seconds.
         """
         variables = [snr, signal, totskynoise, readnoise, darkcurrent, redleak, nread]
         if np.any([isinstance(var, u.Quantity) for var in variables]):
@@ -1235,23 +1438,10 @@ class Photometry:
                 "All inputs must be scalars or scalar arrays. "
                 + "`astropy.Quantity` objects are not supported."
             )
-        if not isinstance(npix, (int, np.integer)):
-            raise ValueError("npix must be an integer")
+        if not isinstance(read_npix, (int, np.integer)):
+            raise ValueError("read_npix must be an integer")
         if not isinstance(nread, (int, np.integer)):
             raise ValueError("nread must be an integer")
-        # #
-        # # Calculate useful quantities
-        # #
-        # snr_sq = snr * snr
-        # signal_sq = signal * signal
-        # poisson_noise = signal + npix * (totskynoise + darkcurrent + redleak)
-        # #
-        # # Calculate time to reach target SNR
-        # #
-        # numer1 = snr_sq * poisson_noise
-        # numer2 = snr_sq * snr_sq * poisson_noise * poisson_noise
-        # numer3 = 4 * snr_sq * signal_sq * (npix * readnoise * readnoise * nread)
-        # t = (numer1 + np.sqrt(numer2 + numer3)) / (2 * signal_sq)  # seconds
         #
         # Calculate useful quantities
         #
@@ -1264,7 +1454,7 @@ class Photometry:
         #
         numer1 = snr_sq * poisson_noise
         numer2 = snr_sq * snr_sq * poisson_noise * poisson_noise
-        numer3 = 4 * snr_sq * signal_sq * (npix * readnoise * readnoise * nread)
+        numer3 = 4 * snr_sq * signal_sq * (read_npix * readnoise * readnoise * nread)
         t = (numer1 + np.sqrt(numer2 + numer3)) / (2 * signal_sq)  # seconds
         return t
 
@@ -1272,8 +1462,8 @@ class Photometry:
         self,
         t=None,
         snr=None,
-        npix=None,
         reddening=0,
+        npix=None,
         nread=1,
         include_redleak=True,
         quiet=False,
@@ -1282,8 +1472,8 @@ class Photometry:
         Calculate the signal-to-noise ratio (SNR) reached in a given time or the
         integration time (t) required to reach a given SNR.
 
-        The `Source` object associated with the `Photometry` instance should have its flux
-        in units of flam (erg/s/cm^2/A).
+        Again, note that the `Source` object associated with the `Photometry` instance
+        should have its spectrum in units of flam (erg/s/cm^2/A).
 
         Parameters
         ----------
@@ -1293,20 +1483,20 @@ class Photometry:
           snr :: float
             Desired signal-to-noise ratio.
 
-          npix :: int or float or None
-            The number of pixels occupied by the source to use for the noise calculations
-            (e.g., sky background, dark current). If None, use the automatically
-            calculated "effective pixel" count. Note that the number of pixels used for
-            the read noise will always be npix rounded up to the nearest integer. Finally,
-            this value does not affect the total signal of the source---only the
-            non-signal-derived noise values are affected (e.g., higher npix means higher
-            total sky background, dark current, and read noise but not higher signal nor
-            redleak).
-
           reddening :: int or float
             The reddening (i.e., E(B-V) in AB mags) based on the pointing. This value will
             be multiplied with each of the telescope's extinction coefficients to get the
             total extinction in each passband.
+
+          npix :: int or float or None
+            The number of pixels occupied by the source to use for the noise calculations
+            (i.e., affects sky background, dark current, and read noise). If None, use the
+            automatically calculated "effective pixel" count. Note that the number of
+            pixels used for the read noise will always be npix rounded up to the nearest
+            integer. Finally, this value does not affect the total signal of the
+            source---only the non-signal-derived noise values are affected (e.g., higher
+            npix means higher total sky background, dark current, and read noise but not
+            higher signal nor redleak).
 
           nread :: int
             Number of detector readouts.
@@ -1349,6 +1539,7 @@ class Photometry:
         #
         # Calculate sky background electron/s
         # (incl. Earthshine & zodiacal light, excl. geocoronal emission lines)
+        # NOTE: zodi_flam and earthshine_flam are actually in units of flam per sq. arcsec
         #
         sky_background_erate = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
         px_area_arcsec_sq = self.TelescopeObj.px_area.to(u.arcsec ** 2).value
@@ -1362,7 +1553,7 @@ class Photometry:
             # Earthshine contribution
             if self.BackgroundObj.earthshine_flam is not None:
                 es_photon_s_A = (  # photon/s/A
-                    self.BackgroundObj.earthshine_flam  # erg/s/cm^2/A
+                    self.BackgroundObj.earthshine_flam  # erg/s/cm^2/A/arcsec^2
                     * mirror_area_cm_sq  # cm^2
                     / calc_photon_energy(  # photon/erg
                         wavelength=self.BackgroundObj.earthshine_wavelengths
@@ -1407,7 +1598,7 @@ class Photometry:
             # Zodiacal light contribution
             if self.BackgroundObj.zodi_flam is not None:
                 zodi_photon_s_A = (  # photon/s/A
-                    self.BackgroundObj.zodi_flam  # erg/s/cm^2/A
+                    self.BackgroundObj.zodi_flam  # erg/s/cm^2/A/arcsec^2
                     * mirror_area_cm_sq  # cm^2
                     / calc_photon_energy(  # photon/erg
                         wavelength=self.BackgroundObj.zodi_wavelengths
@@ -1562,15 +1753,8 @@ class Photometry:
                 mag_to_flux(source_ab_mag, zpt=self.TelescopeObj.phot_zpts[band])[0]
                 * self.source_weights
             )
-            # source_erate[band] = convert_electron_flux_mag(
-            #     avg_passband_flam_per_px * self.source_weights,
-            #     "flam",
-            #     "electron",
-            #     phot_zpt=self.TelescopeObj.phot_zpts[band],
-            #     wavelengths=self.TelescopeObj.passband_pivots[band],
-            # )[0]
         #
-        # Calculate redleak
+        # Calculate red leak (electron/s) at each pixel
         #
         redleaks = self._calc_redleaks(
             source_erate, mirror_area_cm_sq, include_redleak=include_redleak, quiet=quiet
@@ -1587,11 +1771,11 @@ class Photometry:
                 results[band] = Photometry._calc_snr_from_t(
                     t=t,
                     signal=source_erate[band],
-                    npix=int(np.ceil(npix)),  # only used for read noise
                     totskynoise=sky_background_erate[band],
-                    readnoise=self.TelescopeObj.read_noise,  # constant per pixel
                     darkcurrent=dark_current,
                     redleak=redleaks[band],
+                    readnoise=self.TelescopeObj.read_noise,  # constant per pixel
+                    read_npix=int(np.ceil(npix)),  # only used for readnoise and nread
                     nread=nread,
                 )
         else:
@@ -1599,14 +1783,11 @@ class Photometry:
                 results[band] = Photometry._calc_t_from_snr(
                     snr=snr,
                     signal=source_erate[band],
-                    npix=int(np.ceil(npix)),  # only used for read noise
                     totskynoise=sky_background_erate[band],
-                    readnoise=self.TelescopeObj.read_noise,  # constant per pixel
                     darkcurrent=dark_current,
                     redleak=redleaks[band],
+                    readnoise=self.TelescopeObj.read_noise,  # constant per pixel
+                    read_npix=int(np.ceil(npix)),  # only used for readnoise and nread
                     nread=nread,
                 )
         return results
-
-
-# TODO: MAKE REDLEAK FRACTION FUNCTION
