@@ -132,13 +132,13 @@ class Background:
             Earthshine spectrum wavelengths in angstrom.
 
           earthshine_flam :: array of floats or None
-            Earthshine flux density in flam (erg/cm^2/s/A).
+            Earthshine flux density in flam (erg/cm^2/s/A) per sq. arcsec.
 
           zodi_wavelengths :: array of floats or None
             Zodiacal light spectrum wavelengths in angstrom.
 
           zodi_flam :: array of floats or None
-            Zodiacal light flux density in flam (erg/cm^2/s/A).
+            Zodiacal light flux density in flam (erg/cm^2/s/A) per sq. arcsec.
 
           mags_per_sq_arcsec :: dict of floats or None
             The sky background AB magnitudes per square arcsecond (incl. Earthshine &
