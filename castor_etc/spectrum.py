@@ -127,6 +127,17 @@ class SpectrumMixin:
         """
         Check for existing spectrum. If self.wavelengths and/or self.spectrum is not None,
         raise an error if overwrite is False otherwise overwrite the existing spectrum.
+
+        Parameters
+        ----------
+          overwrite :: bool
+            If False and self.wavelengths and/or self.spectrum is not None, raise an
+            error. If True and self.wavelengths and/or self.spectrum is not None, print a
+            message informing the user that the existing spectrum will be overwritten.
+
+        Returns
+        -------
+          None
         """
         if self.wavelengths is not None or self.spectrum is not None:
             if overwrite:
@@ -442,28 +453,29 @@ class SpectrumMixin:
             The spectrum to/from which to add/subtract the Gaussian spectrum.
 
           center :: scalar or `astropy.Quantity`
-            The central wavelength of the Gaussian.
+            The central wavelength of the Gaussian. If a scalar, it is assumed to be in
+            angstrom.
 
           fwhm :: scalar or `astropy.Quantity`
-            The full-width at half-maximum of the Gaussian.
+            The full-width at half-maximum of the Gaussian. If a scalar, it is assumed to
+            be in angstrom.
 
           peak :: int or float
-            The peak flux of the Gaussian (i.e., the flux at the center wavelength). This
-            determines the unit of the returned spectrum. Exactly one of peak or tot_flux
-            must be specified.
+            The peak flux of the Gaussian (i.e., the flux at the center wavelength).
+            Exactly one of peak or tot_flux must be specified.
 
           tot_flux :: int or float
-            The total flux under the curve. This implicitly determines the unit of the
-            returned spectrum. Exactly one of peak or tot_flux must be specified.
+            The total flux under the curve. Exactly one of peak or tot_flux must be
+            specified.
 
           add :: bool
             If True, add the Gaussian spectrum to the existing spectrum. If False,
             subtract the Gaussian from the existing spectrum.
 
           abs_peak :: bool
-            If True, scale spectrum so that the peak of the emission or dip of the
-            absorption line is at the given value. Otherwise, just naively add/subtract
-            the given Gaussian peak.
+            If True, ensure that the peak of the emission line or dip of the absorption
+            line is at the given value. Otherwise, just add/subtract the given Gaussian
+            peak to/from the continuum.
 
         Returns
         -------
@@ -494,7 +506,10 @@ class SpectrumMixin:
         if peak is not None and (
             np.size(peak) != 1 or not isinstance(peak, Number) or peak <= 0
         ):
-            raise ValueError("peak must be a single int or float >= 0.")
+            if add:
+                raise ValueError("peak must be a single int or float >= 0.")
+            else:
+                raise ValueError("dip must be a single int or float >= 0.")
         elif tot_flux is not None and (
             np.size(tot_flux) != 1 or not isinstance(tot_flux, Number) or tot_flux <= 0
         ):
@@ -614,28 +629,29 @@ class SpectrumMixin:
             The spectrum to/from which to add/subtract the Lorentzian spectrum.
 
           center :: scalar or `astropy.Quantity`
-            The central wavelength of the Lorentzian.
+            The central wavelength of the Lorentzian. If a scalar, it is assumed to be in
+            angstrom.
 
           fwhm :: scalar or `astropy.Quantity`
-            The full-width at half-maximum of the Lorentzian.
+            The full-width at half-maximum of the Lorentzian. If a scalar, it is assumed
+            to be in angstrom.
 
           peak :: int or float
-            The peak flux of the Lorentzian (i.e., the flux at the center wavelength). This
-            determines the unit of the returned spectrum. Exactly one of peak or tot_flux
-            must be specified.
+            The peak flux of the Lorentzian (i.e., the flux at the center wavelength).
+            Exactly one of peak or tot_flux must be specified.
 
           tot_flux :: int or float
-            The total flux under the curve. This implicitly determines the unit of the
-            returned spectrum. Exactly one of peak or tot_flux must be specified.
+            The total flux under the curve. Exactly one of peak or tot_flux must be
+            specified.
 
           add :: bool
             If True, add the Lorentzian spectrum to the existing spectrum. If False,
             subtract the Lorentzian from the existing spectrum.
 
           abs_peak :: bool
-            If True, scale spectrum so that the peak of the emission or dip of the
-            absorption line is at the given value. Otherwise, just naively add/subtract
-            the given Lorentzian peak.
+            If True, ensure that the peak of the emission line or dip of the absorption
+            line is at the given value. Otherwise, just add/subtract the given Lorentzian
+            peak to/from the continuum.
 
         Returns
         -------
@@ -644,8 +660,8 @@ class SpectrumMixin:
             from the input `wavelengths` array.
 
           sorted_spectrum :: array of floats
-            The spectrum with the Lorentzian added/subtracted. The shape of this array will
-            be different from the input `spectrum` array.
+            The spectrum with the Lorentzian added/subtracted. The shape of this array
+            will be different from the input `spectrum` array.
         """
 
         def _lorentzian(_peak, _wavelengths, _center, _probable_error):
@@ -666,7 +682,10 @@ class SpectrumMixin:
         if peak is not None and (
             np.size(peak) != 1 or not isinstance(peak, Number) or peak <= 0
         ):
-            raise ValueError("peak must be a single int or float >= 0.")
+            if add:
+                raise ValueError("peak must be a single int or float >= 0.")
+            else:
+                raise ValueError("dip must be a single int or float >= 0.")
         elif tot_flux is not None and (
             np.size(tot_flux) != 1 or not isinstance(tot_flux, Number) or tot_flux <= 0
         ):
@@ -737,12 +756,57 @@ class SpectrumMixin:
         return sorted_wavelengths, sorted_spectrum
 
     def add_emission_line(
-        self, center, fwhm, peak=None, tot_flux=None, shape="gaussian", abs_peak=True
+        self, center, fwhm, peak=None, tot_flux=None, shape="gaussian", abs_peak=False
     ):
         """
-        TODO: docstring
+        Add a well-sampled emission line to the spectrum. Note that the minimum/maximum
+        wavelengths of the source spectrum will not change.
 
-        Note that the minimum/maximum wavelengths of the source spectrum will not change.
+        N.B. the order in which emission/absorption lines are added will affect the final
+        spectrum if using the abs_peak/abs_dip flag. For instance, adding an emission line
+        on top of a continuum then specifying an absorption line with an absolute dip is
+        not the same as specifying an absorption line with an absolute dip then adding an
+        emission line on top of the new continuum.
+
+        Parameters
+        ----------
+          center :: scalar or `astropy.Quantity`
+            The central wavelength of the emission line. If a scalar, it is assumed to be
+            in angstrom.
+
+          fwhm :: scalar or `astropy.Quantity`
+            The full-width at half-maximum of the emission line. If a scalar, it is
+            assumed to be in angstrom.
+
+          peak :: int or float
+            The peak flux of the emission line (i.e., the flux at the center wavelength).
+            Exactly one of peak or tot_flux must be specified.
+
+          tot_flux :: int or float
+            The total flux under the curve. Exactly one of peak or tot_flux must be
+            specified.
+
+          shape :: "gaussian" or "lorentzian"
+            The emission line profile.
+
+          abs_peak :: bool
+            If True, ensure that the peak of the emission line is at the given value.
+            Otherwise, just add the given emission line to the spectrum.
+
+        Attributes
+        ----------
+          wavelengths :: `astropy.Quantity` array
+            The wavelengths of the spectrum including the emission line, in angstroms.
+            This wavelengths array will have a different shape than the previous
+            wavelengths array.
+
+          spectrum :: array of floats
+            The spectrum with the emission line added. This spectrum array will have a
+            different shape than the previous spectrum array.
+
+        Returns
+        -------
+          None
         """
         if self.wavelengths is None or self.spectrum is None:
             raise ValueError("Please generate or load a spectrum first")
@@ -764,12 +828,57 @@ class SpectrumMixin:
         )
 
     def add_absorption_line(
-        self, center, fwhm, dip=None, tot_flux=None, shape="gaussian", abs_dip=True
+        self, center, fwhm, dip=None, tot_flux=None, shape="gaussian", abs_dip=False
     ):
         """
-        TODO: docstring
+        Add a well-sampled absorption line to the spectrum. Note that the minimum/maximum
+        wavelengths of the source spectrum will not change.
 
-        Note that the minimum/maximum wavelengths of the source spectrum will not change.
+        N.B. the order in which emission/absorption lines are added will affect the final
+        spectrum if using the abs_peak/abs_dip flag. For instance, adding an emission line
+        on top of a continuum then specifying an absorption line with an absolute dip is
+        not the same as specifying an absorption line with an absolute dip then adding an
+        emission line on top of the new continuum.
+
+        Parameters
+        ----------
+          center :: scalar or `astropy.Quantity`
+            The central wavelength of the absorption line. If a scalar, it is assumed to
+            be in angstrom.
+
+          fwhm :: scalar or `astropy.Quantity`
+            The full-width at half-maximum of the absorption line. If a scalar, it is
+            assumed to be in angstrom.
+
+          dip :: int or float
+            The minimum flux of the absorption line (i.e., the flux at the center
+            wavelength). Exactly one of dip or tot_flux must be specified.
+
+          tot_flux :: int or float
+            The total flux under (above) the curve. Exactly one of dip or tot_flux must
+            be specified.
+
+          shape :: "gaussian" or "lorentzian"
+            The absorption line profile.
+
+          abs_peak :: bool
+            If True, ensure that the dip of the absorption line is at the given value.
+            Otherwise, just subtract the given absorption line from the spectrum.
+
+        Attributes
+        ----------
+          wavelengths :: `astropy.Quantity` array
+            The wavelengths of the spectrum including the absorption line, in angstroms.
+            This wavelengths array will have a different shape than the previous
+            wavelengths array.
+
+          spectrum :: array of floats
+            The spectrum with the absorption line subtracted. This spectrum array will
+            have a different shape than the previous spectrum array.
+
+        Returns
+        -------
+          None
         """
         if self.wavelengths is None or self.spectrum is None:
             raise ValueError("Please generate or load a spectrum first")
@@ -878,7 +987,7 @@ class SpectrumMixin:
         ----------
           gal_type :: "elliptical" or "spiral"
             The galaxy morphology. The elliptical galaxy (class T=-5, -4) and spiral
-            galaxy (type Sc, class T=5) spectra both run from 22-10000 nm.
+            galaxy (type Sc, class T=5) spectra both run from 22-9698 nm.
 
           overwrite :: bool
             If True, overwrite any existing wavelengths/spectrum. If False, raise an error
@@ -1217,6 +1326,7 @@ class SpectrumMixin:
         #
         # Check inputs
         #
+        self._check_existing_spectrum(overwrite)
         valid_spectral_classes = [
             "a0i",
             "a0iii",
@@ -1533,7 +1643,7 @@ class NormMixin:
     """
     Mixin for normalizing spectra.
 
-    TODO: Make normalize to a specific value at a given wavelength
+    TODO: Make normalization to a specific value at a given wavelength
     """
 
     @staticmethod

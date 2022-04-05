@@ -446,8 +446,6 @@ def convert_electron_flux_mag(
     inputs are over the entire passband. For example, do NOT use this function to convert
     geocoronal emission line flux to electron/s.
 
-    TODO: test this function
-
     Parameters
     ----------
       var1 :: scalar or array

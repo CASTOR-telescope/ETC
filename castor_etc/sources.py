@@ -418,7 +418,6 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
             if not isinstance(_test_result, np.ndarray) or (
                 np.shape(_test_result) != np.shape(_test_arr)
             ):
-                # TODO: relax the check for shape...
                 raise TypeError(
                     "`profile` should return a 2D array of floats. "
                     + "See the docstring below for more details.\n"
@@ -629,8 +628,6 @@ class ExtendedSource(Source):
         Returns
         -------
           `ExtendedSource` instance
-
-        TODO: finish docstring
         """
         super().__init__(profile)
         #
