@@ -172,32 +172,23 @@ class Photometry:
         """
         return deepcopy(self)
 
-    @staticmethod
-    def angle_to_pix(angle, px_scale):
+    def _assign_npix(self):
         """
-        ! DEPRECATED ! (not used)
-        Calculate the number of pixels subtended by an angle
-        (e.g., u.arcsec NOT u.arcsec ** 2).
+        Internal function. Calculate the exact number of pixels in the aperture based on
+        user parameters. Will compare this value to photutils' number of pixels.
 
         Parameters
         ----------
-          angle :: `astropy.Quantity` angle
-            Linear angle (e.g., u.arcsec NOT u.arcsec ** 2).
+          None
 
-          px_scale :: `astropy.Quantity` angle
-            The angular size of a square pixel along one edge.
+        Attributes
+        __________
+          _exact_npix :: float
+            The exact number of pixels in the aperture calculated from user parameters.
 
         Returns
         -------
-          pix :: float
-            The number of pixels lengths covered by the linear angle.
-        """
-        return (angle.to(u.arcsec) / px_scale.to(u.arcsec)).value
-
-    def _assign_npix(self):
-        """
-        ! DEPRECATED
-        Internal function. Calculate the number of pixels in the aperture.
+          None
         """
         self._exact_npix = (
             self._aper_area.to(u.arcsec ** 2)
@@ -220,8 +211,6 @@ class Photometry:
 
         Attributes
         ----------
-        REVIEW: use sparse arrays?
-
           TODO: update attribute docstring (no longer sparse)
           aper_xs :: (1 x N) sparse array of floats
             The aperture array containing the x-coordinates (in arcsec) of the aperture.
@@ -859,14 +848,15 @@ class Photometry:
             b_in = b_out * (a_in / a_out)
         raise NotImplementedError("Not yet implemented")
 
-    def calc_redleak_frac(self):
+    def calc_redleak_frac(self, quiet=False):
         """
         Calculate a source's red leak fraction. The red leak fraction is defined to be the
         ratio of red leak electron/s to total electron/s.
 
         Parameters
         ----------
-          None
+          quiet :: bool
+            If True, suppress warnings from red leak fraction calculations.
 
         Returns
         -------
@@ -910,10 +900,15 @@ class Photometry:
             )  # electron/s/A
             isgood_redleak = np.isfinite(redleak_per_A)  # don't include NaNs
             isgood_total = np.isfinite(total_erate_per_A)  # don't include NaNs
-            if not np.all(isgood_redleak) or not np.all(isgood_total):
+            if not quiet and (not np.all(isgood_redleak) or not np.all(isgood_total)):
                 warnings.warn(
                     "Could not estimate red leak fraction "
-                    + f"at 1 or more wavelengths in {band}-band",
+                    + f"at 1 or more wavelengths in {band}-band. "
+                    + "This may just be caused by the source spectrum not being "
+                    + f"defined at all wavelengths present in the {band}-band definition "
+                    + f"file (which goes up to {round(max(redleak_wavelengths), 2)} A) "
+                    + "and is typically not a reason to worry. "
+                    + "This warning can be suppressed with `quiet=True`.",
                     RuntimeWarning,
                 )
             try:
@@ -943,7 +938,9 @@ class Photometry:
                 )
         return redleak_fracs
 
-    def _calc_redleaks(self, source_erate, mirror_area_cm_sq, include_redleak=True):
+    def _calc_redleaks(
+        self, source_erate, mirror_area_cm_sq, include_redleak=True, quiet=False
+    ):
         """
         Calculate the red leak of a source from its in-passband red leak fraction. The
         in-passband red leak fraction is defined to be the ratio of red leak electron/s to
@@ -951,6 +948,11 @@ class Photometry:
 
         This is a more robust way to calculate red leaks that is independent of how
         source_erate is determined.
+
+        Parameters
+        ----------
+          quiet :: bool
+            If True, suppress warnings from in-passband red leak fraction calculations.
         """
         #
         # Calculate in-passband redleak fraction (red leak electron/s to passband
@@ -1004,10 +1006,18 @@ class Photometry:
                 )  # electron/s/A
                 isgood_redleak = np.isfinite(redleak_per_A)  # don't include NaNs
                 isgood_passband = np.isfinite(passband_erate_per_A)  # don't include NaNs
-                if not np.all(isgood_redleak) or not np.all(isgood_passband):
+                if not quiet and (
+                    not np.all(isgood_redleak) or not np.all(isgood_passband)
+                ):
                     warnings.warn(
                         "Could not estimate in-passband red leak fraction "
-                        + f"at 1 or more passband wavelengths in {band}-band",
+                        + f"at 1 or more wavelengths in {band}-band. "
+                        + "This may just be caused by the source spectrum not being "
+                        + f"defined at all wavelengths present in the {band}-band "
+                        + "definition file (which goes up to "
+                        + f"{round(max(redleak_wavelengths), 2)} A) "
+                        + "and is typically not a reason to worry. "
+                        + "This warning can be suppressed with `quiet=True`.",
                         RuntimeWarning,
                     )
                 try:
@@ -1259,7 +1269,14 @@ class Photometry:
         return t
 
     def calc_snr_or_t(
-        self, t=None, snr=None, npix=None, extinction=0, nread=1, include_redleak=True
+        self,
+        t=None,
+        snr=None,
+        npix=None,
+        reddening=0,
+        nread=1,
+        include_redleak=True,
+        quiet=False,
     ):
         """
         Calculate the signal-to-noise ratio (SNR) reached in a given time or the
@@ -1286,13 +1303,10 @@ class Photometry:
             total sky background, dark current, and read noise but not higher signal nor
             redleak).
 
-          extinction :: scalar or dict of scalars
-            The extinction (AB magnitude) in each passband. If a scalar, the same
-            extinction AB magnitude will be applied across all the telescope passbands. If
-            using a dictionary of scalars, the dictionary keys must at least contain all
-            the telescope passband keys (e.g., `extinction={"uv": 0.66, "u": 0.46, "g":
-            0.36}`).
-            REVIEW: maybe have extinction coefficients defined in `Telescope` class and source-dependent extinction in `Source` class?
+          reddening :: int or float
+            The reddening (i.e., E(B-V) in AB mags) based on the pointing. This value will
+            be multiplied with each of the telescope's extinction coefficients to get the
+            total extinction in each passband.
 
           nread :: int
             Number of detector readouts.
@@ -1301,34 +1315,23 @@ class Photometry:
             If False, the redleak contribution to the total noise is not included. May be
             useful if the source spectrum is, for example, uniform.
 
+          quiet :: bool
+            If True, suppress warning messages from any red leak calculations. Only
+            matters if include_redleak is True.
+
         Returns
         -------
           results :: dict
             If t is given, this is the snr reached after t seconds. If snr is given, this
             is the time in seconds required to reach the given snr.
         """
+        #
+        # Check some inputs (npix and nread will be checked later, in other functions)
+        #
         if (t is None and snr is None) or (t is not None and snr is not None):
             raise ValueError("Exactly one of t or snr must be specified")
-        if npix is not None and not isinstance(npix, Number):
-            raise TypeError("npix must be an int or float or None")
-        if isinstance(extinction, Number):
-            # Apply same extinction value to all passbands
-            if extinction < 0:
-                raise ValueError("extinction must be non-negative")
-            extinction = {band: extinction for band in self.TelescopeObj.passbands}
-        else:
-            try:
-                if any(
-                    band not in extinction.keys() for band in self.TelescopeObj.passbands
-                ):
-                    raise ValueError(
-                        "If extinction is a dictionary, all Telescope passbands bands "
-                        + "must be specified in the extinction dictionary"
-                    )
-                if any(coeff < 0 for coeff in extinction.values()):
-                    raise ValueError("All extinction values must be non-negative")
-            except Exception:
-                raise TypeError("extinction must be a scalar or a dictionary of scalars")
+        if not isinstance(reddening, Number):
+            raise TypeError("reddening must be an int or float")
         #
         # Make some useful variables
         #
@@ -1552,7 +1555,7 @@ class Photometry:
                     "mag",
                     wavelengths=self.TelescopeObj.passband_pivots[band],
                 )[0]
-                + extinction[band]
+                + (self.TelescopeObj.extinction_coeffs[band] * reddening)
             )
             # Convert flux to electron/s
             source_erate[band] = (
@@ -1570,7 +1573,7 @@ class Photometry:
         # Calculate redleak
         #
         redleaks = self._calc_redleaks(
-            source_erate, mirror_area_cm_sq, include_redleak=include_redleak
+            source_erate, mirror_area_cm_sq, include_redleak=include_redleak, quiet=quiet
         )
         #
         # Calculate desired results (either integration time given SNR or SNR given time)

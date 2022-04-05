@@ -194,6 +194,7 @@ class Telescope:
         read_noise=params.READ_NOISE,
         gain=params.GAIN,  # not currently used for any calculations
         redleak_thresholds=params.REDLEAK_THRESHOLDS,
+        extinction_coeffs=params.EXTINCTION_COEFFS,
         show_warnings=True,
     ):
         """
@@ -308,6 +309,9 @@ class Telescope:
             (e.g., `{"uv": 3880 * u.AA, "u": 4730 * u.AA, "g": 5660 * u.AA}`).
             Flux longward of the threshold is considered red leak.
 
+          extinction_coeffs :: dict of int/float
+            The extinction coefficients (i.e., R := A/E(B-V)) for each passband.
+
           show_warnings :: bool
             If True, print a warning when `passband_limits`,
             `passband_response_filepaths`, `passband_response_fileunits`,
@@ -362,6 +366,13 @@ class Telescope:
             response curve (wavelengths and passband response from
             `passband_response_filepaths`) and interpolated to the given
             `passband_resolution`.
+            Note that, to minimize NaNs at the edges of the passband response curves
+            caused by floating point errors in the interpolation evaluation, the maximum
+            wavelength of these full passband curves is 1 `passband_resolution` unit less
+            than the max wavelength from the passband definition files. For example, if a
+            passband file goes up to 11000 A and the desired interpolation resolution is
+            10 A, the maximum wavelength in this `full_passband_curves` entry will be
+            10990 A.
 
           fwhm :: `astropy.Quantity` angle
             The angular full-width at half-maximum of the telescope's PSF.
@@ -408,6 +419,9 @@ class Telescope:
           redleak_thresholds :: dict of `astropy.Quantity` wavelengths
             Dictionary containing the redleak threshold of each passband. Flux longward of
             the threshold is considered red leak.
+
+          extinction_coeffs :: dict of int/float
+            The extinction coefficients (i.e., R := A/E(B-V)) for each passband.
 
         Returns
         -------
@@ -526,6 +540,12 @@ class Telescope:
             u.Quantity,
             "`astropy.Quantity` lengths (e.g., u.AA)",
         )
+        extinction_coeffs = _check_dict(
+            extinction_coeffs,
+            "`extinction_coeffs`",
+            Number,
+            "int or float",
+        )
         if phot_zpts is not None:
             phot_zpts = _check_dict(
                 phot_zpts,
@@ -602,7 +622,6 @@ class Telescope:
         self.mirror_area = np.pi * 0.25 * mirror_diameter * mirror_diameter
 
         if phot_zpts is None:
-            # TODO: calculate phot_zpts from passband_curves
             phot_zpts = Telescope.calc_phot_zpts(
                 self.passband_curves,
                 mirror_area=self.mirror_area.to(u.cm ** 2).value,
@@ -635,6 +654,7 @@ class Telescope:
         self.read_noise = read_noise
         self.gain = gain
         self.redleak_thresholds = redleak_thresholds
+        self.extinction_coeffs = extinction_coeffs
 
     def copy(self):
         """

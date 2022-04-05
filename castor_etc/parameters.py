@@ -149,6 +149,12 @@ READ_NOISE = 2.0  # electron/pixel (high-gain). Read noise is 30 electrons for h
 GAIN = 2.0  # electron/ADU
 
 # Wavelength threshold for red leak. Flux longward of this is considered to be red leak
+# REVIEW: update red leak thresholds
 REDLEAK_THRESHOLDS = {"uv": 3880 << u.AA, "u": 4730 << u.AA, "g": 5660 << u.AA}
+
+# Extinction coefficients (i.e., R := A/E(B-V)) for the different telescope passbands
+# Estimates taken from Yuan+2013, column 3 of Table 2, rows: NUV, (SDSS) u, (SDSS) g
+# <https://ui.adsabs.harvard.edu/abs/2013MNRAS.430.2188Y/abstract>
+EXTINCTION_COEFFS = {"uv": 7.06, "u": 4.35, "g": 3.31}
 
 # -------------------------------------------------------------------------------------- #
