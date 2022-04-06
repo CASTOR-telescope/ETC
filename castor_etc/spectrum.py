@@ -1920,6 +1920,15 @@ class NormMixin:
         Likewise, if `value_type="mag"` and `TelescopeObj` is not provided, the result
         will be the source's average AB magnitude over the entire spectrum.
 
+        Note that, if calculating AB magnitudes, we use the mean flux density (in flam,
+        erg/s/cm^2/A) through a passband as the nominal flam value for that passband. In
+        other words, if this average flam was constant throughout the whole passband, the
+        integrated flux density in this passband (erg/s/cm^2) would be equal to the
+        original spectrum's integrated flux density in the same passband (erg/s/cm^2).
+        Thus, it is correct to use this average flam value (combined with the passband's
+        pivot wavelength) to calculate the source's AB magnitude in a passband. The same
+        argument applies to calculating an AB magnitude of the entire spectrum.
+
         Parameters
         ----------
           value_type :: "flam" or "mag"
@@ -1956,6 +1965,12 @@ class NormMixin:
                     )
                     * u.AA
                 )
+                # Use mean value of flux as nominal flux value. In other words, if
+                # avg_flam (above) was constant throughout the whole spectrum, the
+                # integrated flux (erg/s/cm^2) would be equal to the original spectrum's
+                # integrated flux (erg/s/cm^2). Thus, we will use this avg_flam value (as
+                # well as the spectrum's pivot wavelength) to calculate the source's
+                # bolometric AB magnitude.
                 result = convert_electron_flux_mag(
                     avg_flam,
                     "flam",
@@ -1980,6 +1995,13 @@ class NormMixin:
                     / (passband_lims_AA[1] - passband_lims_AA[0])
                 )
                 if value_type == "mag":
+                    # Use mean value of flux through passband as nominal flux value. In
+                    # other words, if avg_flam (above) was constant throughout the whole
+                    # passband, the integrated flux in this passband (erg/s/cm^2) would be
+                    # equal to the original spectrum's integrated flux in the same
+                    # passband (erg/s/cm^2). Thus, we will use this avg_flam value (as
+                    # well as the passband's pivot wavelength) to calculate the source's
+                    # AB magnitude in this passband.
                     result[band] = convert_electron_flux_mag(
                         avg_flam,
                         "flam",
