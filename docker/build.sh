@@ -23,11 +23,13 @@ then
     docker build --build-arg NOTEBOOK_DIR=${NOTEBOOK_DIR} \
                  --build-arg NB_USER=${NB_USER} \
                  -t castor_etc:${VERSION} \
+                 --build-arg CACHEBUST=$(date +%s) \
                  -f docker/Dockerfile.yesCustomEnv .
 elif [[ "$CUSTOMIZE_ENV" = "no" ]]
 then
     echo "Building with default JupyterLab environment"
     docker build -t castor_etc:${VERSION} \
+                 --build-arg CACHEBUST=$(date +%s) \
                  -f docker/Dockerfile.noCustomEnv .
 else
     echo "ERROR: CUSTOMIZE_ENV is must be yes or no"

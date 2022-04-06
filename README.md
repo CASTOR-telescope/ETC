@@ -70,12 +70,16 @@ be reflected in your environment.
    folder.
 
    ```bash
-   docker build -t castor_etc:<VERSION> -f docker/Dockerfile.noCustomEnv .
+   docker build -t castor_etc:<VERSION> \
+                --build-arg CACHEBUST=$(date +%s) \
+                -f docker/Dockerfile.noCustomEnv .
    ```
 
-   where `<VERSION>` is the version you would like to tag the image with.
+   where `<VERSION>` is the version you would like to tag the image with. The `CACHEBUST`
+   argument ensures that the newest version of the `castor_etc` package is always being
+   installed.
 
-4. Then follow the instructions detailed on the skaha GitHub for [software
+4. Then follow the instructions detailed on the skaha GitHub for [session
    containers](https://github.com/opencadc/skaha/tree/master/containers#publishing-skaha-containers).
    Remember to tag the pushed image as `notebook` on [Harbor](https://images.canfar.net)
    to be able to access it via the Science Portal drop-down menu!
