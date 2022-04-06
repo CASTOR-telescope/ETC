@@ -123,32 +123,37 @@ class SpectrumMixin:
     Mixin for generating spectra. To be used with `Source` object. Do not use directly!
     """
 
-    def _check_existing_spectrum(self, overwrite):
+    def _check_existing_spectrum(self, overwrite, quiet=False):
         """
         Check for existing spectrum. If self.wavelengths and/or self.spectrum is not None,
-        raise an error if overwrite is False otherwise overwrite the existing spectrum.
+        raise an error if overwrite is False; otherwise print a message notifying user
+        that the method will overwrite the existing spectrum (unless `quiet` is True).
 
         Parameters
         ----------
           overwrite :: bool
             If False and self.wavelengths and/or self.spectrum is not None, raise an
             error. If True and self.wavelengths and/or self.spectrum is not None, print a
-            message informing the user that the existing spectrum will be overwritten.
+            message informing the user that the existing spectrum will be overwritten
+            (unless `quiet` is True).
+
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
 
         Returns
         -------
           None
         """
         if self.wavelengths is not None or self.spectrum is not None:
-            if overwrite:
-                print(
-                    "INFO: Overwriting existing wavelengths/spectrum "
-                    + "with new wavelengths/spectrum."
-                )
-            else:
+            if not overwrite:
                 raise ValueError(
                     "wavelengths/spectrum already exists! "
                     + "Use overwrite=True to overwrite wavelengths/spectrum."
+                )
+            elif not quiet:
+                print(
+                    "INFO: Overwriting existing wavelengths/spectrum "
+                    + "with new wavelengths/spectrum."
                 )
 
     def spectrum_erg_to_photon(self):
@@ -194,7 +199,7 @@ class SpectrumMixin:
             raise TypeError("redshift must be an int or float")
         self.wavelengths *= 1 + redshift
 
-    def generate_uniform(self, wavelengths, value):
+    def generate_uniform(self, wavelengths, value, overwrite=False, quiet=False):
         """
         Generate a uniform spectrum equal to a constant value in some arbitrary unit.
 
@@ -206,6 +211,13 @@ class SpectrumMixin:
 
           value :: int or float
             The value of the uniform spectrum, in arbitrary units (e.g., erg/s/cm^2/A).
+
+          overwrite :: bool
+            If True, overwrite any existing wavelengths/spectrum. If False, raise an error
+            if wavelengths or spectrum is not None.
+
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
 
         Attributes
         ----------
@@ -222,6 +234,7 @@ class SpectrumMixin:
         #
         # Check inputs
         #
+        self._check_existing_spectrum(overwrite, quiet=quiet)
         if not isinstance(wavelengths, u.Quantity):
             wavelengths = wavelengths * u.AA
         else:
@@ -242,6 +255,7 @@ class SpectrumMixin:
         radius=1,
         dist=1 << u.kpc,
         overwrite=False,
+        quiet=False,
     ):
         """
         Generate a blackbody (BB) spectrum (in erg/s/cm^2/A) using Planck's radiation law.
@@ -291,6 +305,9 @@ class SpectrumMixin:
             If True, overwrite any existing wavelengths/spectrum. If False, raise an error
             if wavelengths or spectrum is not None.
 
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
+
         Attributes
         ----------
           wavelengths :: `astropy.Quantity` array
@@ -306,7 +323,7 @@ class SpectrumMixin:
         #
         # Check inputs
         #
-        self._check_existing_spectrum(overwrite)
+        self._check_existing_spectrum(overwrite, quiet=quiet)
         if isinstance(T, u.Quantity):
             T = T.to(u.K, equivalencies=u.temperature()).value
         if wavelengths is None:
@@ -347,7 +364,9 @@ class SpectrumMixin:
         self.wavelengths = wavelengths * u.AA
         self.spectrum = NormMixin.norm_to_star(spectrum, radius=radius, dist=dist)  # flam
 
-    def generate_power_law(self, ref_wavelength, wavelengths, exponent, overwrite=False):
+    def generate_power_law(
+        self, ref_wavelength, wavelengths, exponent, overwrite=False, quiet=False
+    ):
         """
         Generate a spectrum with a shape following a power-law in some arbitrary unit. The
         flux is defined so that it is equal to 1 at the reference wavelength.
@@ -375,6 +394,9 @@ class SpectrumMixin:
             If True, overwrite any existing wavelengths/spectrum. If False, raise an error
             if wavelengths or spectrum is not None.
 
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
+
         Attributes
         ----------
           wavelengths :: `astropy.Quantity` array
@@ -390,7 +412,7 @@ class SpectrumMixin:
         #
         # Check inputs
         #
-        self._check_existing_spectrum(overwrite)
+        self._check_existing_spectrum(overwrite, quiet=quiet)
         if np.size(ref_wavelength) != 1:
             raise ValueError(
                 "ref_wavelength must be a single scalar or `astropy.Quantity`."
@@ -899,7 +921,9 @@ class SpectrumMixin:
             abs_peak=abs_dip,
         )
 
-    def use_custom_spectrum(self, filepath, wavelength_unit=u.AA, overwrite=False):
+    def use_custom_spectrum(
+        self, filepath, wavelength_unit=u.AA, overwrite=False, quiet=False
+    ):
         """
         Use custom spectrum from an ASCII or FITS file.
 
@@ -925,6 +949,9 @@ class SpectrumMixin:
             If True, overwrite any existing wavelengths/spectrum. If False, raise an error
             if wavelengths or spectrum is not None.
 
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
+
         Attributes
         ----------
           wavelengths :: `astropy.Quantity` array
@@ -940,7 +967,7 @@ class SpectrumMixin:
         #
         # Check inputs
         #
-        self._check_existing_spectrum(overwrite)
+        self._check_existing_spectrum(overwrite, quiet=quiet)
         if not isinstance(filepath, str):
             raise TypeError("filepath must be a string.")
         try:
@@ -972,7 +999,7 @@ class SpectrumMixin:
                 + "and adhere to the guidelines specified in the docstring."
             )
 
-    def use_galaxy_spectrum(self, gal_type, overwrite=False):
+    def use_galaxy_spectrum(self, gal_type, overwrite=False, quiet=False):
         """
         Use one of the predefined galaxy spectra. These non-uniformly sampled spectra are
         from Fioc & Rocca-Volmerange (1997)
@@ -993,6 +1020,9 @@ class SpectrumMixin:
             If True, overwrite any existing wavelengths/spectrum. If False, raise an error
             if wavelengths or spectrum is not None.
 
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
+
         Attributes
         ----------
           wavelengths :: `astropy.Quantity` array
@@ -1009,7 +1039,7 @@ class SpectrumMixin:
         #
         # Check inputs
         #
-        self._check_existing_spectrum(overwrite)
+        self._check_existing_spectrum(overwrite, quiet=quiet)
         if gal_type == "elliptical" or gal_type == "spiral":
             filepath = join(DATAPATH, "galaxy_spectra", f"{gal_type}_galaxy.txt")
         else:
@@ -1024,7 +1054,7 @@ class SpectrumMixin:
         self.wavelengths = (data[0].values * u.nm).to(u.AA)
         self.spectrum = data[1].values
 
-    def use_pickles_spectrum(self, spectral_class, overwrite=False):
+    def use_pickles_spectrum(self, spectral_class, overwrite=False, quiet=False):
         """
         Use a spectrum from the Pickles catalog
         (<https://ui.adsabs.harvard.edu/abs/1998PASP..110..863P/abstract>) containing
@@ -1040,6 +1070,9 @@ class SpectrumMixin:
           overwrite :: bool
             If True, overwrite any existing wavelengths/spectrum. If False, raise an error
             if wavelengths or spectrum is not None.
+
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
 
         Attributes
         ----------
@@ -1326,7 +1359,7 @@ class SpectrumMixin:
         #
         # Check inputs
         #
-        self._check_existing_spectrum(overwrite)
+        self._check_existing_spectrum(overwrite, quiet=quiet)
         valid_spectral_classes = [
             "a0i",
             "a0iii",
