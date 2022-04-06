@@ -1915,13 +1915,19 @@ class NormMixin:
         or AB magnitude) either over the whole spectrum or through a telescope's passbands
         (in which case TelescopeObj is required).
 
+        For example, if `value_type="mag"` and `TelescopeObj` is provided, then the result
+        will be the source's AB magnitude through each of the `TelescopeObj` passbands.
+        Likewise, if `value_type="mag"` and `TelescopeObj` is not provided, the result
+        will be the source's average AB magnitude over the entire spectrum.
+
         Parameters
         ----------
           value_type :: "flam" or "mag"
             The desired output value type. If "flam", the output is in units of
-            erg/s/cm^2/A. If "mag", the output is in AB magnitudes and the pivot
-            wavelength is automatically calculated assuming a flat response function
-            (i.e., perfect throughput/response over all the entire spectrum).
+            erg/s/cm^2/A. If "mag", the output is in AB magnitudes---if TelescopeObj is
+            not provided, the pivot wavelength is automatically calculated assuming a flat
+            response function (i.e., perfect throughput/response over all the entire
+            spectrum).
 
           TelescopeObj :: `Telescope` object or None
             If provided, will calculate the average value in each of the telescope's
