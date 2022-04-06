@@ -93,7 +93,20 @@ setup(
     author_email="isaac.cheng.ca@gmail.com",
     # maintainer="Isaac Cheng",
     # maintainer_email="isaac.cheng.ca@gmail.com"
-    packages=["castor_etc"],
+    packages=[
+        "castor_etc",
+        "castor_etc.data",
+        "castor_etc.data.passbands",
+        "castor_etc.data.sky_background",
+        "castor_etc.data.galaxy_spectra",
+        "castor_etc.data.pickles_spectra",
+    ],
+    package_data={
+        "castor_etc.data.passbands": ["*.uv", "*.u", "*.g"],
+        "castor_etc.data.sky_background": ["*.fits", "*.txt"],
+        "castor_etc.data.galaxy_spectra": ["*.txt"],
+        "castor_etc.data.pickles_spectra": ["dat/*.dat"],  # must use forward slash
+    },
     install_requires=["numpy", "scipy", "astropy", "pandas", "photutils"],
     license="GPLv3",
     python_requires=">=3.9",

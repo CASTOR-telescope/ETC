@@ -80,20 +80,24 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 
 __all__ = [
     "constants",
-    "conversions",
-    "data",
     "filepaths",
     "parameters",
-    "sources",
+    "conversions",
     "spectrum",
+    "sources",
+    "data",
     "telescope",
+    "background",
+    "photometry",
 ]
 
 from . import constants
-from . import conversions
-from . import data
 from . import filepaths
 from . import parameters
-from . import sources
+from . import conversions
 from . import spectrum
+from . import sources
+from . import data
 from . import telescope
+from . import background
+from . import photometry

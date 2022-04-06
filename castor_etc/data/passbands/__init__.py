@@ -1,11 +1,5 @@
 """
-Data Files for CASTOR
-=====================
-
-Includes:
-  - Background noise estimates
-  - Passband response curves
-  - Spectral energy distributions
+Passband response curve definition files.
 
 ---
 
@@ -69,10 +63,3 @@ Public License along with            Publique GNU avec FORECASTOR ETC ;
 FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
-
-__all__ = ["sky_background", "passbands", "pickles_spectra", "galaxy_spectra"]
-
-from . import sky_background
-from . import passbands
-from . import pickles_spectra
-from . import galaxy_spectra

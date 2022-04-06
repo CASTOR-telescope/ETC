@@ -75,7 +75,7 @@ from astropy.io import fits
 from scipy.integrate import simpson
 
 from .conversions import convert_electron_flux_mag
-from .data.background.background_values import (
+from .data.sky_background.background_values import (
     GEOCORONAL_FLUX_AVG,
     GEOCORONAL_FLUX_HIGH,
     GEOCORONAL_FLUX_LOW,
@@ -93,8 +93,8 @@ class Background:
 
     def __init__(
         self,
-        earthshine_file=join(DATAPATH, "background", "earthshine.fits"),
-        zodi_file=join(DATAPATH, "background", "zodi.fits"),
+        earthshine_file=join(DATAPATH, "sky_background", "earthshine.fits"),
+        zodi_file=join(DATAPATH, "sky_background", "zodi.fits"),
         mags_per_sq_arcsec=None,
     ):
         """
