@@ -2,16 +2,11 @@
 
 Isaac Cheng - 2022
 
-TODO: Figure out a way to ensure consistent absolute paths for project on CANFAR & local
-systems...
-
-TODO: finish the docstrings and make them stylistically consistent (e.g., the Attributes).
+**This is a work in progress! This package should be stable but please let me know if
+there are any bugs or unusual behaviour!**
 
 TODO: generating_sources.ipynb, telescope.ipynb, spectroscopy.ipynb, background.ipynb,
 normalizations.ipynb, redleak.ipynb, etc...
-
-TODO: add attribute in `Source` objects specifying if properties are intrinsic or observed
-(for extinction correction)
 
 ## Installation
 
@@ -51,7 +46,6 @@ pip install -e .
 In develop mode, the installation of the package simply links back to the
 [`castor_etc`](castor_etc/) folder itself, meaning any changes made to this package will
 be reflected in your environment.
-
 
 ## CANFAR Build Instructions
 
@@ -125,44 +119,6 @@ following:
    VERSION=0.1  # version tag for the Docker image
    SCRIPT_DIR="/arc/home/IsaacCheng/ETC"  # the absolute path of this repo on local machine
    ```
-
-   <!-- - You may also wish to save outputs and plots to a separate directory (i.e., not a
-     subfolder in this repo), in which case you should add a bind mount in
-     [build.sh](docker/build.sh) and modify the `OUTPATH` variable in
-     [`constants.py`](src/constants.py) to the proper mounted path. For example, add:
-
-     ```bash
-     -v /arc/local_directory/ETC_plots:/container_directory/ETC_plots
-     ```
-
-     to your [build.sh](docker/build.sh) file and change `OUTPATH` in
-     [`constants.py`](src/constants.py) to "`/container_directory/ETC_plots/`". -->
-
-<!-- 3. Open the [Dockerfile](Dockerfile) and modify the `WORKDIR` value to be whichever path
-   you would like this repo to be contained in. I recommend setting this path to be the
-   same path as if you ran this repo on CANFAR.
-
-   In the same [Dockerfile](Dockerfile), modify the `USERNAME` variable to equal your
-   CANFAR username. -->
-
-<!-- 4. Open [build.sh](build.sh) and modify the line containing "`/arc/home/IsaacCheng/ETC`"
-   to be the same value as the `WORKDIR` variable from the [Dockerfile](Dockerfile). This
-   line creates a [bind mount](https://docs.docker.com/storage/bind-mounts/) between this
-   repository and the "virtual repository" in the Docker container so that any changes you
-   make to the repository files in the Docker container will be reflected outside the
-   container.
-
-   - You may also wish to save outputs and plots to a separate directory (i.e., not a
-     subfolder in this repo), in which case you should add a bind mount in
-     [build.sh](build.sh) and modify the `OUTPATH` variable in
-     [`constants.py`](src/constants.py) to the proper mounted path. For example, add:
-
-     ```bash
-     -v /arc/local_directory/ETC_plots:/container_directory/ETC_plots
-     ```
-
-     to your [build.sh](build.sh) file and change `OUTPATH` in
-     [`constants.py`](src/constants.py) to "`/container_directory/ETC_plots/`". -->
 
 4. Run the [build.sh](docker/build.sh) script to build the image (i.e., run
    `./docker/build.sh`). It should automatically mount this git directory in the Docker
