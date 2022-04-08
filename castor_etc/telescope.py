@@ -228,7 +228,9 @@ class Telescope:
 
           passband_pivots :: dict of `astropy.Quantity` wavelengths or None
             The pivot wavelengths for each passband. If None, calculate the passband
-            pivots based on the given passband limits and passband response files.
+            pivots based on the given passband limits and passband response files. Note
+            that the passband pivots are calculating using the equal-energy (EE)
+            convention, which should be correct for the AB magnitude system.
 
           phot_zpts :: dict of int/float or None
             The photometric zero-points for each passband. If None, automatically
@@ -636,6 +638,7 @@ class Telescope:
                     Telescope.calc_pivot_wavelength(
                         self.passband_curves[band]["wavelength"].value,
                         self.passband_curves[band]["response"],
+                        response_func="EE",
                     )
                     * passband_response_fileunits[band]
                 )
@@ -672,7 +675,7 @@ class Telescope:
         return deepcopy(self)
 
     @staticmethod
-    def calc_pivot_wavelength(wavelengths, response, response_func="QE"):
+    def calc_pivot_wavelength(wavelengths, response, response_func="EE"):
         """
         Calculate the pivot wavelength of a passband using Eq. (A11) from Tokunaga & Vacca
         (2005) <https://ui.adsabs.harvard.edu/abs/2005PASP..117..421T/abstract>. This
@@ -692,7 +695,7 @@ class Telescope:
           reponse_func :: "EE" or "QE"
             The convention used for the response function. "EE" denotes an the
             equal energy response function while "QE" denotes the quantum efficiency
-            response function.
+            response function. The AB magnitude system should use the "EE" convention.
 
         Returns
         -------
