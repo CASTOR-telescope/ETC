@@ -81,6 +81,7 @@ from .sources import PointSource, Source
 from .telescope import Telescope
 
 # TODO: convolve with PSF (waiting for data file)
+# TODO: get encircled energy as function of aperture radius (for point sources)
 
 
 class Photometry:
@@ -154,6 +155,8 @@ class Photometry:
         self._exact_npix = None  # number of pixels calculated from given aperture params
         self._eff_npix = None  # number of pixels calculated from photutils mask
         self._aper_extent = None  # the [xmin, xmax, ymin, ymax] extent of the imshow plot
+        self._source_aper_overlap_arr = None  # array showing the source-aperture overlap
+        self._source_aper_overlap_frac = None  # the source-aperture overlap fraction
         # Optimal aperture dimensions for a point source
         self._optimal_aperture_dimen = self._calc_optimal_aperture_dimen(
             SourceObj.angle_a, SourceObj.angle_b, TelescopeObj.fwhm, print_info=False
@@ -216,11 +219,11 @@ class Photometry:
 
         Attributes
         ----------
-          aper_xs :: (M x N) 2D array of floats
+          _aper_xs :: (M x N) 2D array of floats
             The aperture array containing the x-coordinates (in arcsec) relative to the
             center of the aperture.
 
-          aper_ys :: (M x N) 2D array of floats
+          _aper_ys :: (M x N) 2D array of floats
             The aperture array containing the y-coordinates (in arcsec) relative to the
             center of the aperture.
 
@@ -228,25 +231,31 @@ class Photometry:
             The [xmin, xmax, ymin, ymax] extent of the aperture in arcsec (for plotting
             the weight arrays).
 
-        If any of the following have not been set (i.e., are None), then that attribute
-        will be created with uniform weights:
-
           sky_background_weights :: (M x N) 2D array of floats
             The pixel weights for the sky background (incl. Earthshine, zodiacal light,
-            geocoronal emission). This is currently all ones (1) (i.e., uniform noise) if
-            not previously set.
+            geocoronal emission). This is currently all ones (1) (i.e., uniform noise).
 
           dark_current_weights :: (M x N) 2D array of floats
             The pixel weights for the dark current. This is currently all ones (1) (i.e.,
-            uniform noise) if not previously set.
+            uniform noise).
 
           redleak_weights :: (M x N) 2D array of floats
             The pixel weights for the redleak. This is currently all ones (1) (i.e.,
-            uniform noise) if not previously set.
+            uniform noise).
 
         Returns
         -------
-          None
+          center_px :: 2-element 1D list of floats
+            The (x, y) center index of the aperture coordinates arrays (i.e., _aper_xs and
+            _aper_ys). To be very explicit, this is not (0, 0) but rather the center of
+            the 2D arrays.
+
+          source_center_px :: 2-element 1D list of floats
+            The (x, y) center of the source in pixel units. These values can be negative
+            or larger than the aperture coordinate array size, which means the center of
+            the source is outside the aperture array. N.B. the aperture array may be
+            slightly larger than the aperture (but these excess pixels are mapped to
+            NaNs).
         """
         if not overwrite and (self._aper_xs is not None or self._aper_ys is not None):
             raise ValueError(
@@ -269,16 +278,23 @@ class Photometry:
             ys[-1] + half_px_scale + center[1],
         ]  # we use +/- half_px_scale to center matplotlib tickmarks on pixels
 
-        # Assume uniform background noise, dark current, and red leak if not set
-        # if self.sky_background_weights is None:
-        #     self.sky_background_weights = np.ones_like(self._aper_xs)
-        # if self.dark_current_weights is None:
-        #     self.dark_current_weights = np.ones_like(self._aper_xs)
-        # if self.redleak_weights is None:
-        #     self.redleak_weights = np.ones_like(self._aper_xs)
+        # Assume uniform background noise, dark current, and red leak
         self.sky_background_weights = np.ones_like(self._aper_xs)
         self.dark_current_weights = np.ones_like(self._aper_xs)
         self.redleak_weights = np.ones_like(self._aper_xs)
+
+        # Find pixel that corresponds to center of the source
+        center_px = [
+            0.5 * (self._aper_xs.shape[1] - 1),  # x-coordinate in pixel units
+            0.5 * (self._aper_ys.shape[0] - 1),  # y-coordinate in pixel units
+        ]
+        # Recall point-slope form of a line: (y - y0) = m * (x - x0)
+        num_px_offset_x = (-center[0] + xs[0]) / px_scale_arcsec + center_px[0]
+        num_px_offset_y = (-center[1] + ys[0]) / px_scale_arcsec + center_px[1]
+        source_center_px_x = center_px[0] + num_px_offset_x
+        source_center_px_y = center_px[1] + num_px_offset_y
+
+        return center_px, [source_center_px_x, source_center_px_y]
 
     @staticmethod
     def _calc_source_weights(profile, aper_xs, aper_ys, center):
@@ -310,17 +326,75 @@ class Photometry:
           source_weights :: (M x N) 2D array of floats
             The source weights for each pixel in the aperture. These represent the flux of
             the source at each pixel relative to the flux at the center of the source.
-
-          center_px :: 2-element 1D list of floats
-            The (x, y) center index of the source_weights array. To be very explicit, this
-            is not (0, 0) but rather the center of the 2D array.
         """
-        source_weights = profile(aper_xs, aper_ys, center)
-        center_px = [
-            0.5 * (source_weights.shape[1] - 1),  # x-coordinate in pixel units
-            0.5 * (source_weights.shape[0] - 1),  # y-coordinate in pixel units
-        ]
-        return source_weights, center_px
+        return profile(aper_xs, aper_ys, center)
+
+    def _do_source_aper_overlap(self, source_center_px, px_scale_arcsec):
+        """
+        Internal function to find the fraction of the source within the aperture. Note
+        that the `source_weights` attribute should already be created and masked with the
+        `_aper_mask` attribute.
+
+        Parameters
+        ----------
+          source_center_px :: 2-element 1D list of floats
+            The (x, y) center of the source in pixel units. These values can be negative
+            or larger than the aperture coordinate array size, which means the center of
+            the source is outside the aperture array. N.B. the aperture array may be
+            slightly larger than the aperture (but these excess pixels are mapped to
+            NaNs).
+
+          px_scale_arcsec :: float
+            The `TelescopeObj` object's pixel scale in units of arcsec. Only passing this
+            as a parameter to avoid having to calculate it multiple times.
+
+        Attributes
+        ----------
+          ! (`source_weights` NOT MODIFIED ANYMORE) !
+          source_weights :: (M x N) 2D array of floats
+            The source weights for each pixel in the aperture. Any pixel within the
+            aperture but outside of the source is now zero. Note that the extent of the
+            source is determined by the source's semimajor and semiminor axes.
+
+          _source_aper_overlap_arr :: (M x N) 2D array of floats
+            The array showing the source and the aperture overlap.
+
+          _source_aper_overlap_frac :: float
+            The fraction of the source within the aperture.
+
+        Returns
+        -------
+          None
+        """
+        #
+        # Create an ellipse representing the source
+        #
+        source_ellipse = (
+            EllipticalAperture(
+                positions=source_center_px,
+                a=self.SourceObj.angle_a.to(u.arcsec).value / px_scale_arcsec,
+                b=self.SourceObj.angle_b.to(u.arcsec).value / px_scale_arcsec,
+                theta=self.SourceObj.rotation,  # already in radians
+            )
+            .to_mask(method="exact")
+            .to_image(self.source_weights.shape)
+        )
+        if source_ellipse is None:
+            raise ValueError("Source is not contained within the aperture!")
+        source_ellipse[source_ellipse >= 1e-12] = 1.0
+        source_ellipse[source_ellipse <= 1e-12] = 0.0
+        #
+        # Account for fraction of source contained within aperture
+        #
+        # self.source_weights *= source_ellipse  # REVIEW: don't do this b/c sharp cutoff? Remember that uniform profile is uniform over whole aperture.
+        self._source_aper_overlap_arr = source_ellipse * self._aper_mask
+        self._source_aper_overlap_frac = np.nansum(self._source_aper_overlap_arr) / (
+            self.SourceObj.area.to(u.arcsec ** 2).value
+            / self.TelescopeObj.px_area.to(u.arcsec ** 2).value
+        )
+        if self._source_aper_overlap_frac > 1.0:
+            # Sometimes point sources are too small and result in >100% overlap
+            self._source_aper_overlap_frac = 1.0
 
     def show_source_weights(
         self, mark_source=False, source_markersize=4, norm=None, plot=True
@@ -332,8 +406,10 @@ class Photometry:
         the aperture mask, visualized using `show_aper_weights()`). These two effects
         combined give the "source weights".
 
-        The "effective number of aperture pixels" is the sum of the aperture mask weights.
-        See the docstring of `show_aper_weights()` for more details.
+        The "percentage of source within aperture" is based on the `SourceObj` object's
+        angular area, which was specified when the `SourceObj` object was created. This
+        percentage is is the projected area of the source contained within the aperture
+        divided by the (total) projected area of the source.
 
         Parameters
         ----------
@@ -385,8 +461,13 @@ class Photometry:
             cbar.set_label("Flux Relative to Center of Source")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
+            # ax.set_title(
+            #     "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
+            # )
             ax.set_title(
-                "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
+                "Percentage of Source Within Aperture: "
+                + f"{100 * self._source_aper_overlap_frac:.2f}"
+                + r"\%"
             )
             if plot:
                 plt.show()
@@ -447,6 +528,61 @@ class Photometry:
             ax.set_ylabel("$y$ [arcsec]")
             ax.set_title(
                 "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
+            )
+            if plot:
+                plt.show()
+            else:
+                return fig, ax, cbar
+
+    def show_source_aper_overlap(self, plot=True):
+        """
+        Plot the pixel-by-pixel overlap between the source object and the photometry
+        aperture.
+
+        The "percentage of source within aperture" is based on the `SourceObj` object's
+        angular area, which was specified when the `SourceObj` object was created. This
+        percentage is is the projected area of the source contained within the aperture
+        divided by the (total) projected area of the source.
+
+        Parameters
+        ----------
+          plot :: bool
+            If True, plot the overlap between the source object and the aperture, then
+            return None. If False, return the figure, axis, and colorbar instance
+            associated with the plot.
+
+        Returns
+        -------
+        If plot is True:
+          None
+
+        If plot is False:
+          fig, ax :: `matplotlib.figure.Figure` and `matplotlib.axes.Axes` objects
+            The figure and axis instance associated with the plot.
+
+          cbar :: `matplotlib.colorbar.Colorbar` object
+            The colorbar instance associated with the plot.
+        """
+        rc = {"axes.grid": False}
+        with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
+            fig, ax = plt.subplots()
+            # (N.B. array already "xy" indexing. Do not transpose array)
+            img = ax.imshow(
+                self._source_aper_overlap_arr,
+                origin="lower",
+                extent=self._aper_extent,
+                interpolation=None,
+                cmap="copper",
+            )
+            ax.tick_params(color="grey", which="both")
+            cbar = fig.colorbar(img)
+            cbar.set_label("Fraction of Source Overlapped with Pixel")
+            ax.set_xlabel("$x$ [arcsec]")
+            ax.set_ylabel("$y$ [arcsec]")
+            ax.set_title(
+                "Percentage of Source Within Aperture: "
+                + f"{100 * self._source_aper_overlap_frac:.2f}"
+                + r"\%"
             )
             if plot:
                 plt.show()
@@ -641,9 +777,7 @@ class Photometry:
 
         return [factor * a.to(u.arcsec), factor * b.to(u.arcsec)]
 
-    def use_optimal_aperture(
-        self, factor=1.4, center=[0, 0] << u.arcsec, quiet=False, overwrite=False
-    ):
+    def use_optimal_aperture(self, factor=1.4, quiet=False, overwrite=False):
         """
         Uses the "optimal" circular aperture calculated from a source's angular size and
         the telescope's FWHM. Note that this is only valid for point sources.
@@ -652,17 +786,16 @@ class Photometry:
         angle smaller than half the telescope's FWHM, half of the FWHM value is used as
         the reference value for this calculation instead.
 
+        Note that the encircled energy for a point source with this aperture is going to
+        be approximated as 100% for the photometry calculation (because this aperture area
+        will be at least 96% larger than the point source, assuming `factor=1.4`).
+
         Parameters
         ----------
           factor :: int or float
             The factor by which to scale the source's angular size---or if the angular
             size is less than the telescope's FWHM, the telescope's FWHM---along each
             dimension.
-
-          center :: 2-element `astropy.Quantity` angles array
-            The (x, y) center of the aperture relative to the center of the source.
-            Positive values means the source is displaced to the bottom/left relative to
-            the aperture center.
 
           quiet :: bool
             If False, print a message if an aperture dimension is based on the FWHM of the
@@ -716,17 +849,22 @@ class Photometry:
         # Create source weights with arbitrary source flux profile through aperture
         #
         # Recall all internal angle aperture angles are in arcsec
-        center = center.to(u.arcsec).value
-        self._create_aper_arrs(
-            aper_dimen[0].value, aper_dimen[1].value, center, overwrite=overwrite
+        center = [0, 0]  # arcsec
+        # N.B. must round to nearest multiple of px_scale or else rounding errors will
+        # affect source weights
+        px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
+        center_px, source_center_px = self._create_aper_arrs(
+            np.ceil(aper_dimen[0].value / px_scale_arcsec) * px_scale_arcsec,
+            np.ceil(aper_dimen[1].value / px_scale_arcsec) * px_scale_arcsec,
+            center,
+            overwrite=overwrite,
         )
-        source_weights, center_px = Photometry._calc_source_weights(
+        source_weights = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
         #
-        px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
         aper_dimen_px = [(dimen / px_scale_arcsec).value for dimen in aper_dimen]
         aper = EllipticalAperture(
             positions=center_px, a=aper_dimen_px[0], b=aper_dimen_px[1], theta=0
@@ -744,6 +882,10 @@ class Photometry:
             np.isfinite(aper_mask), aper_mask, copy=True
         ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
+        #
+        # Find the fraction of the source within the aperture
+        #
+        self._do_source_aper_overlap(source_center_px, px_scale_arcsec)
         #
         # Final sanity check
         #
@@ -838,21 +980,29 @@ class Photometry:
         # Below is modified rotation matrix to ensure full aperture is covered in arrays
         # N.B. must round to nearest multiple of px_scale or else rounding errors will
         # affect source weights
-        rotation = np.deg2rad(rotation)
-        abs_sin_rotate, abs_cos_rotate = abs(np.sin(rotation)), abs(np.cos(rotation))
-        x = (
-            np.ceil((abs_cos_rotate * a + abs_sin_rotate * b) / px_scale_arcsec)
-            * px_scale_arcsec
-        ).value
-        y = (
-            np.ceil((abs_sin_rotate * a + abs_cos_rotate * b) / px_scale_arcsec)
-            * px_scale_arcsec
-        ).value
-        x = x if x >= a.value else a.value
-        y = y if y >= b.value else b.value
+        if abs(a.value - b.value) >= 1e-15:
+            # Non-circular aperture
+            rotation = np.deg2rad(rotation)
+            abs_sin_rotate, abs_cos_rotate = abs(np.sin(rotation)), abs(np.cos(rotation))
+            x = (
+                np.ceil((abs_cos_rotate * a + abs_sin_rotate * b) / px_scale_arcsec)
+                * px_scale_arcsec
+            ).value
+            y = (
+                np.ceil((abs_sin_rotate * a + abs_cos_rotate * b) / px_scale_arcsec)
+                * px_scale_arcsec
+            ).value
+            x = x if x >= a.value else a.value
+            y = y if y >= b.value else b.value
+        else:
+            # Circular aperture
+            x = a.value
+            y = b.value
         #
-        self._create_aper_arrs(x, y, center, overwrite=overwrite)
-        source_weights, center_px = Photometry._calc_source_weights(
+        center_px, source_center_px = self._create_aper_arrs(
+            x, y, center, overwrite=overwrite
+        )
+        source_weights = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
@@ -878,6 +1028,10 @@ class Photometry:
             np.isfinite(aper_mask), aper_mask, copy=True
         ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
+        #
+        # Find the fraction of the source within the aperture
+        #
+        self._do_source_aper_overlap(source_center_px, px_scale_arcsec)
         #
         # Final sanity checks
         #
@@ -977,13 +1131,13 @@ class Photometry:
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
-        self._create_aper_arrs(
+        center_px, source_center_px = self._create_aper_arrs(
             0.5 * width.value,  # width is along x
             0.5 * length.value,  # length is along y
             center,
             overwrite=overwrite,
         )
-        source_weights, center_px = Photometry._calc_source_weights(
+        source_weights = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
@@ -1011,15 +1165,32 @@ class Photometry:
         ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
         #
+        # Find the fraction of the source within the aperture
+        #
+        self._do_source_aper_overlap(source_center_px, px_scale_arcsec)
+        #
         # Final sanity checks
         #
         if abs(self._eff_npix - self._exact_npix) > 0.1:
             # Discrepancy larger than 0.1 pixels
+            #
+            # BUG in photutils (as of v1.4.0)?:
+            # Try making an aperture with
+            # `width=2.12 * u.arcsec, length=1.8 * u.arcsec, center=[0, 0] * u.arcsec`
+            # and the `Telescope` pixel size is `0.1 * arcsec`... _eff_npix will be wrong
+            # regardless of the aper array sizes (i.e., not a padding problem).
+            # TODO: report this bug to photutils...
+            #
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
-                + "Contact the developer with a minimal working example please. Thanks!",
+                + "Contact the developer with a minimal working example please. Thanks!"
+                + "\nNOTE: As of photutils-v1.4.0, there seems to be a bug where, in some "
+                + "cases, the rectangular aperture mask will return the wrong number of "
+                + "pixels regardless of the array size used to house the aperture "
+                + "mask!! This requires a fix from the `photutils` team, unfortunately.",
                 RuntimeWarning,
             )
+            print("eff_npix, exact_npix", self._eff_npix, self._exact_npix)
         if isinstance(self.SourceObj, PointSource):
             aper_threshold = min(self._optimal_aperture_dimen) * 2
             if (length < aper_threshold) or (width < aper_threshold):
@@ -1294,8 +1465,6 @@ class Photometry:
         nread=1,
     ):
         """
-        TODO: add parameter for fraction of source flux enclosed within aperture
-
         Calculate the signal-to-noise ratio (SNR) reached given an integration time.
 
         The equation to calculate the SNR is:
@@ -1403,8 +1572,6 @@ class Photometry:
         nread=1,
     ):
         """
-        TODO: add parameter for fraction of source flux enclosed within aperture
-
         Calculate the time required to reach a given signal-to-noise ratio (SNR).
 
         The theoretical equation to calculate the time required to reach a given SNR is:
@@ -1679,86 +1846,66 @@ class Photometry:
         # Calculate signal in each passband (flam -> electron/s)
         #
         source_erate = dict.fromkeys(self.TelescopeObj.passbands, np.nan)
-        #
-        # NEW CODE
-        #
         source_ab_mags = self.SourceObj.get_AB_mag(self.TelescopeObj)
-        # print("source_ab_mags:", source_ab_mags)
         # (N.B. Unlike background noise, aper_weight_scale and npix cancel out here. Just
         # use original _eff_npix and source_weights below; no need for npix or
         # aper_weight_scale)
+        #
         for band in source_erate:
             # Account for extinction
             source_passband_mag = source_ab_mags[band] + (
                 self.TelescopeObj.extinction_coeffs[band] * reddening
             )
-            # print(f"NEW source_passband_mag {band}-band:", source_passband_mag)
-            # Convert extinction-corrected AB mag to electron/s
-            # print(
-            #     f"NEW source_erate_per_px {band}-band",
-            #     mag_to_flux(
-            #         source_passband_mag,
-            #         zpt=self.TelescopeObj.phot_zpts[band],
-            #     )[0]
-            #     / self._eff_npix,
-            # )
+            # Convert extinction-corrected AB mag to electron/s using passband's
+            # photometric zero point and account for fraction of source within aperture
+            # REVIEW: is this calculation correct???
             source_erate[band] = (
                 mag_to_flux(
                     source_passband_mag,
                     zpt=self.TelescopeObj.phot_zpts[band],
                 )[0]
-                * (self.source_weights / self._eff_npix)
+                * (self.source_weights / self._eff_npix)  # must norm by _eff_npix
+                * self._source_aper_overlap_frac
             )
-        #
-        #
-        #
-        # source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
-        # for band in source_erate:
-        #     passband_limits_AA = self.TelescopeObj.passband_limits[band].to(u.AA).value
-        #     is_in_passband = (source_wavelengths_AA >= passband_limits_AA[0]) & (
-        #         source_wavelengths_AA <= passband_limits_AA[1]
-        #     )
-        #     # FIXME: correct AB magnitude calculation!!
-        #     # Use mean value of flux through passband as nominal flux value. In other
-        #     # words, if avg_passband_flam (below) was constant throughout the whole
-        #     # passband, the integrated flux in this passband (erg/s/cm^2) would be equal
-        #     # to the original spectrum's integrated flux in the same passband
-        #     # (erg/s/cm^2). Thus, we will use this avg_passband_flam value to calculate
-        #     # the source's AB magnitude and then convert to electron/s using the
-        #     # passband's photometric zero point.
-        #     avg_passband_flam = (  # erg/s/cm^2/A
-        #         simpson(
-        #             y=self.SourceObj.spectrum[is_in_passband],
-        #             x=source_wavelengths_AA[is_in_passband],
-        #             even="avg",
+        # # See Eq. (2) and Eq. (9) of
+        # # <https://hst-docs.stsci.edu/acsihb/chapter-9-exposure-time-calculations/9-2-determining-count-rates-from-sensitivities#id-9.2DeterminingCountRatesfromSensitivities-9.2.1>.
+        # if isinstance(self.SourceObj, PointSource):
+        #     for band in source_erate:
+        #         # Account for extinction
+        #         source_passband_mag = source_ab_mags[band] + (
+        #             self.TelescopeObj.extinction_coeffs[band] * reddening
         #         )
-        #         / (passband_limits_AA[1] - passband_limits_AA[0])
-        #     )
-        #     # (N.B. Unlike background noise, aper_weight_scale and npix cancel out here.
-        #     # Just use original _eff_npix and source_weights below; no need for npix or
-        #     # aper_weight_scale)
-        #     # TODO: transform to surface brightness units
-        #     avg_passband_flam_per_px = avg_passband_flam / self._eff_npix
-        #     # Convert source flux to AB magnitudes and correct for extinction
-        #     source_ab_mag = (
-        #         convert_electron_flux_mag(
-        #             avg_passband_flam_per_px,
-        #             "flam",
-        #             "mag",
-        #             wavelengths=self.TelescopeObj.passband_pivots[band],
-        #         )[0]
-        #         + (self.TelescopeObj.extinction_coeffs[band] * reddening)
-        #     )
-        #     print(f"OLD source_ab_mag {band}-band:", source_ab_mag)
-        #     # Convert flux to electron/s
-        #     source_erate[band] = (
-        #         mag_to_flux(source_ab_mag, zpt=self.TelescopeObj.phot_zpts[band])[0]
-        #         * self.source_weights
-        #     )
-        #     print(
-        #         "OLD source_erate_per_px",
-        #         mag_to_flux(source_ab_mag, zpt=self.TelescopeObj.phot_zpts[band])[0],
-        #     )
+        #         # Convert extinction-corrected AB mag to electron/s using Eq. (2) from the
+        #         # link above and the passband's photometric zero point
+        #         # REVIEW: is this calculation correct???
+        #         source_erate[band] = (
+        #             mag_to_flux(
+        #                 source_passband_mag,
+        #                 zpt=self.TelescopeObj.phot_zpts[band],
+        #             )[0]
+        #             * (self.source_weights / self._eff_npix)  # must norm by _eff_npix
+        #             * self._source_aper_overlap_frac
+        #         )
+        # else:
+        #     for band in source_erate:
+        #         # Account for extinction
+        #         source_passband_mag = source_ab_mags[band] + (
+        #             self.TelescopeObj.extinction_coeffs[band] * reddening
+        #         )
+        #         # Convert extinction-corrected AB mag to electron/s using Eq. (9) from the
+        #         # link above and the passband's photometric zero point
+        #         # REVIEW: is this calculation correct???
+        #         # ! The following calculation doesn't make sense! Try having an aperture > source size...
+        #         # source_erate[band] = (
+        #         #     mag_to_flux(
+        #         #         source_passband_mag,
+        #         #         zpt=self.TelescopeObj.phot_zpts[band],
+        #         #     )[0]
+        #         #     * self.source_weights
+        #         #     * (
+        #         #         px_area_arcsec_sq / self.SourceObj.area.to(u.arcsec ** 2).value
+        #         #     )  # convert to surface brightness
+        #         # )
         #
         # Calculate red leak (electron/s) at each pixel
         #
@@ -1774,7 +1921,6 @@ class Photometry:
         )
         if t is not None:
             for band in results:
-                # TODO: add parameter for fraction of source flux enclosed within aperture
                 results[band] = Photometry._calc_snr_from_t(
                     t=t,
                     signal=source_erate[band],
@@ -1787,7 +1933,6 @@ class Photometry:
                 )
         else:
             for band in results:
-                # TODO: add parameter for fraction of source flux enclosed within aperture
                 results[band] = Photometry._calc_t_from_snr(
                     snr=snr,
                     signal=source_erate[band],
