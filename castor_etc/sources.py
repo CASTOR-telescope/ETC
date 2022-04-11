@@ -367,7 +367,7 @@ class Profiles:
 
 class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
     """
-    Base class for astronomical sources.
+    Base (abstract) class for astronomical sources.
     """
 
     @abstractmethod
@@ -451,7 +451,7 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
             self.dist = None
             self.angle_a = None
             self.angle_b = None
-            # TODO: add area attribute (for surface brightness calculation)
+            self.area = None
             self.rotation = None
 
     def copy(self):
@@ -575,6 +575,7 @@ class PointSource(Source):
                 angle = angle * u.arcsec
             angle *= 0.5  # convert to angular radius
         self.angle_a = self.angle_b = angle
+        self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = 0.0
 
 
@@ -703,6 +704,7 @@ class ExtendedSource(Source):
                 self.angle_b = angle_b.to(u.arcsec)
             else:
                 self.angle_b = angle_b * u.arcsec
+        self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = np.deg2rad(rotation)
 
 
@@ -838,4 +840,5 @@ class GalaxySource(Source):
         eccentricity = np.sqrt(1 - (self.angle_b.value / self.angle_a.value) ** 2)
         profile = Profiles.sersic(r_eff, n, e=eccentricity, angle=rotation)
         super().__init__(profile, init_dimensions=False)
+        self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = np.deg2rad(rotation)
