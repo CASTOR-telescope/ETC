@@ -602,8 +602,8 @@ class Telescope:
         # ]  # total wavelength range spanned by the passbands
         self.passband_resolution = passband_resolution
 
-        # TODO: deprecate passband_curves to only use full_passband_curves?
-        # Less memory at the cost of slighly slower performance?
+        # REVIEW: deprecate passband_curves to only use full_passband_curves?
+        # Less memory at the cost of slower performance?
         # (will need to change a lot of other stuff!)
         self.passband_curves = Telescope.load_passbands(
             passband_response_filepaths,
@@ -680,8 +680,6 @@ class Telescope:
         Calculate the pivot wavelength of a passband using Eq. (A11) from Tokunaga & Vacca
         (2005) <https://ui.adsabs.harvard.edu/abs/2005PASP..117..421T/abstract>. This
         function uses Simpson's rule to approximate the integration.
-
-        INFO: Equal energy response function vs. QE response function?
 
         Parameters
         ----------
@@ -958,6 +956,7 @@ class Telescope:
                 electron/s and returns (electron/s - 1) so that f(x) = 0 when x is the
                 photometric zero-point.
                 """
+                # Make spectrum that is flat in AB mag (but won't be flat in erg/s/cm^2/A)
                 photlam = fnu_to_photlam(
                     mag_to_flux(ab_mag, zpt=-48.60)[0], wavelength=wavelengths_AA
                 )  # photon/s/cm^2/A

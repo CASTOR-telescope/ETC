@@ -1,6 +1,8 @@
 """
 Unit tests for the castor_etc module.
 
+TODO: these tests are severely outdated & no longer reflect the current ETC functionality
+
 ---
 
         GNU General Public License v3 (GNU GPLv3)
