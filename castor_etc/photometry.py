@@ -197,7 +197,7 @@ class Photometry:
             / self.TelescopeObj.px_area.to(u.arcsec ** 2)
         ).value
 
-    def _create_aper_arrs(self, half_x, half_y, center):
+    def _create_aper_arrs(self, half_x, half_y, center, overwrite=False):
         """
         Parameters
         ----------
@@ -210,6 +210,9 @@ class Photometry:
             The (x, y) center of the aperture relative to the center of the source in
             arcsec. Positive values means the source is displaced to the bottom/left
             relative to the aperture center.
+
+          overwrite :: bool
+            If True, allow overwriting of any existing aperture arrays.
 
         Attributes
         ----------
@@ -245,6 +248,13 @@ class Photometry:
         -------
           None
         """
+        if not overwrite and (self._aper_xs is not None or self._aper_ys is not None):
+            raise ValueError(
+                "An aperture for this `Photometry` object already exists. "
+                + "Use `overwrite=True` to allow overwriting of the aperture "
+                + " and all associated weights (i.e., source, sky background, "
+                + "dark current, and red leak weights will all be reset)."
+            )
         px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
         half_px_scale = 0.5 * px_scale_arcsec  # to ensure correct arange/extent
 
@@ -260,12 +270,15 @@ class Photometry:
         ]  # we use +/- half_px_scale to center matplotlib tickmarks on pixels
 
         # Assume uniform background noise, dark current, and red leak if not set
-        if self.sky_background_weights is None:
-            self.sky_background_weights = np.ones_like(self._aper_xs)
-        if self.dark_current_weights is None:
-            self.dark_current_weights = np.ones_like(self._aper_xs)
-        if self.redleak_weights is None:
-            self.redleak_weights = np.ones_like(self._aper_xs)
+        # if self.sky_background_weights is None:
+        #     self.sky_background_weights = np.ones_like(self._aper_xs)
+        # if self.dark_current_weights is None:
+        #     self.dark_current_weights = np.ones_like(self._aper_xs)
+        # if self.redleak_weights is None:
+        #     self.redleak_weights = np.ones_like(self._aper_xs)
+        self.sky_background_weights = np.ones_like(self._aper_xs)
+        self.dark_current_weights = np.ones_like(self._aper_xs)
+        self.redleak_weights = np.ones_like(self._aper_xs)
 
     @staticmethod
     def _calc_source_weights(profile, aper_xs, aper_ys, center):
@@ -309,7 +322,9 @@ class Photometry:
         ]
         return source_weights, center_px
 
-    def show_source_weights(self, mark_source=False, source_markersize=4, norm=None, plot=True):
+    def show_source_weights(
+        self, mark_source=False, source_markersize=4, norm=None, plot=True
+    ):
         """
         Plot the source as seen through the photometry aperture. The pixels are colored by
         the flux of the source at each pixel relative to the flux at the center of the
@@ -626,7 +641,9 @@ class Photometry:
 
         return [factor * a.to(u.arcsec), factor * b.to(u.arcsec)]
 
-    def use_optimal_aperture(self, factor=1.4, center=[0, 0] << u.arcsec, quiet=False):
+    def use_optimal_aperture(
+        self, factor=1.4, center=[0, 0] << u.arcsec, quiet=False, overwrite=False
+    ):
         """
         Uses the "optimal" circular aperture calculated from a source's angular size and
         the telescope's FWHM. Note that this is only valid for point sources.
@@ -650,6 +667,10 @@ class Photometry:
           quiet :: bool
             If False, print a message if an aperture dimension is based on the FWHM of the
             telescope's PSF instead of the point source's dimensions.
+
+          overwrite :: bool
+            If True, allow overwriting of any existing aperture associated with this
+            `Photometry` object.
 
         Attributes
         ----------
@@ -696,17 +717,17 @@ class Photometry:
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
-        self._create_aper_arrs(aper_dimen[0].value, aper_dimen[1].value, center)
+        self._create_aper_arrs(
+            aper_dimen[0].value, aper_dimen[1].value, center, overwrite=overwrite
+        )
         source_weights, center_px = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
         #
-        aper_dimen_px = [
-            (dimen / self.TelescopeObj.px_scale.to(u.arcsec)).value
-            for dimen in aper_dimen
-        ]
+        px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
+        aper_dimen_px = [(dimen / px_scale_arcsec).value for dimen in aper_dimen]
         aper = EllipticalAperture(
             positions=center_px, a=aper_dimen_px[0], b=aper_dimen_px[1], theta=0
         )
@@ -734,7 +755,9 @@ class Photometry:
                 RuntimeWarning,
             )
 
-    def use_elliptical_aperture(self, a, b, center=[0, 0] << u.arcsec, rotation=0):
+    def use_elliptical_aperture(
+        self, a, b, center=[0, 0] << u.arcsec, rotation=0, overwrite=False
+    ):
         """
         Use an elliptical aperture.
 
@@ -753,6 +776,10 @@ class Photometry:
             The counter-clockwise rotation angle in degrees of the ellipse's semimajor
             axis from the positive x-axis. If rotation is 0, the semimajor axis is along
             the x-axis and the semiminor axis is along the y-axis.
+
+          overwrite :: bool
+            If True, allow overwriting of any existing aperture associated with this
+            `Photometry` object.
 
         Attributes
         ----------
@@ -807,25 +834,31 @@ class Photometry:
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
+        px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
         # Below is modified rotation matrix to ensure full aperture is covered in arrays
+        # N.B. must round to nearest multiple of px_scale or else rounding errors will
+        # affect source weights
         rotation = np.deg2rad(rotation)
         abs_sin_rotate, abs_cos_rotate = abs(np.sin(rotation)), abs(np.cos(rotation))
-        x = (abs_cos_rotate * a + abs_sin_rotate * b).value
-        y = (abs_sin_rotate * a + abs_cos_rotate * b).value
+        x = (
+            np.ceil((abs_cos_rotate * a + abs_sin_rotate * b) / px_scale_arcsec)
+            * px_scale_arcsec
+        ).value
+        y = (
+            np.ceil((abs_sin_rotate * a + abs_cos_rotate * b) / px_scale_arcsec)
+            * px_scale_arcsec
+        ).value
         x = x if x >= a.value else a.value
         y = y if y >= b.value else b.value
         #
-        self._create_aper_arrs(x, y, center)
+        self._create_aper_arrs(x, y, center, overwrite=overwrite)
         source_weights, center_px = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
         )
         #
         # Create aperture
         #
-        aper_dimen_px = [
-            (a / self.TelescopeObj.px_scale.to(u.arcsec)).value,
-            (b / self.TelescopeObj.px_scale.to(u.arcsec)).value,
-        ]
+        aper_dimen_px = [(a / px_scale_arcsec).value, (b / px_scale_arcsec).value]
         aper = EllipticalAperture(
             positions=center_px,
             a=aper_dimen_px[0],
@@ -864,7 +897,9 @@ class Photometry:
                     UserWarning,
                 )
 
-    def use_rectangular_aperture(self, width, length, center=[0, 0] << u.arcsec):
+    def use_rectangular_aperture(
+        self, width, length, center=[0, 0] << u.arcsec, overwrite=False
+    ):
         """
         Use a rectangular aperture.
 
@@ -878,6 +913,10 @@ class Photometry:
             The (x, y) center of the aperture relative to the center of the source.
             Positive values means the source is displaced to the bottom/left relative to
             the aperture center.
+
+          overwrite :: bool
+            If True, allow overwriting of any existing aperture associated with this
+            `Photometry` object.
 
         Attributes
         ----------
@@ -942,6 +981,7 @@ class Photometry:
             0.5 * width.value,  # width is along x
             0.5 * length.value,  # length is along y
             center,
+            overwrite=overwrite,
         )
         source_weights, center_px = Photometry._calc_source_weights(
             self.SourceObj.profile, self._aper_xs, self._aper_ys, center
@@ -949,9 +989,10 @@ class Photometry:
         #
         # Create aperture
         #
+        px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
         aper_dimen_px = [
-            (width / self.TelescopeObj.px_scale.to(u.arcsec)).value,
-            (length / self.TelescopeObj.px_scale.to(u.arcsec)).value,
+            (width / px_scale_arcsec).value,
+            (length / px_scale_arcsec).value,
         ]
         aper = RectangularAperture(
             positions=center_px, w=aper_dimen_px[0], h=aper_dimen_px[1], theta=0
