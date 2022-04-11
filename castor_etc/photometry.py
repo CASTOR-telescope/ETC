@@ -76,7 +76,7 @@ from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from .background import Background
-from .conversions import calc_photon_energy, convert_electron_flux_mag, mag_to_flux
+from .conversions import calc_photon_energy, mag_to_flux
 from .sources import PointSource, Source
 from .telescope import Telescope
 
@@ -132,7 +132,6 @@ class Photometry:
             raise TypeError("SourceObj must be a `castor_etc.Source` object")
         if not isinstance(BackgroundObj, Background):
             raise TypeError("BackgroundObj must be a `castor_etc.Background` object")
-        # TODO: check BackgroundObj dict keys
         #
         # Assign attributes
         #
@@ -310,7 +309,7 @@ class Photometry:
         ]
         return source_weights, center_px
 
-    def show_source_weights(self, mark_source=False, source_markersize=4, plot=True):
+    def show_source_weights(self, mark_source=False, source_markersize=4, norm=None, plot=True):
         """
         Plot the source as seen through the photometry aperture. The pixels are colored by
         the flux of the source at each pixel relative to the flux at the center of the
@@ -328,6 +327,10 @@ class Photometry:
 
           source_markersize :: int or float
             The markersize for the cyan point indicating the center of the source.
+
+          norm :: `matplotlib.colors` normalization class (e.g., `LogNorm`) or None
+            The scaling and normalization to use for the colorbar. If None, then a linear
+            scaling with the default (min pixel value, max pixel value) bounds are used.
 
           plot :: bool
             If True, plot the source weights and return None. If False, return the figure,
@@ -358,6 +361,7 @@ class Photometry:
                 extent=self._aper_extent,
                 interpolation=None,
                 cmap="inferno",
+                norm=norm,
             )
             ax.tick_params(color="grey", which="both")
             cbar = fig.colorbar(img)
@@ -1249,6 +1253,8 @@ class Photometry:
         nread=1,
     ):
         """
+        TODO: add parameter for fraction of source flux enclosed within aperture
+
         Calculate the signal-to-noise ratio (SNR) reached given an integration time.
 
         The equation to calculate the SNR is:
@@ -1356,6 +1362,8 @@ class Photometry:
         nread=1,
     ):
         """
+        TODO: add parameter for fraction of source flux enclosed within aperture
+
         Calculate the time required to reach a given signal-to-noise ratio (SNR).
 
         The theoretical equation to calculate the time required to reach a given SNR is:
@@ -1522,6 +1530,8 @@ class Photometry:
             raise ValueError("Exactly one of t or snr must be specified")
         if not isinstance(reddening, Number):
             raise TypeError("reddening must be an int or float")
+        if self.source_weights is None:
+            raise ValueError("Please choose an aperture first.")
         #
         # Make some useful variables
         #
@@ -1539,114 +1549,32 @@ class Photometry:
         #
         # Calculate sky background electron/s
         # (incl. Earthshine & zodiacal light, excl. geocoronal emission lines)
-        # NOTE: zodi_flam and earthshine_flam are actually in units of flam per sq. arcsec
         #
         sky_background_erate = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
         px_area_arcsec_sq = self.TelescopeObj.px_area.to(u.arcsec ** 2).value
         mirror_area_cm_sq = self.TelescopeObj.mirror_area.to(u.cm ** 2).value
-        #
+        # Use passband photometric zero points + sky background AB magnitudes (per sq.
+        # arcsec) to calculate sky background electron/s.
+        # Note that this is completely equivalent to convolving the sky background spectra
+        # with passband response curves, which was the previous method (now removed
+        # because this is much simpler)! Compare results if you want!
         if self.BackgroundObj.mags_per_sq_arcsec is None:
-            #
-            # Use passband response curves to calculate sky background electron/s
-            # (will linearly interp sky background spectra to passband curve resolution)
-            #
-            # Earthshine contribution
-            if self.BackgroundObj.earthshine_flam is not None:
-                es_photon_s_A = (  # photon/s/A
-                    self.BackgroundObj.earthshine_flam  # erg/s/cm^2/A/arcsec^2
-                    * mirror_area_cm_sq  # cm^2
-                    / calc_photon_energy(  # photon/erg
-                        wavelength=self.BackgroundObj.earthshine_wavelengths
+            background_mags_per_sq_arcsec = self.BackgroundObj._get_mags_per_sq_arcsec(
+                self.TelescopeObj
+            )
+            for band in self.TelescopeObj.passbands:
+                # Convert sky background AB mag per arcsec^2 to electron/s (per pixel)
+                sky_background_erate[band] = (
+                    mag_to_flux(
+                        background_mags_per_sq_arcsec[band],
+                        zpt=self.TelescopeObj.phot_zpts[band],
                     )[0]
+                    * px_area_arcsec_sq
                 )
-                es_interp = interp1d(
-                    self.BackgroundObj.earthshine_wavelengths,
-                    es_photon_s_A,
-                    kind="linear",
-                    bounds_error=False,
-                    fill_value=np.nan,
-                )
-                # Convolve with response curve (photon -> electron) & integrate over band
-                for band in self.TelescopeObj.passbands:
-                    es_erate_A = (
-                        es_interp(response_curve_wavelengths_AA[band])
-                        * self.TelescopeObj.passband_curves[band]["response"]
-                    )  # electron/s/A
-                    isgood_es = np.isfinite(es_erate_A)  # don't integrate over NaNs
-                    if not np.all(isgood_es):
-                        warnings.warn(
-                            "Could not estimate Earthshine noise (electron/s/A) "
-                            + f"at 1 or more passband wavelengths in {band}-band",
-                            RuntimeWarning,
-                        )
-                    # Total Earthshine over 1 pixel area (electron/s)
-                    es_erate = (
-                        simpson(
-                            y=es_erate_A,
-                            x=response_curve_wavelengths_AA[band][isgood_es],
-                            even="avg",
-                        )
-                        * px_area_arcsec_sq
-                    )
-                    if np.isfinite(es_erate):
-                        sky_background_erate[band] += es_erate
-                    else:
-                        raise RuntimeError(
-                            "Earthshine noise (electron/s) could not be estimated "
-                            + f"at all in {band}-band!"
-                        )
-            # Zodiacal light contribution
-            if self.BackgroundObj.zodi_flam is not None:
-                zodi_photon_s_A = (  # photon/s/A
-                    self.BackgroundObj.zodi_flam  # erg/s/cm^2/A/arcsec^2
-                    * mirror_area_cm_sq  # cm^2
-                    / calc_photon_energy(  # photon/erg
-                        wavelength=self.BackgroundObj.zodi_wavelengths
-                    )[0]
-                )
-                zodi_interp = interp1d(
-                    self.BackgroundObj.zodi_wavelengths,
-                    zodi_photon_s_A,
-                    kind="linear",
-                    bounds_error=False,
-                    fill_value=np.nan,
-                )
-                # Convolve with response curve (photon -> electron) & integrate over band
-                for band in self.TelescopeObj.passbands:
-                    zodi_erate_A = (
-                        zodi_interp(response_curve_wavelengths_AA[band])
-                        * self.TelescopeObj.passband_curves[band]["response"]
-                    )  # electron/s/A
-                    isgood_zodi = np.isfinite(zodi_erate_A)  # don't integrate over NaNs
-                    if not np.all(isgood_zodi):
-                        warnings.warn(
-                            "Could not estimate zodiacal light noise (electron/s/A) "
-                            + f"at 1 or more passband wavelengths in {band}-band",
-                            RuntimeWarning,
-                        )
-                    # Total zodiacal light over 1 pixel area (electron/s)
-                    zodi_erate = (
-                        simpson(
-                            y=zodi_erate_A[isgood_zodi],
-                            x=response_curve_wavelengths_AA[band][isgood_zodi],
-                            even="avg",
-                        )
-                        * px_area_arcsec_sq
-                    )
-                    if np.isfinite(zodi_erate):
-                        sky_background_erate[band] += zodi_erate
-                    else:
-                        raise RuntimeError(
-                            "Zodiacal light noise (electron/s) could not be estimated "
-                            + f"at all in {band}-band!"
-                        )
         else:
-            #
-            # Use passband photometric zero points to calculate sky background electron/s
-            #
             for band in self.TelescopeObj.passbands:
                 try:
-                    # Convert sky background AB mag per arcsec^2 (per pixel) to electron/s
+                    # Convert sky background AB mag per arcsec^2 to electron/s (per pixel)
                     sky_background_erate[band] = (
                         mag_to_flux(
                             self.BackgroundObj.mags_per_sq_arcsec[band],
@@ -1709,50 +1637,87 @@ class Photometry:
         #
         # Calculate signal in each passband (flam -> electron/s)
         #
-        if self.source_weights is None:
-            raise ValueError("Please choose an aperture first.")
-        #
         source_erate = dict.fromkeys(self.TelescopeObj.passbands, np.nan)
-        source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
+        #
+        # NEW CODE
+        #
+        source_ab_mags = self.SourceObj.get_AB_mag(self.TelescopeObj)
+        # print("source_ab_mags:", source_ab_mags)
+        # (N.B. Unlike background noise, aper_weight_scale and npix cancel out here. Just
+        # use original _eff_npix and source_weights below; no need for npix or
+        # aper_weight_scale)
         for band in source_erate:
-            passband_limits_AA = self.TelescopeObj.passband_limits[band].to(u.AA).value
-            is_in_passband = (source_wavelengths_AA >= passband_limits_AA[0]) & (
-                source_wavelengths_AA <= passband_limits_AA[1]
+            # Account for extinction
+            source_passband_mag = source_ab_mags[band] + (
+                self.TelescopeObj.extinction_coeffs[band] * reddening
             )
-            # Use mean value of flux through passband as nominal flux value. In other
-            # words, if avg_passband_flam (below) was constant throughout the whole
-            # passband, the integrated flux in this passband (erg/s/cm^2) would be equal
-            # to the original spectrum's integrated flux in the same passband
-            # (erg/s/cm^2). Thus, we will use this avg_passband_flam value to calculate
-            # the source's AB magnitude and then convert to electron/s using the
-            # passband's photometric zero point.
-            avg_passband_flam = (  # erg/s/cm^2/A
-                simpson(
-                    y=self.SourceObj.spectrum[is_in_passband],
-                    x=source_wavelengths_AA[is_in_passband],
-                    even="avg",
-                )
-                / (passband_limits_AA[1] - passband_limits_AA[0])
-            )
-            # (N.B. Unlike background noise, aper_weight_scale and npix cancel out here.
-            # Just use original _eff_npix and source_weights below; no need for npix or
-            # aper_weight_scale)
-            avg_passband_flam_per_px = avg_passband_flam / self._eff_npix
-            # Convert source flux to AB magnitudes and correct for extinction
-            source_ab_mag = (
-                convert_electron_flux_mag(
-                    avg_passband_flam_per_px,
-                    "flam",
-                    "mag",
-                    wavelengths=self.TelescopeObj.passband_pivots[band],
-                )[0]
-                + (self.TelescopeObj.extinction_coeffs[band] * reddening)
-            )
-            # Convert flux to electron/s
+            # print(f"NEW source_passband_mag {band}-band:", source_passband_mag)
+            # Convert extinction-corrected AB mag to electron/s
+            # print(
+            #     f"NEW source_erate_per_px {band}-band",
+            #     mag_to_flux(
+            #         source_passband_mag,
+            #         zpt=self.TelescopeObj.phot_zpts[band],
+            #     )[0]
+            #     / self._eff_npix,
+            # )
             source_erate[band] = (
-                mag_to_flux(source_ab_mag, zpt=self.TelescopeObj.phot_zpts[band])[0]
-                * self.source_weights
+                mag_to_flux(
+                    source_passband_mag,
+                    zpt=self.TelescopeObj.phot_zpts[band],
+                )[0]
+                * (self.source_weights / self._eff_npix)
             )
+        #
+        #
+        #
+        # source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
+        # for band in source_erate:
+        #     passband_limits_AA = self.TelescopeObj.passband_limits[band].to(u.AA).value
+        #     is_in_passband = (source_wavelengths_AA >= passband_limits_AA[0]) & (
+        #         source_wavelengths_AA <= passband_limits_AA[1]
+        #     )
+        #     # FIXME: correct AB magnitude calculation!!
+        #     # Use mean value of flux through passband as nominal flux value. In other
+        #     # words, if avg_passband_flam (below) was constant throughout the whole
+        #     # passband, the integrated flux in this passband (erg/s/cm^2) would be equal
+        #     # to the original spectrum's integrated flux in the same passband
+        #     # (erg/s/cm^2). Thus, we will use this avg_passband_flam value to calculate
+        #     # the source's AB magnitude and then convert to electron/s using the
+        #     # passband's photometric zero point.
+        #     avg_passband_flam = (  # erg/s/cm^2/A
+        #         simpson(
+        #             y=self.SourceObj.spectrum[is_in_passband],
+        #             x=source_wavelengths_AA[is_in_passband],
+        #             even="avg",
+        #         )
+        #         / (passband_limits_AA[1] - passband_limits_AA[0])
+        #     )
+        #     # (N.B. Unlike background noise, aper_weight_scale and npix cancel out here.
+        #     # Just use original _eff_npix and source_weights below; no need for npix or
+        #     # aper_weight_scale)
+        #     # TODO: transform to surface brightness units
+        #     avg_passband_flam_per_px = avg_passband_flam / self._eff_npix
+        #     # Convert source flux to AB magnitudes and correct for extinction
+        #     source_ab_mag = (
+        #         convert_electron_flux_mag(
+        #             avg_passband_flam_per_px,
+        #             "flam",
+        #             "mag",
+        #             wavelengths=self.TelescopeObj.passband_pivots[band],
+        #         )[0]
+        #         + (self.TelescopeObj.extinction_coeffs[band] * reddening)
+        #     )
+        #     print(f"OLD source_ab_mag {band}-band:", source_ab_mag)
+        #     # Convert flux to electron/s
+        #     source_erate[band] = (
+        #         mag_to_flux(source_ab_mag, zpt=self.TelescopeObj.phot_zpts[band])[0]
+        #         * self.source_weights
+        #     )
+        #     print(
+        #         "OLD source_erate_per_px",
+        #         mag_to_flux(source_ab_mag, zpt=self.TelescopeObj.phot_zpts[band])[0],
+        #     )
         #
         # Calculate red leak (electron/s) at each pixel
         #
@@ -1768,6 +1733,7 @@ class Photometry:
         )
         if t is not None:
             for band in results:
+                # TODO: add parameter for fraction of source flux enclosed within aperture
                 results[band] = Photometry._calc_snr_from_t(
                     t=t,
                     signal=source_erate[band],
@@ -1780,6 +1746,7 @@ class Photometry:
                 )
         else:
             for band in results:
+                # TODO: add parameter for fraction of source flux enclosed within aperture
                 results[band] = Photometry._calc_t_from_snr(
                     snr=snr,
                     signal=source_erate[band],

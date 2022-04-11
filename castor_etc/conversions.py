@@ -72,6 +72,7 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 
 import astropy.units as u
 import numpy as np
+from scipy.integrate import simpson
 
 from . import constants as const
 from . import parameters as params
@@ -251,7 +252,6 @@ def fnu_to_flam(fnu, wavelength, fnu_err=0.0, wavelength_err=0.0):
     # Convert fnu (erg/cm^2/s/Hz) to flam (erg/cm^2/s/A)
     #
     flam = const.FNU_TO_FLAM * fnu / (wavelength * wavelength)
-    # REVIEW: check error propagation is correct
     flam_err = flam * np.sqrt(
         (fnu_err / fnu) ** 2 + 4 * (wavelength_err / wavelength) ** 2
     )  # derived & simplified from partial derivative error propagation
@@ -295,7 +295,6 @@ def flam_to_fnu(flam, wavelength, flam_err=0.0, wavelength_err=0.0):
     # Convert fnu (erg/cm^2/s/Hz) to flam (erg/cm^2/s/A)
     #
     fnu = const.FLAM_TO_FNU * flam * (wavelength * wavelength)
-    # REVIEW: check error propagation is correct
     fnu_err = fnu * np.sqrt(
         (flam_err / flam) ** 2 + 4 * (wavelength_err / wavelength) ** 2
     )  # derived & simplified from partial derivative error propagation
@@ -427,6 +426,52 @@ def mag_to_flux(mag, mag_err=0.0, zpt=-48.60):
     flux = 10 ** (-0.4 * (mag - zpt))
     flux_err = 0.4 * np.log(10) * abs(flux * mag_err)
     return flux, flux_err
+
+
+def flam_to_AB_mag(wavelengths, flam, response):
+    """
+    Convert a spectrum in flam (erg/s/cm^2/A) to an AB magnitude. Follows Eq. (2) of
+    Bessell & Murphy (2012)
+    <https://ui.adsabs.harvard.edu/abs/2012PASP..124..140B/abstract>.
+
+    Parameters
+    ----------
+      wavelengths :: array of floats or `astropy.Quantity` array
+        The wavelengths over which to integrate the spectrum. If an array of floats, it is
+        assumed to be in units of angstrom.
+
+      flam :: array of floats
+        The spectral flux density at the given wavelengths, in units of erg/s/cm^2/A.
+
+      response :: array of floats
+        The system response function at the given wavelengths. This represents the
+        throughput of the whole optical path and should include the detector quantum
+        efficiencies (i.e., converts from photons to electrons).
+
+    Returns
+    -------
+      ab_mag :: float
+        The AB magnitude of the spectrum.
+    """
+    #
+    # Check inputs
+    #
+    if isinstance(wavelengths, u.Quantity):
+        wavelengths = wavelengths.to(u.AA).value
+    if np.any(~np.isfinite(wavelengths) | ~np.isfinite(flam) | ~np.isfinite(response)):
+        raise ValueError("`wavelengths`, `flam`, and `response` must all be finite")
+    #
+    # Perform calculation (Eq. (2) of Bessell & Murphy (2012))
+    #
+    numer = simpson(y=flam * response * wavelengths, x=wavelengths, even="avg")
+    denom = simpson(
+        y=response / wavelengths,
+        x=wavelengths,
+        even="avg",
+    )
+    return (
+        -2.5 * np.log10(numer / (const.LIGHTSPEED.to(u.AA / u.s).value * denom)) - 48.60
+    )  # AB magnitude
 
 
 def convert_electron_flux_mag(

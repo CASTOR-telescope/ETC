@@ -93,7 +93,7 @@ from scipy.interpolate import interp1d
 
 from . import constants as const
 from . import parameters as params
-from .conversions import calc_photon_energy, convert_electron_flux_mag
+from .conversions import calc_photon_energy, convert_electron_flux_mag, flam_to_AB_mag
 from .filepaths import DATAPATH
 from .telescope import Telescope
 
@@ -1676,7 +1676,7 @@ class NormMixin:
     """
     Mixin for normalizing spectra.
 
-    TODO: Make normalization to a specific value at a given wavelength
+    TODO: Make normalization to a specific value at a given wavelength?
     """
 
     @staticmethod
@@ -1724,6 +1724,67 @@ class NormMixin:
         radian = radius / dist
         return spectrum * np.pi * radian * radian  # multiply by projected solid angle
 
+    def norm_to_AB_mag(
+        self,
+        ab_mag,
+        passband=None,
+        TelescopeObj=None,
+    ):
+        """
+        Normalize a spectrum to a given AB magnitude in a specified passband or to a given
+        bolometric AB magnitude. The spectrum should be in units of flam (erg/s/cm^2/A).
+
+        Parameters
+        ----------
+          ab_mag :: int or float
+            The desired AB magnitude.
+
+          passband :: valid `Telescope` passband string (e.g., "uv", "u", "g") or None
+            If not None, normalize the spectrum such that it has the desired AB magnitude
+            in this passband; `TelescopeObj` must also be provided. If None, normalize the
+            spectrum such that the spectrum's bolometric magnitude equals the given AB
+            magnitude; `TelescopeObj` must not be provided.
+
+          TelescopeObj :: `Telescope` object or None
+            The `Telescope` object containing the limits and response curves of the
+            different passbands. If not None, `passband` must also be provided. If None,
+            `passband` must not be provided.
+
+        Attributes
+        ----------
+          spectrum :: array of floats
+            The renormalized spectrum in units of erg/s/cm^2/A (identical to the previous
+            spectrum units).
+
+        Returns
+        -------
+          None
+        """
+        #
+        # Check inputs
+        #
+        if self.spectrum is None or self.wavelengths is None:
+            raise ValueError("Please generate a spectrum before normalizing.")
+        if (TelescopeObj is None and passband is not None) or (
+            TelescopeObj is not None and passband is None
+        ):
+            raise ValueError(
+                "Please either specify both `TelescopeObj` and `passband`"
+                + "or neither of them."
+            )
+        #
+        # Normalize
+        #
+        current_ab_mag = self.get_AB_mag(TelescopeObj=TelescopeObj)
+        if passband is not None:
+            if passband not in TelescopeObj.passbands:
+                raise ValueError(
+                    f"Invalid `passband`. Valid passbands are: {TelescopeObj.passbands}."
+                )
+            current_ab_mag = current_ab_mag[passband]
+        norm_factor = 10 ** (-0.4 * (ab_mag - current_ab_mag))
+        self.spectrum *= norm_factor
+
     def norm_to_value(
         self,
         value,
@@ -1734,6 +1795,10 @@ class NormMixin:
         pivot_wavelength=None,
     ):
         """
+        ! DEPRECATED ! See `norm_to_AB_mag()` instead.
+
+        TODO: remove this function
+
         Normalize the spectrum so that it's average flux density (in units of "flam",
         erg/s/cm^2/A) or AB magnitude (based on mean flux density, erg/s/cm^2/A) is equal
         to the given value, either over the whole wavelength range or within a passband.
@@ -1814,6 +1879,9 @@ class NormMixin:
         #
         # Check inputs
         #
+        print(
+            "WARNING: norm_to_value() is deprecated. Please use norm_to_AB_mag() instead."
+        )
         if self.spectrum is None or self.wavelengths is None:
             raise ValueError("Please generate a spectrum before normalizing.")
         if value_type not in ["flam", "mag"]:
@@ -1942,8 +2010,84 @@ class NormMixin:
         norm_factor = luminosity / tot_luminosity  # dimensionless
         self.spectrum *= norm_factor  # erg/s/cm^2/A
 
+    def get_AB_mag(self, TelescopeObj=None):
+        """
+        Calculate the AB magnitude of the source either through the telescope's passbands
+        or over the whole spectrum (bolometric magnitude). Note that the source spectrum
+        should be in units of erg/s/cm^2/A.
+
+        Parameters
+        ----------
+          TelescopeObj :: `Telescope` object or None
+            If provided, will calculate the AB magnitude of the source in each of the
+            telescope's passbands. Otherwise will calculate the source's bolometric AB
+            magnitude.
+
+        Returns
+        -------
+          ab_mags :: scalar or dict of scalars
+            If `TelescopeObj` is None, the result is a scalar equal to the bolometric AB
+            magnitude of the source. If TelescopeObj is not None, the result is a dict of
+            scalars representing the source's AB magnitude through each of the telescope's
+            passbands.
+        """
+        if self.spectrum is None or self.wavelengths is None:
+            raise ValueError(
+                "Please generate a spectrum before calculating AB magnitude(s)."
+            )
+        wavelengths_AA = self.wavelengths.to(u.AA).value
+        if TelescopeObj is None:
+            #
+            # Calculate bolometric AB magnitude
+            #
+            return flam_to_AB_mag(
+                wavelengths_AA,
+                self.spectrum,
+                np.ones_like(wavelengths_AA, dtype=float),  # perfect "passband" response
+            )
+        else:
+            #
+            # Calculate the AB magnitude through each of the telescope's passbands
+            #
+            ab_mags = dict.fromkeys(TelescopeObj.passbands)
+            spectrum_interp = interp1d(
+                x=wavelengths_AA,
+                y=self.spectrum,
+                kind="linear",
+                bounds_error=False,
+                fill_value=np.nan,
+            )
+            for band in TelescopeObj.passband_limits:
+                passband_wavelengths = (
+                    TelescopeObj.passband_curves[band]["wavelength"].to(u.AA).value
+                )
+                passband_spectrum = spectrum_interp(passband_wavelengths)
+                isgood_passband = np.isfinite(passband_spectrum)  # do not integrate NaNs
+                if np.any(~isgood_passband):
+                    if np.all(~isgood_passband):
+                        raise RuntimeError(
+                            "Source spectrum could not be estimated "
+                            + f"at any {band}-band wavelength"
+                        )
+                    else:
+                        warnings.warn(
+                            "Source spectrum could not be estimated "
+                            + f"at some {band}-band wavelengths",
+                            RuntimeWarning,
+                        )
+                ab_mags[band] = flam_to_AB_mag(
+                    passband_wavelengths[isgood_passband],
+                    passband_spectrum[isgood_passband],
+                    TelescopeObj.passband_curves[band]["response"][isgood_passband],
+                )
+            return ab_mags
+
     def get_avg_value(self, value_type="mag", TelescopeObj=None):
         """
+        ! DEPRECATED ! Use `get_AB_mag` instead.
+
+        TODO: deprecate this.
+
         Calculate the average value of the source spectrum (in either flam, erg/s/cm^2/A,
         or AB magnitude) either over the whole spectrum or through a telescope's passbands
         (in which case TelescopeObj is required).
@@ -1983,6 +2127,7 @@ class NormMixin:
             is not None, the result is a dict of average values in each of the telescope's
             passbands.
         """
+        print("WARNING: get_avg_value() is deprecated. Use get_AB_mag() instead.")
         if value_type not in ["flam", "mag"]:
             raise ValueError("value_type must be either 'flam' or 'mag'.")
         source_AA = self.wavelengths.to(u.AA).value

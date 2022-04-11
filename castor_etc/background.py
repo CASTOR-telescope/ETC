@@ -65,6 +65,7 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
+import warnings
 from copy import deepcopy
 from numbers import Number
 from os.path import join
@@ -72,9 +73,9 @@ from os.path import join
 import astropy.units as u
 import numpy as np
 from astropy.io import fits
-from scipy.integrate import simpson
+from scipy.interpolate import interp1d
 
-from .conversions import convert_electron_flux_mag
+from .conversions import flam_to_AB_mag
 from .data.sky_background.background_values import (
     GEOCORONAL_FLUX_AVG,
     GEOCORONAL_FLUX_HIGH,
@@ -263,64 +264,140 @@ class Background:
         self.geo_wavelength.append(wavelength)
         self.geo_linewidth.append(linewidth)  # currently not used in any calculations
 
-    def calc_mags_per_sq_arcsec(self, TelescopeObj):
+    def _get_mags_per_sq_arcsec(self, TelescopeObj):
         """
-        Calculates the sky background AB magnitudes per square arcsecond (not including
-        geocoronal emission lines) through the telescope's passbands. This is useful if
-        reusing the same sky background object for multiple Photometry/Spectroscopy
-        instances with the same `Telescope` object.
+        Internal function to calculate the sky background AB magnitudes per square
+        arsecond (not including geocoronal emission lines) through the given
+        `TelescopeObj`'s passbands based on Earthshine and/or zodiacal light spectra.
+
+        Users should use the `calc_mags_per_sq_arcsec()` method instead.
 
         Parameters
         ----------
           TelescopeObj :: `Telescope` object
-            The `castor_etc.Telescope` object to use for the sky background calculations
-            (needed for passband limits and pivots).
+            The `castor_etc.Telescope` object to use for the sky background calculations.
+
+        Returns
+        -------
+          mags_per_sq_arcsec :: dict of floats
+            The total sky background AB magnitudes per square arcsecond in the telescope's
+            passbands, excluding geocoronal emission lines.
+        """
+        if (
+            self.earthshine_flam is None
+            and self.earthshine_wavelengths is None
+            and self.zodi_flam is None
+            and self.zodi_wavelengths is None
+        ):
+            warnings.warn(
+                "No Earthshine and zodiacal light spectra. The sky background AB mags "
+                + "per sq. arcsec will be zero!",
+                RuntimeWarning,
+            )
+        #
+        # Evaluate both spectra at passband wavelengths, then integrate to get AB mag
+        #
+        mags_per_sq_arcsec = dict.fromkeys(TelescopeObj.passbands)
+        # 1. Prepare interpolation functions for passband wavelengths as inputs
+        if self.earthshine_flam is not None and self.earthshine_wavelengths is not None:
+            earthshine_interp = interp1d(
+                x=self.earthshine_wavelengths,
+                y=self.earthshine_flam,
+                kind="linear",
+                bounds_error=False,
+                fill_value=np.nan,
+            )
+        if self.zodi_flam is not None and self.zodi_wavelengths is not None:
+            zodi_interp = interp1d(
+                x=self.zodi_wavelengths,
+                y=self.zodi_flam,
+                kind="linear",
+                bounds_error=False,
+                fill_value=np.nan,
+            )
+        # 2. Evaluate and sum spectra at passband wavelengths
+        for band in TelescopeObj.passband_limits:
+            sky_background_flam = 0.0
+            passband_wavelengths = (
+                TelescopeObj.passband_curves[band]["wavelength"].to(u.AA).value
+            )
+            if (
+                self.earthshine_flam is not None
+                and self.earthshine_wavelengths is not None
+            ):
+                sky_background_flam += earthshine_interp(passband_wavelengths)
+            if self.zodi_flam is not None and self.zodi_wavelengths is not None:
+                sky_background_flam += zodi_interp(passband_wavelengths)
+            isgood_passband = np.isfinite(sky_background_flam)  # do not integrate NaNs
+            if np.any(~isgood_passband):
+                if np.all(~isgood_passband):
+                    raise RuntimeError(
+                        "Earthshine and/or zodiacal light spectrum could not be "
+                        + f"estimated at any {band}-band wavelength"
+                    )
+                else:
+                    warnings.warn(
+                        "Earthshine and/or zodiacal light spectrum could not be "
+                        + f"estimated at some {band}-band wavelengths",
+                        RuntimeWarning,
+                    )
+            # 3. Integrate to get AB mag per square arcsecond
+            if isinstance(sky_background_flam, Number):
+                # No sky background spectra
+                mags_per_sq_arcsec[band] = sky_background_flam  # 0.0
+            else:
+                mags_per_sq_arcsec[band] = flam_to_AB_mag(
+                    passband_wavelengths[isgood_passband],
+                    sky_background_flam[isgood_passband],
+                    TelescopeObj.passband_curves[band]["response"][isgood_passband],
+                )
+        return mags_per_sq_arcsec
+
+    def calc_mags_per_sq_arcsec(self, TelescopeObj, overwrite=False):
+        """
+        Calculates the sky background AB magnitudes per square arcsecond (not including
+        geocoronal emission lines) through the telescope's passbands based on Earthshine
+        and/or zodiacal light spectra. This is useful if reusing the same sky background
+        object for multiple `Photometry`/`Spectroscopy` instances with the same
+        `Telescope` object.
+
+        Parameters
+        ----------
+          TelescopeObj :: `Telescope` object
+            The `castor_etc.Telescope` object to use for the sky background calculations.
+
+          overwrite :: bool
+            If True, calculate the sky background AB magnitudes per square arsec in each
+            `Telescope` passband (excluding geocoronal emission) based on Earthshine
+            and/or zodiacal light spectra and the provided `Telescope` object and
+            overwrite any existing `mags_per_sq_arcsec` attribute. If False and the
+            `mags_per_sq_arcsec` attribute is not None, raise an error.
 
         Attributes
         ----------
           mags_per_sq_arcsec :: dict of floats
             The total sky background AB magnitudes per square arcsecond in the telescope's
-            passbands.
+            passbands, excluding geocoronal emission lines.
 
         Returns
         -------
-          None
+          mags_per_sq_arcsec :: dict of floats
+            The total sky background AB magnitudes per square arcsecond in the telescope's
+            passbands, excluding geocoronal emission lines.
         """
+        #
+        # Check inputs
+        #
         if not isinstance(TelescopeObj, Telescope):
             raise TypeError("TelescopeObj must be a `castor_etc.Telescope` object.")
-
-        def _add_avg_flam(wavelengths, flam):
-            for band in avg_sky_flam_per_sq_arcsec:
-                in_passband = (wavelengths >= passband_limits_AA[band][0]) & (
-                    wavelengths <= passband_limits_AA[band][1]
-                )
-                passband_range = passband_limits_AA[band][1] - passband_limits_AA[band][0]
-                # Mean value of the flux density per sq. arcsec in the passband
-                avg_sky_flam_per_sq_arcsec[band] += (
-                    simpson(y=flam[in_passband], x=wavelengths[in_passband], even="avg")
-                    / passband_range
-                )  # erg/cm^2/s/A/arcsec^2
-
-        passband_limits_AA = {
-            band: limits.to(u.AA).value
-            for band, limits in TelescopeObj.passband_limits.items()
-        }
-        avg_sky_flam_per_sq_arcsec = dict.fromkeys(
-            TelescopeObj.passband_limits, 0.0
-        )  # average flam per sq. arcsec through band
-
-        if self.earthshine_wavelengths is not None and self.earthshine_flam is not None:
-            _add_avg_flam(self.earthshine_wavelengths, self.earthshine_flam)
-        if self.zodi_wavelengths is not None and self.zodi_flam is not None:
-            _add_avg_flam(self.zodi_wavelengths, self.zodi_flam)
-        avg_sky_mags_per_sq_arcsec = dict.fromkeys(TelescopeObj.passband_limits, np.nan)
-        for band in avg_sky_flam_per_sq_arcsec:
-            # (No need to return uncertainty)
-            avg_sky_mags_per_sq_arcsec[band] = convert_electron_flux_mag(
-                avg_sky_flam_per_sq_arcsec[band],
-                "flam",
-                "mag",
-                wavelengths=TelescopeObj.passband_pivots[band],
-            )[0]
-
-        self.mags_per_sq_arcsec = avg_sky_mags_per_sq_arcsec
+        if not overwrite and self.mags_per_sq_arcsec is not None:
+            raise AttributeError(
+                "`mags_per_sq_arcsec` has already been provided/calculated. "
+                + "Use `overwrite=True` to overwrite existing `mags_per_sq_arcsec`."
+            )
+        #
+        # Calculate sky background AB mags per sq. arcsec
+        #
+        mags_per_sq_arcsec = self._get_mags_per_sq_arcsec(TelescopeObj)
+        self.mags_per_sq_arcsec = mags_per_sq_arcsec
+        return mags_per_sq_arcsec
