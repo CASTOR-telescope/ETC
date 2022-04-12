@@ -476,7 +476,7 @@ class PointSource(Source):
     Point source.
     """
 
-    def __init__(self, profile, angle=None, radius=None, dist=None):
+    def __init__(self, profile=None, angle=None, radius=None, dist=None):
         """
         Generate a circular point source (e.g., a star). Can optionally give either:
           1. the angle subtended by the diameter of the source, or
@@ -491,7 +491,7 @@ class PointSource(Source):
 
         Parameters
         ----------
-          profile :: function with a header of `profile(x, y, aper_center)`
+          profile :: function with a header of `profile(x, y, aper_center)` or None
             Function with 3 positional parameters that describes the flux of the
             source at each aperture pixel relative to the flux at the source center.
               - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
@@ -499,8 +499,9 @@ class PointSource(Source):
               - `aper_center` is a 2-element 1D array of floats representing the x- and y-
               coordinates of the aperture's center relative to the source's center,
               respectively.
-            In most, if not all, cases, this should be the uniform flux profile with
-            default arguments (i.e., `Profiles.uniform()`).
+            If None, use a uniform flux profile with default arguments (i.e.,
+            `Profiles.uniform()`). This should be the preferred option in most, if not
+            all, cases.
 
           angle :: int or float or `astropy.Quantity` or None
             The angle subtended by the circular point source's diameter. If a scalar,
@@ -553,6 +554,8 @@ class PointSource(Source):
         -------
           `PointSource` instance
         """
+        if profile is None:
+            profile = Profiles.uniform()
         super().__init__(profile)
         #
         # Check inputs
