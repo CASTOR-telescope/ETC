@@ -84,6 +84,7 @@ from astropy.modeling.models import Sersic2D
 from photutils.aperture import EllipticalAperture
 
 from . import constants as const
+from .parameters import FWHM
 from .spectrum import NormMixin, SpectrumMixin
 
 
@@ -477,13 +478,16 @@ class PointSource(Source):
 
     def __init__(self, profile, angle=None, radius=None, dist=None):
         """
-        Generate a circular point source (e.g., a star) given either:
+        Generate a circular point source (e.g., a star). Can optionally give either:
           1. the angle subtended by the diameter of the source, or
           2. the physical radius (i.e., with units of length) of the source & distance to
           the source.
 
         If item 2, this will calculate the angle subtended by a circular source of a given
         radius at a certain distance.
+
+        Note that the angular diameter of a point source should be no larger than the
+        telescope's full-width at half-maximum (FWHM).
 
         Parameters
         ----------
@@ -495,27 +499,30 @@ class PointSource(Source):
               - `aper_center` is a 2-element 1D array of floats representing the x- and y-
               coordinates of the aperture's center relative to the source's center,
               respectively.
+            In most, if not all, cases, this should be the uniform flux profile with
+            default arguments (i.e., `Profiles.uniform()`).
 
           angle :: int or float or `astropy.Quantity` or None
             The angle subtended by the circular point source's diameter. If a scalar,
-            angle is assumed to be in arcsec. If angle is given, radius and dist must both
-            be None. If not given, radius and dist must both be provided. Internally, this
-            will be assigned to the `angle_a` and `angle_b` attributes.
+            `angle` is assumed to be in arcsec. If `angle` is given, `radius` and `dist`
+            must both be None. If `angle`, `radius`, and `dist` are all None, use the
+            default telescope's FWHM (0.15 arcsec).
+            Internally, this will be assigned to the `angle_a` and `angle_b` attributes.
 
           radius :: int or float or `astropy.Quantity` or None
-            The physical radius of the circular point source. If a scalar, radius is
-            assumed to be in units of solar radii. If radius is given, dist must also be
-            provided and angle must be None. If not given, angle must be provided.
+            The physical radius of the circular point source. If a scalar, `radius` is
+            assumed to be in units of solar radii. If `radius` is given, `dist` must also
+            be provided and `angle` must be None.
             Internally, this will be assigned to the `a` (semimajor axis) and `b`
             (semiminor axis) attributes as well as used to calculate the `angle_a` and
             `angle_b` attributes.
 
           dist :: int or float or `astropy.Quantity` or None
-            The distance to the source. If a scalar, dist is assumed to be in units of
-            kpc. If dist is given, radius must also be provided and angle must be None. If
-            not given, angle must be provided. Internally, this will be assigned to the
-            `dist` attribute as well as used to calculate the `angle_a` and `angle_b`
-            attributes.
+            The distance to the source. If a scalar, `dist` is assumed to be in units of
+            kpc. If `dist` is given, `radius` must also be provided and `angle` must be
+            None.
+            Internally, this will be assigned to the `dist` attribute as well as used to
+            calculate the `angle_a` and `angle_b` attributes.
 
         Attributes
         ----------
@@ -550,7 +557,9 @@ class PointSource(Source):
         #
         # Check inputs
         #
-        if ((radius is None or dist is None) and angle is None) or (
+        if angle is None and radius is None and dist is None:
+            angle = deepcopy(FWHM)  # must copy or else will pass by reference
+        elif ((radius is None or dist is None) and angle is None) or (
             angle is not None and (radius is not None or dist is not None)
         ):
             raise ValueError(
@@ -566,6 +575,8 @@ class PointSource(Source):
                 dist = dist * u.kpc
             self.a = self.b = radius
             self.dist = dist
+            if radius <= 0 or dist <= 0:
+                raise ValueError("`radius` and `dist` must be greater than zero.")
             radius = radius.to(u.AU).value
             dist = dist.to(u.pc).value
             # Calculate the angle subtended by source radius (from definition of parsec)
@@ -573,6 +584,8 @@ class PointSource(Source):
         else:
             if not isinstance(angle, u.Quantity):
                 angle = angle * u.arcsec
+            if angle <= 0:
+                raise ValueError("`angle` must be greater than zero.")
             angle *= 0.5  # convert to angular radius
         self.angle_a = self.angle_b = angle
         self.area = np.pi * self.angle_a * self.angle_b
@@ -692,10 +705,14 @@ class ExtendedSource(Source):
             a = a.to(u.AU).value
             b = b.to(u.AU).value
             dist = dist.to(u.pc).value
+            if a <= 0 or b <= 0 or dist <= 0:
+                raise ValueError("`a`, `b`, and `dist` must all be greater than zero.")
             # Calculate the angle subtended by source radius from definition of parsec
             self.angle_a = np.arctan(a.value / dist.value) * u.arcsec
             self.angle_b = np.arctan(a.value / dist.value) * u.arcsec
         else:
+            if angle_a <= 0 or angle_b <= 0:
+                raise ValueError("`angle_a` and `angle_b` must be greater than zero.")
             if isinstance(angle_a, u.Quantity):
                 self.angle_a = angle_a.to(u.arcsec)
             else:
@@ -825,6 +842,8 @@ class GalaxySource(Source):
             a = a.to(u.AU).value
             b = b.to(u.AU).value
             dist = dist.to(u.pc).value
+            if a <= 0 or b <= 0 or dist <= 0:
+                raise ValueError("`a`, `b`, and `dist` must all be greater than zero.")
             # Calculate the angle subtended by source radius from definition of parsec
             self.angle_a = np.arctan(a.value / dist.value) * u.arcsec
             self.angle_b = np.arctan(a.value / dist.value) * u.arcsec
@@ -837,6 +856,8 @@ class GalaxySource(Source):
                 self.angle_b = angle_b.to(u.arcsec)
             else:
                 self.angle_b = angle_b * u.arcsec
+            if angle_a <= 0 or angle_b <= 0:
+                raise ValueError("`angle_a` and `angle_b` must be greater than zero.")
         eccentricity = np.sqrt(1 - (self.angle_b.value / self.angle_a.value) ** 2)
         profile = Profiles.sersic(r_eff, n, e=eccentricity, angle=rotation)
         super().__init__(profile, init_dimensions=False)

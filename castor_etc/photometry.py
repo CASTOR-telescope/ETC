@@ -84,6 +84,11 @@ from .telescope import Telescope
 # TODO: get encircled energy as function of aperture radius (for point sources)
 
 
+# The optimal aperture for a point source is a circular aperture with a radius equal
+# to the factor below times half the telescope's FWHM
+_OPTIMAL_APER_FACTOR = 1.4
+
+
 class Photometry:
     """
     Photometry class.
@@ -157,10 +162,8 @@ class Photometry:
         self._aper_extent = None  # the [xmin, xmax, ymin, ymax] extent of the imshow plot
         self._source_aper_overlap_arr = None  # array showing the source-aperture overlap
         self._source_aper_overlap_frac = None  # the source-aperture overlap fraction
-        # Optimal aperture dimensions for a point source
-        self._optimal_aperture_dimen = self._calc_optimal_aperture_dimen(
-            SourceObj.angle_a, SourceObj.angle_b, TelescopeObj.fwhm, print_info=False
-        )  # only valid for point sources
+        # Default optimal aperture dimensions for a point source
+        self._optimal_aperture_radius = _OPTIMAL_APER_FACTOR * 0.5 * TelescopeObj.fwhm
 
     def copy(self):
         """
@@ -542,7 +545,7 @@ class Photometry:
     def show_source_aper_overlap(self, plot=True):
         """
         Plot the pixel-by-pixel overlap between the source object and the photometry
-        aperture.
+        aperture (the latter includes fractional pixel weights).
 
         The "percentage of source within aperture" is based on the `SourceObj` object's
         angular area, which was specified when the `SourceObj` object was created. This
@@ -581,7 +584,10 @@ class Photometry:
             )
             ax.tick_params(color="grey", which="both")
             cbar = fig.colorbar(img)
-            cbar.set_label("Fraction of Source Overlapped with Pixel")
+            cbar.set_label(
+                "Fraction of Source Overlapped with Aperture Pixel\n"
+                + "(including fractional pixel weights from aperture)"
+            )
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
             ax.set_title(
@@ -730,81 +736,25 @@ class Photometry:
             )
         self.redleak_weights = redleak_weights
 
-    @staticmethod
-    def _calc_optimal_aperture_dimen(a, b, fwhm, factor=1.4, print_info=True):
+    def use_optimal_aperture(
+        self, factor=_OPTIMAL_APER_FACTOR, quiet=False, overwrite=False
+    ):
         """
-        Calculates the "ideal/optimal" circular/elliptical aperture dimensions from the
-        angular dimensions of a (point) source. Note that if a dimension is smaller than
-        half the telescope's FWHM, the half-FWHM value should be used for that dimension
-        instead.
-
-        Parameters
-        ----------
-          a, b :: `astropy.Quantity` angles
-            The angle subtended by the semimajor and semiminor axes of the source,
-            respectively. Note that if a dimension is smaller than half the telescope's
-            FWHM, the half-FWHM should be used for that dimension instead.
-
-          fwhm :: `astropy.Quantity` angle
-            The telescope PSF's full-width at half-maximum.
-
-          factor :: int or float
-            The factor by which to scale the source's angular size along each dimension.
-
-          print_info :: bool
-            If True, print a message if an aperture dimension is based on the FWHM of the
-            telescope's PSF instead of the point source's dimensions.
-
-        Returns
-        -------
-          aper_dimen :: list of 2 `astropy.Quantity` angles
-            The "ideal/optimal" circular/elliptical aperture dimensions along the
-            semimajor (a) and semiminor (b) axes of the source, respectively.
-        """
-        if factor <= 0:
-            raise ValueError("factor must be a positive scalar")
-
-        half_fwhm = 0.5 * fwhm
-        if a < half_fwhm:
-            if print_info:
-                print(
-                    "INFO: Source's semimajor axis (a) or radius subtends angle < "
-                    + "1/2 of the FWHM of the telescope's PSF. Using 1/2 of FWHM instead."
-                )
-            a = half_fwhm
-        if b < half_fwhm:
-            if print_info:
-                print(
-                    "INFO: Source's semiminor axis (b) or radius subtends angle < "
-                    + "1/2 of the FWHM of the telescope's PSF. Using 1/2 of FWHM instead."
-                )
-            b = half_fwhm
-
-        return [factor * a.to(u.arcsec), factor * b.to(u.arcsec)]
-
-    def use_optimal_aperture(self, factor=1.4, quiet=False, overwrite=False):
-        """
-        Uses the "optimal" circular aperture calculated from a source's angular size and
-        the telescope's FWHM. Note that this is only valid for point sources.
-
-        When calculating the size of the optimal aperture, if the point source subtends an
-        angle smaller than half the telescope's FWHM, half of the FWHM value is used as
-        the reference value for this calculation instead.
+        Uses the "optimal" circular aperture calculated from the telescope's FWHM. Note
+        that this is only valid for point sources.
 
         Note that the encircled energy for a point source with this aperture is going to
-        be approximated as 100% for the photometry calculation (because this aperture area
-        will be at least 96% larger than the point source, assuming `factor=1.4`).
+        be approximated as 95% for the photometry calculation. This will change in the
+        future as we acquire the necessary PSF data.
 
         Parameters
         ----------
           factor :: int or float
-            The factor by which to scale the source's angular size---or if the angular
-            size is less than the telescope's FWHM, the telescope's FWHM---along each
-            dimension.
+            The factor by which to scale the telescope's FWHM.
 
           quiet :: bool
-            If False, print a message if an aperture dimension is based on the FWHM of the
-            telescope's PSF instead of the point source's dimensions.
+            If False, print a message if the point source's diameter is larger than the
+            telescope's FWHM.
 
           overwrite :: bool
             If True, allow overwriting of any existing aperture associated with this
@@ -838,17 +788,18 @@ class Photometry:
             )
         if factor <= 0:
             raise ValueError("factor must be a positive number")
+        if not quiet and self.SourceObj.angle_a > 0.5 * self.TelescopeObj.fwhm:
+            warnings.warn(
+                "The point source's diameter is larger than the telescope's FWHM. "
+                + "Will use the telescope's FWHM for calculating the optimal aperture "
+                + "and, for now, the encircled energy fraction.",
+                RuntimeWarning,
+            )
         #
         # Calculate the optimal aperture dimensions, aperture area, and exact # pixels
         #
-        aper_dimen = Photometry._calc_optimal_aperture_dimen(
-            self.SourceObj.angle_a,
-            self.SourceObj.angle_b,
-            self.TelescopeObj.fwhm,
-            factor=factor,
-            print_info=(not quiet),
-        )  # each dimension an `astropy.Quantity` in arcsec
-        self._aper_area = np.pi * aper_dimen[0] * aper_dimen[1]
+        aper_radius_arcsec = factor * 0.5 * self.TelescopeObj.fwhm.to(u.arcsec)
+        self._aper_area = np.pi * aper_radius_arcsec * aper_radius_arcsec
         self._assign_exact_npix()
         #
         # Create source weights with arbitrary source flux profile through aperture
@@ -859,8 +810,8 @@ class Photometry:
         # affect source weights
         px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
         center_px, source_center_px = self._create_aper_arrs(
-            np.ceil(aper_dimen[0].value / px_scale_arcsec) * px_scale_arcsec,
-            np.ceil(aper_dimen[1].value / px_scale_arcsec) * px_scale_arcsec,
+            np.ceil(aper_radius_arcsec.value / px_scale_arcsec) * px_scale_arcsec,
+            np.ceil(aper_radius_arcsec.value / px_scale_arcsec) * px_scale_arcsec,
             center,
             overwrite=overwrite,
         )
@@ -870,9 +821,9 @@ class Photometry:
         #
         # Create aperture
         #
-        aper_dimen_px = [(dimen / px_scale_arcsec).value for dimen in aper_dimen]
+        aper_radius_px = (aper_radius_arcsec / px_scale_arcsec).value
         aper = EllipticalAperture(
-            positions=center_px, a=aper_dimen_px[0], b=aper_dimen_px[1], theta=0
+            positions=center_px, a=aper_radius_px, b=aper_radius_px, theta=0
         )
         # Restrict weight maps to aperture (which is an unrotated ellipse)
         aper_mask = aper.to_mask(method="exact").to_image(source_weights.shape)
@@ -1048,11 +999,11 @@ class Photometry:
                 RuntimeWarning,
             )
         if isinstance(self.SourceObj, PointSource):
-            aper_threshold = min(self._optimal_aperture_dimen)
-            if a < aper_threshold or b < aper_threshold:
+            if a < self._optimal_aperture_radius or b < self._optimal_aperture_radius:
                 warnings.warn(
                     "Chosen a/b is smaller than the 'ideal' aperture size "
-                    + f"for this source! a & b should be at least {aper_threshold}.",
+                    + "for this source! a & b should be at least "
+                    + f"{self._optimal_aperture_radius}.",
                     UserWarning,
                 )
 
@@ -1197,7 +1148,7 @@ class Photometry:
             )
             print("eff_npix, exact_npix", self._eff_npix, self._exact_npix)
         if isinstance(self.SourceObj, PointSource):
-            aper_threshold = min(self._optimal_aperture_dimen) * 2
+            aper_threshold = self._optimal_aperture_radius * 2
             if (length < aper_threshold) or (width < aper_threshold):
                 warnings.warn(
                     "Chosen length/width is smaller than the 'ideal' aperture "
