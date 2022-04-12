@@ -1679,6 +1679,7 @@ class Photometry:
         t=None,
         snr=None,
         reddening=0,
+        encircled_energy=None,
         npix=None,
         nread=1,
         include_redleak=True,
@@ -1703,6 +1704,12 @@ class Photometry:
             The reddening (i.e., E(B-V) in AB mags) based on the pointing. This value will
             be multiplied with each of the telescope's extinction coefficients to get the
             total extinction in each passband.
+
+          encircled_energy :: int or float or None
+            The fraction of the source flux enclosed within the aperture. If None, use the
+            fraction of the source'a area enclosed within the aperture, which is a value
+            between (0, 1]; this value can be seen on the source weights plot (i.e., via
+            the `show_source_weights()` method).
 
           npix :: int or float or None
             The number of pixels occupied by the source to use for the noise calculations
@@ -1740,11 +1747,17 @@ class Photometry:
             raise TypeError("reddening must be an int or float")
         if self.source_weights is None:
             raise ValueError("Please choose an aperture first.")
+        if encircled_energy is not None:
+            if (
+                not isinstance(encircled_energy, Number)
+                or encircled_energy > 1
+                or encircled_energy <= 0
+            ):
+                raise ValueError("encircled_energy must be a number between (0, 1]")
         #
         # Make some useful variables
         #
         response_curve_wavelengths_AA = dict.fromkeys(self.TelescopeObj.passbands)
-        # passband_resolution_AA = self.TelescopeObj.passband_resolution.to(u.AA).value
         for band in response_curve_wavelengths_AA:
             response_curve_wavelengths_AA[band] = (
                 self.TelescopeObj.passband_curves[band]["wavelength"].to(u.AA).value
@@ -1847,10 +1860,11 @@ class Photometry:
         #
         source_erate = dict.fromkeys(self.TelescopeObj.passbands, np.nan)
         source_ab_mags = self.SourceObj.get_AB_mag(self.TelescopeObj)
-        # (N.B. Unlike background noise, aper_weight_scale and npix cancel out here. Just
-        # use original _eff_npix and source_weights below; no need for npix or
-        # aper_weight_scale)
-        #
+        # (N.B. Unlike background noise, aper_weight_scale and npix cancel out for the
+        # source electron/s calculation below. Thus, just use the original _eff_npix and
+        # source_weights below; no need for npix or aper_weight_scale)
+        if encircled_energy is None:
+            encircled_energy = self._source_aper_overlap_frac
         for band in source_erate:
             # Account for extinction
             source_passband_mag = source_ab_mags[band] + (
@@ -1865,8 +1879,23 @@ class Photometry:
                     zpt=self.TelescopeObj.phot_zpts[band],
                 )[0]
                 * (self.source_weights / self._eff_npix)  # must norm by _eff_npix
-                * self._source_aper_overlap_frac
+                * encircled_energy  # either user-provided or the source-aperture overlap
             )
+            # NOTE: normalizing by _eff_npix and multiplying by the source-aperture
+            # fractional overlap is actually equivalent to the surface brightness approach
+            # (i.e., dividing by the area of the source and multiplying by the pixel area
+            # instead of dividing by _eff_npix and multiplying by the source-aperture
+            # fractional overlap) for extended sources! (Try it if you don't believe me.)
+            # There are 2 important things to note, however. First, since the "surface
+            # brightness" of our simulated source is based on the user-supplied
+            # dimensions, the surface brightness approach will differ from our current
+            # approach above when the area of the aperture is larger than the source. In
+            # this case, I believe that our approach above makes more sense since the
+            # surface brightness approach would lead to a source that increases in total
+            # brightness as the aperture increases! Second, the approach above works for
+            # point sources as well; further, the user can also specify the precise
+            # encircled energy fraction to replace the source-aperture area overlap
+            # approximation.
         # # See Eq. (2) and Eq. (9) of
         # # <https://hst-docs.stsci.edu/acsihb/chapter-9-exposure-time-calculations/9-2-determining-count-rates-from-sensitivities#id-9.2DeterminingCountRatesfromSensitivities-9.2.1>.
         # if isinstance(self.SourceObj, PointSource):
