@@ -396,6 +396,11 @@ class Photometry:
             # Sometimes point sources are too small and result in >100% overlap
             self._source_aper_overlap_frac = 1.0
 
+        # TODO: actually integrate PSF pixel-by-pixel in the future
+        # For now, just assume 95% encircled energy for point source
+        if isinstance(self.SourceObj, PointSource):
+            self._source_aper_overlap_frac = 0.95
+
     def show_source_weights(
         self, mark_source=False, source_markersize=4, norm=None, plot=True
     ):
