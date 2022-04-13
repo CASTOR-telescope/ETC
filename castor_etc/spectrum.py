@@ -93,7 +93,13 @@ from scipy.interpolate import interp1d
 
 from . import constants as const
 from . import parameters as params
-from .conversions import calc_photon_energy, convert_electron_flux_mag, flam_to_AB_mag
+from .conversions import (
+    calc_photon_energy,
+    convert_electron_flux_mag,
+    flam_to_AB_mag,
+    mag_to_flux,
+    fnu_to_flam,
+)
 from .filepaths import DATAPATH
 from .telescope import Telescope
 
@@ -199,9 +205,14 @@ class SpectrumMixin:
             raise TypeError("redshift must be an int or float")
         self.wavelengths *= 1 + redshift
 
-    def generate_uniform(self, wavelengths, value, overwrite=False, quiet=False):
+    def generate_uniform(
+        self, wavelengths, value, unit="ABmag", overwrite=False, quiet=False
+    ):
         """
-        Generate a uniform spectrum equal to a constant value in some arbitrary unit.
+        Generate a uniform spectrum equal to a constant value in either flam
+        (erg/s/cm^2/A), fnu (erg/s/cm^2/Hz), ABmag (AB magnitude), or STmag (ST
+        magnitude). Note that the computed (and stored) spectrum will always be in units
+        of flam.
 
         Parameters
         ----------
@@ -210,7 +221,11 @@ class SpectrumMixin:
             scalars, it should be in angstrom.
 
           value :: int or float
-            The value of the uniform spectrum, in arbitrary units (e.g., erg/s/cm^2/A).
+            The value of the uniform spectrum in the specified `unit`.
+
+          unit :: "flam" or "fnu" or "ABmag" or "STmag"
+            The unit of the `value`: either flam (erg/s/cm^2/A), fnu (erg/s/cm^2/Hz),
+            ABmag (AB magnitude), or STmag (ST magnitude).
 
           overwrite :: bool
             If True, overwrite any existing wavelengths/spectrum. If False, raise an error
@@ -222,10 +237,10 @@ class SpectrumMixin:
         Attributes
         ----------
           wavelengths :: `astropy.Quantity` array
-            The wavelengths of the spectrum, in angstroms.
+            The wavelengths of the spectrum, in angstrom.
 
           spectrum :: array of floats
-            Uniform spectrum in arbitrary units.
+            Spectrum, in erg/s/cm^2/A, that is uniform in the specified unit.
 
         Returns
         -------
@@ -241,8 +256,31 @@ class SpectrumMixin:
             wavelengths = wavelengths.to(u.AA)
         if not isinstance(value, Number):
             raise ValueError("`value` must be an int or float")
+        if unit not in ["flam", "fnu", "ABmag", "STmag"]:
+            raise ValueError("`unit` must be one of 'flam', 'fnu', 'ABmag', or 'STmag'")
+        if unit == "flam" or unit == "fnu":
+            if value <= 0:
+                raise ValueError("`value` must be > 0 if `unit` is 'flam' or 'fnu'")
+        #
+        # Generate spectrum
+        #
+        spectrum = np.full(np.shape(wavelengths), value, dtype=float)
+        if unit == "fnu":
+            spectrum = fnu_to_flam(
+                fnu=spectrum, wavelength=wavelengths, fnu_err=0.0, wavelength_err=0.0
+            )[0]
+        elif unit == "ABmag":
+            # Convert to fnu
+            spectrum = mag_to_flux(mag=spectrum, mag_err=0.0, zpt=-48.60)[0]
+            # Convert fnu to flam
+            spectrum = fnu_to_flam(
+                fnu=spectrum, wavelength=wavelengths, fnu_err=0.0, wavelength_err=0.0
+            )[0]
+        elif unit == "STmag":
+            # Convert directly to flam
+            spectrum = mag_to_flux(mag=spectrum, mag_err=0.0, zpt=-21.10)[0]
         self.wavelengths = wavelengths
-        self.spectrum = np.full(np.shape(wavelengths), value, dtype=float)
+        self.spectrum = spectrum
 
     def generate_bb(
         self,
@@ -921,11 +959,20 @@ class SpectrumMixin:
             abs_peak=abs_dip,
         )
 
+    def set_spectrum(self, wavelengths, spectrum, unit="flam"):
+        """
+        Set the spectrum of the source based on the input arrays.
+
+        TODO: docstring
+        """
+        raise NotImplementedError("set_spectrum is not implemented")
+
     def use_custom_spectrum(
         self, filepath, wavelength_unit=u.AA, overwrite=False, quiet=False
     ):
         """
-        Use custom spectrum from an ASCII or FITS file.
+        Use custom spectrum from an ASCII or FITS file. To use a spectrum from arrays,
+        use the `set_spectrum()` method.
 
         Parameters
         ----------
