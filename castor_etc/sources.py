@@ -74,6 +74,7 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
+import warnings
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from numbers import Number
@@ -478,6 +479,8 @@ class PointSource(Source):
 
     def __init__(self, profile=None, angle=None, radius=None, dist=None):
         """
+        TODO: deprecate `angle`, `radius`, and `dist` parameters
+
         Generate a circular point source (e.g., a star). Can optionally give either:
           1. the angle subtended by the diameter of the source, or
           2. the physical radius (i.e., with units of length) of the source & distance to
@@ -560,8 +563,14 @@ class PointSource(Source):
         #
         # Check inputs
         #
+        if angle is not None or radius is not None or dist is not None:
+            warnings.warn(
+                "The `angle`, `radius`, and `dist` parameters are deprecated.",
+                DeprecationWarning,
+            )
         if angle is None and radius is None and dist is None:
-            angle = deepcopy(FWHM)  # must copy or else will pass by reference
+            # angle = deepcopy(FWHM)  # must copy or else will pass by reference
+            angle = 1e-12 * u.arcsec  # super small value that is unlikely to be > FWHM
         elif ((radius is None or dist is None) and angle is None) or (
             angle is not None and (radius is not None or dist is not None)
         ):
