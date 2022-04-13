@@ -228,11 +228,13 @@ def fnu_to_flam(fnu, wavelength, fnu_err=0.0, wavelength_err=0.0):
         to be in angstroms. If not an array, wavelength should be the pivot wavelength of
         the passband.
 
-      fnu_err :: array of scalars
-        The absolute uncertainty in fnu.
+      fnu_err :: scalar or array of scalars
+        The absolute uncertainty in fnu. If a scalar, the same uncertainty is applied to
+        all fnu values.
 
-      wavelength_err :: array of scalars or `astropy.Quantity` array
-        The absolute uncertainty in wavelength. If values are scalars, they are assumed to
+      wavelength_err :: scalar or `astropy.Quantity`
+                        or array of scalars or `astropy.Quantity` array
+        The absolute uncertainty in wavelength. If scalar(s), wavelength_err is assumed to
         be in angstroms. If not an array, wavelength_err should be the uncertainty in the
         pivot wavelength of the passband.
 
@@ -362,8 +364,8 @@ def flux_to_mag(flux, flux_err=0.0, zpt=-48.60, calc_abs=False, dist=None, dist_
       flux, flux_err :: scalar or arrays
         The monochromatic flux and its uncertainty. The unit of the flux depends on the
         magnitude system. For example, zpt=-48.60 corresponds to the AB magnitude system
-        and the flux will be in units of erg/s/cm^2/Hz. Likewise, zpt=-21.1 corresponds to
-        the ST magnitude system and the flux will be in units of erg/s/cm^2/A.
+        and the flux will be in units of erg/s/cm^2/Hz. Likewise, zpt=-21.10 corresponds
+        to the ST magnitude system and the flux will be in units of erg/s/cm^2/A.
 
       zpt :: scalar
         The zero point of the magnitude system.
@@ -412,7 +414,7 @@ def mag_to_flux(mag, mag_err=0.0, zpt=-48.60):
       zpt :: scalar
         The zero point of the magnitude system. For example, zpt=-48.60 corresponds to the
         AB magnitude system and the flux will be in units of erg/s/cm^2/Hz. Likewise,
-        zpt=-21.1 corresponds to the ST magnitude system and the flux will be in units of
+        zpt=-21.10 corresponds to the ST magnitude system and the flux will be in units of
         erg/s/cm^2/A.
 
     Returns
@@ -420,12 +422,61 @@ def mag_to_flux(mag, mag_err=0.0, zpt=-48.60):
       flux, flux_err :: scalar or arrays
         The monochromatic flux and its uncertainty. The unit of the flux depends on the
         magnitude system. For example, zpt=-48.60 corresponds to the AB magnitude system
-        and the flux will be in units of erg/s/cm^2/Hz. Likewise, zpt=-21.1 corresponds to
-        the ST magnitude system and the flux will be in units of erg/s/cm^2/A.
+        and the flux will be in units of erg/s/cm^2/Hz. Likewise, zpt=-21.10 corresponds
+        to the ST magnitude system and the flux will be in units of erg/s/cm^2/A.
     """
     flux = 10 ** (-0.4 * (mag - zpt))
     flux_err = 0.4 * np.log(10) * abs(flux * mag_err)
     return flux, flux_err
+
+
+def convert_AB_ST_mag(mag, wavelength, to="ABmag"):
+    """
+    Converts AB magnitude to ST magnitude and vice versa. See the derivation (up to Eq.
+    (7)) in Casagrande & VandenBerg (2014):
+    <https://ui.adsabs.harvard.edu/abs/2014MNRAS.444..392C/abstract>
+
+    Parameters
+    ----------
+      mag :: scalar or arrays
+        The magnitude(s) to convert.
+
+      wavelength :: scalar or `astropy.Quantity`
+                    or array of scalars or `astropy.Quantity` array
+        If a single value, this is the pivot wavelength of the passband. If an array,
+        these should be the wavelengths at which the magnitude is measured. If scalar(s),
+        wavelength is assumed to be in angstrom.
+
+      to :: "ABmag" or "STmag"
+        If "ABmag", convert input magnitudes and their uncertainties to AB magnitudes. If
+        "STmag", convert input magnitudes and their uncertainties to ST magnitudes.
+
+    Returns
+    -------
+      converted_mag :: scalar or arrays
+        The input magnitude(s) converted into the desired magnitude system.
+    """
+    #
+    # Check inputs
+    #
+    if isinstance(wavelength, u.Quantity):
+        try:
+            wavelength = wavelength.to(u.AA).value
+        except Exception:
+            raise ValueError("`wavelength` must have the proper units (e.g., angstrom).")
+    if np.any(wavelength <= 0):
+        raise ValueError("All wavelengths must be positive")
+    if to not in ["ABmag", "STmag"]:
+        raise ValueError("`to` must be either 'ABmag' or 'STmag'")
+    #
+    # Do conversion
+    #
+    offset = 21.10 - 48.60 + 2.5 * np.log10(const.LIGHTSPEED.to(u.AA / u.s).value)
+    if to == "ABmag":
+        converted_mag = mag - 5 * np.log10(wavelength) + offset
+    else:
+        converted_mag = mag + 5 * np.log10(wavelength) - offset
+    return converted_mag
 
 
 def flam_to_AB_mag(wavelengths, flam, response):
