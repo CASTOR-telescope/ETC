@@ -566,7 +566,7 @@ class PointSource(Source):
         if angle is not None or radius is not None or dist is not None:
             warnings.warn(
                 "The `angle`, `radius`, and `dist` parameters are deprecated.",
-                DeprecationWarning,
+                FutureWarning,  # don't use DeprecationWarning b/c it's ignored by default
             )
         if angle is None and radius is None and dist is None:
             # angle = deepcopy(FWHM)  # must copy or else will pass by reference
