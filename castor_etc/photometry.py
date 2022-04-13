@@ -360,10 +360,15 @@ class Photometry:
             source is determined by the source's semimajor and semiminor axes.
 
           _source_aper_overlap_arr :: (M x N) 2D array of floats
-            The array showing the source and the aperture overlap.
+            The array showing the source and the aperture overlap. Note that this is not
+            useful for point sources since the fraction of a pixel that overlaps a point
+            source is virtually zero!
 
           _source_aper_overlap_frac :: float
-            The fraction of the source within the aperture.
+            The fraction of the source flux within the aperture. For extended sources and
+            galaxies, this is the fraction of the source (determined from it's semimajor
+            and semiminor axes) within the aperture. For point sources, this is the
+            encircled energy within the aperture.
 
         Returns
         -------
@@ -545,7 +550,9 @@ class Photometry:
     def show_source_aper_overlap(self, plot=True):
         """
         Plot the pixel-by-pixel overlap between the source object and the photometry
-        aperture (the latter includes fractional pixel weights).
+        aperture (the latter includes fractional pixel weights). IMPORTANT: this is not
+        useful for point sources since the fraction of a pixel that overlaps a point
+        source is virtually zero!
 
         The "percentage of source within aperture" is based on the `SourceObj` object's
         angular area, which was specified when the `SourceObj` object was created. This
@@ -571,6 +578,13 @@ class Photometry:
           cbar :: `matplotlib.colorbar.Colorbar` object
             The colorbar instance associated with the plot.
         """
+        if isinstance(self.SourceObj, PointSource):
+            warnings.warn(
+                "This plot is not useful for point sources since they are so small; "
+                + "the fraction of a pixel that overlaps a point source"
+                + "is virtually zero!",
+                UserWarning,
+            )
         rc = {"axes.grid": False}
         with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
             fig, ax = plt.subplots()
@@ -584,10 +598,7 @@ class Photometry:
             )
             ax.tick_params(color="grey", which="both")
             cbar = fig.colorbar(img)
-            cbar.set_label(
-                "Fraction of Source Overlapped with Aperture Pixel\n"
-                + "(including fractional pixel weights from aperture)"
-            )
+            cbar.set_label("Fraction of Pixel Overlapped with Source")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
             ax.set_title(
