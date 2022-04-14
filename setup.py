@@ -107,7 +107,7 @@ setup(
         "castor_etc.data.galaxy_spectra": ["*.txt"],
         "castor_etc.data.pickles_spectra": ["dat/*.dat"],  # must use forward slash
     },
-    install_requires=["numpy", "scipy", "astropy", "pandas", "photutils"],
+    install_requires=["numpy", "scipy", "matplotlib", "astropy", "pandas", "photutils"],
     license="GPLv3",
     python_requires=">=3.9",
     platforms=["Linux"],  # only tested on Ubuntu. MacOS and Windows may be okay.
