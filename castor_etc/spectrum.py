@@ -1786,7 +1786,10 @@ class SpectrumMixin:
         fig, ax = plt.subplots()
         ax.plot(self.wavelengths.to(u.AA).value, self.spectrum, "k", lw=1)
         ax.fill_between(self.wavelengths.to(u.AA).value, self.spectrum, alpha=0.5)
-        ax.set_xlabel("Wavelength [\AA]")
+        if plt.rcParams["text.usetex"]:
+            ax.set_xlabel("Wavelength [\AA]")
+        else:
+            ax.set_xlabel("Wavelength [$\AA$]")
         ax.set_ylabel(r"Flux Density [$\rm erg\, s^{-1}\, cm^{-2}\,$\AA$^{-1}$]")
         ax.set_ylim(bottom=0)
         if plot:

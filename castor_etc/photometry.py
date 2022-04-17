@@ -477,11 +477,17 @@ class Photometry:
             # ax.set_title(
             #     "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
             # )
-            ax.set_title(
-                "Percentage of Source Within Aperture: "
-                + f"{100 * self._source_aper_overlap_frac:.2f}"
-                + r"\%"
-            )
+            if plt.rcParams["text.usetex"]:
+                ax.set_title(
+                    "Percentage of Source Within Aperture: "
+                    + f"{100 * self._source_aper_overlap_frac:.2f}"
+                    + r"\%"
+                )
+            else:
+                ax.set_title(
+                    "Percentage of Source Within Aperture: "
+                    + f"{100 * self._source_aper_overlap_frac:.2f}%"
+                )
             if plot:
                 plt.show()
             else:
@@ -601,11 +607,17 @@ class Photometry:
             cbar.set_label("Fraction of Pixel Overlapped with Source")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
-            ax.set_title(
-                "Percentage of Source Within Aperture: "
-                + f"{100 * self._source_aper_overlap_frac:.2f}"
-                + r"\%"
-            )
+            if plt.rcParams["text.usetex"]:
+                ax.set_title(
+                    "Percentage of Source Within Aperture: "
+                    + f"{100 * self._source_aper_overlap_frac:.2f}"
+                    + r"\%"
+                )
+            else:
+                ax.set_title(
+                    "Percentage of Source Within Aperture: "
+                    + f"{100 * self._source_aper_overlap_frac:.2f}%"
+                )
             if plot:
                 plt.show()
             else:
