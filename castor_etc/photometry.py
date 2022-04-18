@@ -81,7 +81,6 @@ from .sources import PointSource, Source
 from .telescope import Telescope
 
 # TODO: convolve with PSF (waiting for data file)
-# TODO: get encircled energy as function of aperture radius (for point sources)
 
 
 # The optimal aperture for a point source is a circular aperture with a radius equal
@@ -160,9 +159,8 @@ class Photometry:
         self._exact_npix = None  # number of pixels calculated from given aperture params
         self._eff_npix = None  # number of pixels calculated from photutils mask
         self._aper_extent = None  # the [xmin, xmax, ymin, ymax] extent of the imshow plot
-        self._source_aper_overlap_arr = None  # array showing the source-aperture overlap
-        self._source_aper_overlap_frac = None  # the source-aperture overlap fraction
-        # Default optimal aperture dimensions for a point source
+        self._encircled_energy = None  # encircled energy of the point source
+        # Default optimal aperture dimensions for a point source. For error-checking
         self._optimal_aperture_radius = _OPTIMAL_APER_FACTOR * 0.5 * TelescopeObj.fwhm
 
     def copy(self):
@@ -252,13 +250,6 @@ class Photometry:
             The (x, y) center index of the aperture coordinates arrays (i.e., _aper_xs and
             _aper_ys). To be very explicit, this is not (0, 0) but rather the center of
             the 2D arrays.
-
-          source_center_px :: 2-element 1D list of floats
-            The (x, y) center of the source in pixel units. These values can be negative
-            or larger than the aperture coordinate array size, which means the center of
-            the source is outside the aperture array. N.B. the aperture array may be
-            slightly larger than the aperture (but these excess pixels are mapped to
-            NaNs).
         """
         if not overwrite and (self._aper_xs is not None or self._aper_ys is not None):
             raise ValueError(
@@ -291,34 +282,20 @@ class Photometry:
             0.5 * (self._aper_xs.shape[1] - 1),  # x-coordinate in pixel units
             0.5 * (self._aper_ys.shape[0] - 1),  # y-coordinate in pixel units
         ]
-        # Recall point-slope form of a line: (y - y0) = m * (x - x0)
-        num_px_offset_x = (-center[0] + xs[0]) / px_scale_arcsec + center_px[0]
-        num_px_offset_y = (-center[1] + ys[0]) / px_scale_arcsec + center_px[1]
-        source_center_px_x = center_px[0] + num_px_offset_x
-        source_center_px_y = center_px[1] + num_px_offset_y
+        # # Recall point-slope form of a line: (y - y0) = m * (x - x0)
+        # num_px_offset_x = (-center[0] + xs[0]) / px_scale_arcsec + center_px[0]
+        # num_px_offset_y = (-center[1] + ys[0]) / px_scale_arcsec + center_px[1]
+        # source_center_px_x = center_px[0] + num_px_offset_x
+        # source_center_px_y = center_px[1] + num_px_offset_y
 
-        return center_px, [source_center_px_x, source_center_px_y]
+        return center_px
 
-    @staticmethod
-    def _calc_source_weights(profile, aper_xs, aper_ys, center):
+    def _calc_source_weights(self, center):
         """
         Calculate the source weights for the given profile.
 
         Parameters
         ----------
-          profile :: function with a header of `profile(x, y, aper_center)`
-            Function with 3 positional parameters that describes the flux of the
-            source at each aperture pixel relative to the flux at the source center.
-              - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
-              of each pixel from the aperture's center,
-              - `aper_center` is a 2-element 1D array of floats representing the x- and y-
-              coordinates of the aperture's center relative to the source's center,
-              respectively.
-
-          half_x, half_y :: floats
-            The half-widths of the aperture in x- and y- directions in arcsec. (e.g.,
-            semimajor/semiminor axes, half of a rectangle's length/width, etc.)
-
           center :: 2-element 1D array of floats
             The (x, y) center of the aperture relative to the center of the source in
             arcsec. Positive values means the source is displaced to the bottom/left
@@ -330,87 +307,22 @@ class Photometry:
             The source weights for each pixel in the aperture. These represent the flux of
             the source at each pixel relative to the flux at the center of the source.
         """
-        return profile(aper_xs, aper_ys, center)
-
-    def _do_source_aper_overlap(self, source_center_px, px_scale_arcsec):
-        """
-        Internal function to find the fraction of the source within the aperture. Note
-        that the `source_weights` attribute should already be created and masked with the
-        `_aper_mask` attribute.
-
-        Parameters
-        ----------
-          source_center_px :: 2-element 1D list of floats
-            The (x, y) center of the source in pixel units. These values can be negative
-            or larger than the aperture coordinate array size, which means the center of
-            the source is outside the aperture array. N.B. the aperture array may be
-            slightly larger than the aperture (but these excess pixels are mapped to
-            NaNs).
-
-          px_scale_arcsec :: float
-            The `TelescopeObj` object's pixel scale in units of arcsec. Only passing this
-            as a parameter to avoid having to calculate it multiple times.
-
-        Attributes
-        ----------
-          ! (`source_weights` NOT MODIFIED ANYMORE) !
-          source_weights :: (M x N) 2D array of floats
-            The source weights for each pixel in the aperture. Any pixel within the
-            aperture but outside of the source is now zero. Note that the extent of the
-            source is determined by the source's semimajor and semiminor axes.
-
-          _source_aper_overlap_arr :: (M x N) 2D array of floats
-            The array showing the source and the aperture overlap. Note that this is not
-            useful for point sources since the fraction of a pixel that overlaps a point
-            source is virtually zero!
-
-          _source_aper_overlap_frac :: float
-            The fraction of the source flux within the aperture. For extended sources and
-            galaxies, this is the fraction of the source (determined from it's semimajor
-            and semiminor axes) within the aperture. For point sources, this is the
-            encircled energy within the aperture.
-
-        Returns
-        -------
-          None
-        """
-        #
-        # Create an ellipse representing the source
-        #
-        source_ellipse = (
-            EllipticalAperture(
-                positions=source_center_px,
-                a=self.SourceObj.angle_a.to(u.arcsec).value / px_scale_arcsec,
-                b=self.SourceObj.angle_b.to(u.arcsec).value / px_scale_arcsec,
-                theta=self.SourceObj.rotation,  # already in radians
-            )
-            .to_mask(method="exact")
-            .to_image(self.source_weights.shape)
-        )
-        if source_ellipse is None:
-            raise ValueError("Source is not contained within the aperture!")
-        source_ellipse[source_ellipse >= 1e-12] = 1.0
-        source_ellipse[source_ellipse <= 1e-12] = 0.0
-        #
-        # Account for fraction of source contained within aperture
-        #
-        # self.source_weights *= source_ellipse  # REVIEW: don't do this b/c sharp cutoff? Remember that uniform profile is uniform over whole aperture.
-        self._source_aper_overlap_arr = source_ellipse * self._aper_mask
-        self._source_aper_overlap_frac = np.nansum(self._source_aper_overlap_arr) / (
-            self.SourceObj.area.to(u.arcsec ** 2).value
-            / self.TelescopeObj.px_area.to(u.arcsec ** 2).value
-        )
-        if self._source_aper_overlap_frac > 1.0:
-            # Sometimes point sources are too small and result in >100% overlap
-            self._source_aper_overlap_frac = 1.0
-
-        # TODO: actually integrate PSF pixel-by-pixel in the future
-        # For now, just assume 95% encircled energy for point source
         if isinstance(self.SourceObj, PointSource):
-            self._source_aper_overlap_frac = 0.95
+            telescope_standard_dev_sq = (
+                self.TelescopeObj.fwhm.to(u.arcsec).value ** 2
+            ) / (4 * 2 * np.log(2))
+            source_weights = np.exp(
+                -((self._aper_xs + center[0]) ** 2 + (self._aper_ys + center[1]) ** 2)
+                / (2 * telescope_standard_dev_sq)
+            )  # normalized to peak of 1
+            # Note that we will not use these point source weights when calculating S/N or
+            # time in `calc_snr_or_t()`. Instead we use encircled energy
+        else:
+            source_weights = self.SourceObj.profile(self._aper_xs, self._aper_ys, center)
+        return source_weights
 
     def show_source_weights(
-        self, mark_source=False, source_markersize=4, norm=None, plot=True
+        self, mark_source=False, source_markersize=4, norm=None, plot=True, quiet=False
     ):
         """
         Plot the source as seen through the photometry aperture. The pixels are colored by
@@ -419,10 +331,13 @@ class Photometry:
         the aperture mask, visualized using `show_aper_weights()`). These two effects
         combined give the "source weights".
 
-        The "percentage of source within aperture" is based on the `SourceObj` object's
-        angular area, which was specified when the `SourceObj` object was created. This
-        percentage is is the projected area of the source contained within the aperture
-        divided by the (total) projected area of the source.
+        The "effective number of aperture pixels" is the sum of the aperture mask weights.
+        See the docstring of `show_aper_weights()` for more details.
+
+        Note that changing the source weights for a point source will not affect the final
+        photometry calculation. Instead, set the `encircled_energy` parameter in the
+        `calc_snr_or_t()` method. These weights are still useful in visualizing the point
+        source.
 
         Parameters
         ----------
@@ -440,6 +355,10 @@ class Photometry:
             If True, plot the source weights and return None. If False, return the figure,
             axis, and colorbar instance associated with the plot.
 
+          quiet :: bool
+            If True, do not print a reminder about the point source weights being for
+            visualization purposes only.
+
         Returns
         -------
         If plot is True:
@@ -454,6 +373,16 @@ class Photometry:
         """
         if self.source_weights is None or self._aper_extent is None:
             raise ValueError("Please select an aperture first.")
+        if isinstance(self.SourceObj, PointSource) and not quiet:
+            print(
+                "INFO: Note that, while these weights are useful in visualizing the point "
+                + "source, changing the source weights for a point source will not affect "
+                + "the final photometry calculation."
+                + "\n      Instead, set the `encircled_energy` parameter in the "
+                + "`calc_snr_or_t()` method to affect the signal-to-noise or "
+                + "integration time calculations."
+                + "\n      You can silence this message by setting `quiet=True`."
+            )
 
         rc = {"axes.grid": False}
         with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
@@ -471,23 +400,12 @@ class Photometry:
             cbar = fig.colorbar(img)
             if mark_source:
                 ax.plot(0, 0, "co", ms=source_markersize)
-            cbar.set_label("Flux Relative to Center of Source")
+            cbar.set_label("Flux Relative to Center of Source (incl. fractional pixels)")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
-            # ax.set_title(
-            #     "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
-            # )
-            if plt.rcParams["text.usetex"]:
-                ax.set_title(
-                    "Percentage of Source Within Aperture: "
-                    + f"{100 * self._source_aper_overlap_frac:.2f}"
-                    + r"\%"
-                )
-            else:
-                ax.set_title(
-                    "Percentage of Source Within Aperture: "
-                    + f"{100 * self._source_aper_overlap_frac:.2f}%"
-                )
+            ax.set_title(
+                "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
+            )
             if plot:
                 plt.show()
             else:
@@ -548,76 +466,6 @@ class Photometry:
             ax.set_title(
                 "Effective No." + "\u00A0" + f"of Aperture Pixels: {self._eff_npix:.2f}"
             )
-            if plot:
-                plt.show()
-            else:
-                return fig, ax, cbar
-
-    def show_source_aper_overlap(self, plot=True):
-        """
-        Plot the pixel-by-pixel overlap between the source object and the photometry
-        aperture (the latter includes fractional pixel weights). IMPORTANT: this is not
-        useful for point sources since the fraction of a pixel that overlaps a point
-        source is virtually zero!
-
-        The "percentage of source within aperture" is based on the `SourceObj` object's
-        angular area, which was specified when the `SourceObj` object was created. This
-        percentage is is the projected area of the source contained within the aperture
-        divided by the (total) projected area of the source.
-
-        Parameters
-        ----------
-          plot :: bool
-            If True, plot the overlap between the source object and the aperture, then
-            return None. If False, return the figure, axis, and colorbar instance
-            associated with the plot.
-
-        Returns
-        -------
-        If plot is True:
-          None
-
-        If plot is False:
-          fig, ax :: `matplotlib.figure.Figure` and `matplotlib.axes.Axes` objects
-            The figure and axis instance associated with the plot.
-
-          cbar :: `matplotlib.colorbar.Colorbar` object
-            The colorbar instance associated with the plot.
-        """
-        if isinstance(self.SourceObj, PointSource):
-            warnings.warn(
-                "This plot is not useful for point sources since they are so small; "
-                + "the fraction of a pixel that overlaps a point source"
-                + "is virtually zero!",
-                UserWarning,
-            )
-        rc = {"axes.grid": False}
-        with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
-            fig, ax = plt.subplots()
-            # (N.B. array already "xy" indexing. Do not transpose array)
-            img = ax.imshow(
-                self._source_aper_overlap_arr,
-                origin="lower",
-                extent=self._aper_extent,
-                interpolation=None,
-                cmap="copper",
-            )
-            ax.tick_params(color="grey", which="both")
-            cbar = fig.colorbar(img)
-            cbar.set_label("Fraction of Pixel Overlapped with Source")
-            ax.set_xlabel("$x$ [arcsec]")
-            ax.set_ylabel("$y$ [arcsec]")
-            if plt.rcParams["text.usetex"]:
-                ax.set_title(
-                    "Percentage of Source Within Aperture: "
-                    + f"{100 * self._source_aper_overlap_frac:.2f}"
-                    + r"\%"
-                )
-            else:
-                ax.set_title(
-                    "Percentage of Source Within Aperture: "
-                    + f"{100 * self._source_aper_overlap_frac:.2f}%"
-                )
             if plot:
                 plt.show()
             else:
@@ -763,21 +611,48 @@ class Photometry:
         self, factor=_OPTIMAL_APER_FACTOR, quiet=False, overwrite=False
     ):
         """
-        Uses the "optimal" circular aperture calculated from the telescope's FWHM. Note
-        that this is only valid for point sources.
+        Uses the "optimal" circular aperture calculated from the telescope PSF's
+        full-width at half-maximum (FWHM). Note that this aperture is only valid for point
+        sources.
 
         Note that the encircled energy for a point source with this aperture is going to
-        be approximated as 95% for the photometry calculation. This will change in the
-        future as we acquire the necessary PSF data.
+        be calculated by assuming the point spread function (PSF) is a 2D Gaussian (more
+        specifically, a 2D multivariate Normal distribution) with the same FWHM as the
+        telescope's FWHM.
+
+        Specifically, the PSF is assumed to be a 2D Normal distribution with the equation:
+        ```math
+        PSF = 1 / (2 * pi * sigma^2) * exp(-(x^2 + y^2) / (2 * sigma^2))
+        ```
+        By changing to polar coordinates (`r = sqrt(x^2 + y^2)`) and integrating over a
+        circular region of radius `R`, the encircled energy is easily shown to be:
+        ```math
+        Encircled energy = 1 - exp(-R^2 / (2 * sigma^2))
+        ```
+        Recall that the full-with at half-maximum of a Gaussian is given by
+        ```math
+        FWHM = 2 * sqrt(2 * ln(2)) * sigma
+        ```
+        Thus, the encircled energy within a circular region of radius `R = 1.4 * (FWHM/2)`
+        is simply:
+        ```math
+        Encircled energy = 1 - exp(-(1.4^2) * ln 2) = 1 - (0.5)^(1.4^2) = approx 0.7430
+        ```
+        Or in general, for a circular region of radius `R = factor * (FWHM/2)`, the
+        encircled energy is:
+        ```math
+        Encircled energy = 1 - (0.5)^(factor^2)
+        ```
 
         Parameters
         ----------
           factor :: int or float
-            The factor by which to scale the telescope's FWHM.
+            The factor by which to scale the telescope's FWHM. The radius of the optimal
+            aperture will be `R = factor * (FWHM/2)`.
 
           quiet :: bool
             If False, print a message if the point source's diameter is larger than the
-            telescope's FWHM.
+            telescope's FWHM as well as print the encircled energy fraction.
 
           overwrite :: bool
             If True, allow overwriting of any existing aperture associated with this
@@ -787,6 +662,9 @@ class Photometry:
         ----------
           source_weights :: (M x N) 2D array of floats
             The pixel weights for the source.
+            Note that changing the source weights for a point source will not affect the
+            final photometry calculation. Instead, set the `encircled_energy` parameter in
+            the `calc_snr_or_t()` method.
 
           sky_background_weights :: (M x N) 2D array of floats
             The pixel weights for the sky background.
@@ -821,8 +699,10 @@ class Photometry:
         #
         # Calculate the optimal aperture dimensions, aperture area, and exact # pixels
         #
-        aper_radius_arcsec = factor * 0.5 * self.TelescopeObj.fwhm.to(u.arcsec)
-        self._aper_area = np.pi * aper_radius_arcsec * aper_radius_arcsec
+        aper_radius_arcsec = factor * 0.5 * self.TelescopeObj.fwhm.to(u.arcsec).value
+        self._aper_area = (
+            np.pi * aper_radius_arcsec * aper_radius_arcsec * (u.arcsec ** 2)
+        )
         self._assign_exact_npix()
         #
         # Create source weights with arbitrary source flux profile through aperture
@@ -830,21 +710,21 @@ class Photometry:
         # Recall all internal angle aperture angles are in arcsec
         center = [0, 0]  # arcsec
         # N.B. must round to nearest multiple of px_scale or else rounding errors will
-        # affect source weights
+        # affect source weights. Not necessary in this case anymore
         px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
-        center_px, source_center_px = self._create_aper_arrs(
-            np.ceil(aper_radius_arcsec.value / px_scale_arcsec) * px_scale_arcsec,
-            np.ceil(aper_radius_arcsec.value / px_scale_arcsec) * px_scale_arcsec,
+        center_px = self._create_aper_arrs(
+            np.ceil(aper_radius_arcsec / px_scale_arcsec) * px_scale_arcsec,
+            np.ceil(aper_radius_arcsec / px_scale_arcsec) * px_scale_arcsec,
+            # aper_radius_arcsec,
+            # aper_radius_arcsec,
             center,
             overwrite=overwrite,
         )
-        source_weights = Photometry._calc_source_weights(
-            self.SourceObj.profile, self._aper_xs, self._aper_ys, center
-        )
+        source_weights = self._calc_source_weights(center)
         #
         # Create aperture
         #
-        aper_radius_px = (aper_radius_arcsec / px_scale_arcsec).value
+        aper_radius_px = aper_radius_arcsec / px_scale_arcsec
         aper = EllipticalAperture(
             positions=center_px, a=aper_radius_px, b=aper_radius_px, theta=0
         )
@@ -862,9 +742,11 @@ class Photometry:
         ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
         #
-        # Find the fraction of the source within the aperture
+        # Find the encircled energy fraction
         #
-        self._do_source_aper_overlap(source_center_px, px_scale_arcsec)
+        self._encircled_energy = 1 - (0.5) ** (factor * factor)
+        if not quiet:
+            print(f"INFO: Point source encircled energy = {self._encircled_energy:.2%}")
         #
         # Final sanity check
         #
@@ -877,10 +759,33 @@ class Photometry:
             )
 
     def use_elliptical_aperture(
-        self, a, b, center=[0, 0] << u.arcsec, rotation=0, overwrite=False
+        self,
+        a,
+        b,
+        center=[0, 0] << u.arcsec,
+        rotation=0,
+        quiet=False,
+        overwrite=False,
     ):
         """
         Use an elliptical aperture.
+
+        If (and only if) a point source, this will calculate the encircled energy by
+        assuming that the point spread function (PSF) is a 2D Gaussian (more specifically,
+        a 2D multivariate Normal distribution) with the same full-width at half-maximum
+        (FWHM) as the telescope's FWHM.
+
+        Specifically, the PSF is assumed to be a 2D Normal distribution with the equation:
+        ```math
+        PSF = 1 / (2 * pi * sigma^2) * exp(-(x^2 + y^2) / (2 * sigma^2))
+        ```
+        And recall the FWHM is related to the standard deviation (sigma) via:
+        ```math
+        FWHM = 2 * sqrt(2 * ln(2)) * sigma
+        ```
+
+        The encircled energy will then be calculated using a Monte Carlo integration over
+        a region specified by the given parameters.
 
         Parameters
         ----------
@@ -898,6 +803,10 @@ class Photometry:
             axis from the positive x-axis. If rotation is 0, the semimajor axis is along
             the x-axis and the semiminor axis is along the y-axis.
 
+          quiet :: bool
+            If True and doing point source photometry, do not print encircled energy
+            fraction.
+
           overwrite :: bool
             If True, allow overwriting of any existing aperture associated with this
             `Photometry` object.
@@ -906,6 +815,9 @@ class Photometry:
         ----------
           source_weights :: (M x N) 2D array of floats
             The pixel weights for the source.
+            Note that changing the source weights for a point source will not affect the
+            final photometry calculation. Instead, set the `encircled_energy` parameter in
+            the `calc_snr_or_t()` method.
 
           sky_background_weights :: (M x N) 2D array of floats
             The pixel weights for the sky background.
@@ -975,23 +887,18 @@ class Photometry:
             y = y if y >= b.value else b.value
         else:
             # Circular aperture
-            x = a.value
-            y = b.value
+            x = np.ceil(a.value / px_scale_arcsec) * px_scale_arcsec
+            y = np.ceil(b.value / px_scale_arcsec) * px_scale_arcsec
         #
-        center_px, source_center_px = self._create_aper_arrs(
-            x, y, center, overwrite=overwrite
-        )
-        source_weights = Photometry._calc_source_weights(
-            self.SourceObj.profile, self._aper_xs, self._aper_ys, center
-        )
+        center_px = self._create_aper_arrs(x, y, center, overwrite=overwrite)
+        source_weights = self._calc_source_weights(center)
         #
         # Create aperture
         #
-        aper_dimen_px = [(a / px_scale_arcsec).value, (b / px_scale_arcsec).value]
         aper = EllipticalAperture(
             positions=center_px,
-            a=aper_dimen_px[0],
-            b=aper_dimen_px[1],
+            a=(a / px_scale_arcsec).value,
+            b=(b / px_scale_arcsec).value,
             theta=rotation,
         )
         # Restrict weight maps to aperture
@@ -1008,9 +915,42 @@ class Photometry:
         ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
         #
-        # Find the fraction of the source within the aperture
+        # Find the encircled energy if doing point source photometry
         #
-        self._do_source_aper_overlap(source_center_px, px_scale_arcsec)
+        if isinstance(self.SourceObj, PointSource):
+            #
+            # Monte Carlo integration
+            #
+            telescope_fwhm_arcsec = self.TelescopeObj.fwhm.to(u.arcsec).value
+            a_arcsec = a.to(u.arcsec).value
+            b_arcsec = b.to(u.arcsec).value
+            sin_rotation = np.sin(rotation)  # rotation already in radians
+            cos_rotation = np.cos(rotation)  # rotation already in radians
+            # 1. Generate random samples
+            telescope_standard_dev_sq = (telescope_fwhm_arcsec ** 2) / (4 * 2 * np.log(2))
+            psf_x, psf_y = np.random.multivariate_normal(
+                mean=[0, 0],
+                cov=[[telescope_standard_dev_sq, 0], [0, telescope_standard_dev_sq]],
+                size=100000,
+            ).T
+            # 2. Find fraction within ellipse (center already in arcsec)
+            ellipse_x = (
+                (psf_x + center[0]) * cos_rotation + (psf_y + center[1]) * sin_rotation
+            ) / a_arcsec
+            ellipse_y = (
+                (psf_y + center[1]) * cos_rotation - (psf_x + center[0]) * sin_rotation
+            ) / b_arcsec
+            is_within_ellipse = (ellipse_x ** 2 + ellipse_y ** 2) <= 1.0
+            self._encircled_energy = np.sum(is_within_ellipse) / np.size(
+                is_within_ellipse
+            )
+            if not quiet:
+                print(
+                    "INFO: Point source encircled energy = "
+                    + f"{self._encircled_energy:.2%}"
+                )
+            if self._encircled_energy < 1e-14:
+                raise RuntimeError("Point source encircled energy is virtually zero!")
         #
         # Final sanity checks
         #
@@ -1031,10 +971,27 @@ class Photometry:
                 )
 
     def use_rectangular_aperture(
-        self, width, length, center=[0, 0] << u.arcsec, overwrite=False
+        self, width, length, center=[0, 0] << u.arcsec, quiet=False, overwrite=False
     ):
         """
         Use a rectangular aperture.
+
+        If (and only if) a point source, this will calculate the encircled energy by
+        assuming that the point spread function (PSF) is a 2D Gaussian (more specifically,
+        a 2D multivariate Normal distribution) with the same full-width at half-maximum
+        (FWHM) as the telescope's FWHM.
+
+        Specifically, the PSF is assumed to be a 2D Normal distribution with the equation:
+        ```math
+        PSF = 1 / (2 * pi * sigma^2) * exp(-(x^2 + y^2) / (2 * sigma^2))
+        ```
+        And recall the FWHM is related to the standard deviation (sigma) via:
+        ```math
+        FWHM = 2 * sqrt(2 * ln(2)) * sigma
+        ```
+
+        The encircled energy will then be calculated using a Monte Carlo integration over
+        a region specified by the given parameters.
 
         Parameters
         ----------
@@ -1047,6 +1004,10 @@ class Photometry:
             Positive values means the source is displaced to the bottom/left relative to
             the aperture center.
 
+          quiet :: bool
+            If True and doing point source photometry, do not print encircled energy
+            fraction.
+
           overwrite :: bool
             If True, allow overwriting of any existing aperture associated with this
             `Photometry` object.
@@ -1055,6 +1016,9 @@ class Photometry:
         ----------
           source_weights :: (M x N) 2D array of floats
             The pixel weights for the source.
+            Note that changing the source weights for a point source will not affect the
+            final photometry calculation. Instead, set the `encircled_energy` parameter in
+            the `calc_snr_or_t()` method.
 
           sky_background_weights :: (M x N) 2D array of floats
             The pixel weights for the sky background.
@@ -1110,25 +1074,24 @@ class Photometry:
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
-        center_px, source_center_px = self._create_aper_arrs(
-            0.5 * width.value,  # width is along x
-            0.5 * length.value,  # length is along y
+        half_width = 0.5 * width.value  # arcsec
+        half_length = 0.5 * length.value  # arcsec
+        center_px = self._create_aper_arrs(
+            half_width,  # width is along x
+            half_length,  # length is along y
             center,
             overwrite=overwrite,
         )
-        source_weights = Photometry._calc_source_weights(
-            self.SourceObj.profile, self._aper_xs, self._aper_ys, center
-        )
+        source_weights = self._calc_source_weights(center)
         #
         # Create aperture
         #
         px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
-        aper_dimen_px = [
-            (width / px_scale_arcsec).value,
-            (length / px_scale_arcsec).value,
-        ]
         aper = RectangularAperture(
-            positions=center_px, w=aper_dimen_px[0], h=aper_dimen_px[1], theta=0
+            positions=center_px,
+            w=(width / px_scale_arcsec).value,
+            h=(length / px_scale_arcsec).value,
+            theta=0,
         )
         # Restrict weight maps to aperture
         aper_mask = aper.to_mask(method="exact").to_image(source_weights.shape)
@@ -1144,9 +1107,40 @@ class Photometry:
         ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
         #
-        # Find the fraction of the source within the aperture
+        # Find the encircled energy if doing point source photometry
         #
-        self._do_source_aper_overlap(source_center_px, px_scale_arcsec)
+        if isinstance(self.SourceObj, PointSource):
+            #
+            # Monte Carlo integration
+            #
+            telescope_fwhm_arcsec = self.TelescopeObj.fwhm.to(u.arcsec).value
+            # 1. Generate random samples
+            telescope_standard_dev_sq = (telescope_fwhm_arcsec ** 2) / (4 * 2 * np.log(2))
+            psf_x, psf_y = np.random.multivariate_normal(
+                mean=[0, 0],
+                cov=[[telescope_standard_dev_sq, 0], [0, telescope_standard_dev_sq]],
+                size=100000,
+            ).T
+            # 2. Find fraction within rectangle (center, half_width, half_length already
+            #    in arcsec). N.B. rectangle may be off-center, so can't just compare abs()
+            psf_x += center[0]
+            psf_y += center[1]
+            is_within_rectangle = (
+                (psf_x >= -half_width)
+                & (psf_x <= half_width)
+                & (psf_y >= -half_length)
+                & (psf_y <= half_length)
+            )
+            self._encircled_energy = np.sum(is_within_rectangle) / np.size(
+                is_within_rectangle
+            )
+            if not quiet:
+                print(
+                    "INFO: Point source encircled energy = "
+                    + f"{self._encircled_energy:.2%}"
+                )
+            if self._encircled_energy < 1e-14:
+                raise RuntimeError("Point source encircled energy is virtually zero!")
         #
         # Final sanity checks
         #
@@ -1179,16 +1173,6 @@ class Photometry:
                     + f"Length/width should be at least {aper_threshold}.",
                     UserWarning,
                 )
-
-    def use_annular_aperture(self, a_out, b_out, a_in=0, b_in=None):
-        """
-        Not implemented!
-
-        TODO: maybe implement this if enough demand?
-        """
-        if b_in is None:
-            b_in = b_out * (a_in / a_out)
-        raise NotImplementedError("Not yet implemented")
 
     def calc_redleak_frac(self, quiet=False):
         """
@@ -1642,7 +1626,7 @@ class Photometry:
         #
         snr_sq = snr * snr
         tot_sig = np.nansum(signal)
-        signal_sq = np.nansum(tot_sig * tot_sig)
+        signal_sq = tot_sig * tot_sig
         poisson_noise = tot_sig + np.nansum(totskynoise + darkcurrent + redleak)
         #
         # Calculate time to reach target SNR
@@ -1685,10 +1669,11 @@ class Photometry:
             total extinction in each passband.
 
           encircled_energy :: int or float or None
-            The fraction of the source flux enclosed within the aperture. If None, use the
-            fraction of the source'a area enclosed within the aperture, which is a value
-            between (0, 1]; this value can be seen on the source weights plot (i.e., via
-            the `show_source_weights()` method).
+            The fraction of the point source flux enclosed within the aperture. If None,
+            use the automatically calculated value based on a PSF approximated as a 2D
+            Gaussian with a FWHM equal to the telescope's FWHM. Note that this parameter
+            is only valid for a point source; extended sources and galaxies use surface
+            brightness in their calculations instead.
 
           npix :: int or float or None
             The number of pixels occupied by the source to use for the noise calculations
@@ -1721,18 +1706,20 @@ class Photometry:
         # Check some inputs (npix and nread will be checked later, in other functions)
         #
         if (t is None and snr is None) or (t is not None and snr is not None):
-            raise ValueError("Exactly one of t or snr must be specified")
+            raise ValueError("Exactly one of `t` or `snr` must be specified")
         if not isinstance(reddening, Number):
-            raise TypeError("reddening must be an int or float")
+            raise TypeError("`reddening` must be an int or float")
         if self.source_weights is None:
             raise ValueError("Please choose an aperture first.")
         if encircled_energy is not None:
+            if not isinstance(self.SourceObj, PointSource):
+                raise TypeError("`encircled_energy` is only valid for a point source")
             if (
                 not isinstance(encircled_energy, Number)
                 or encircled_energy > 1
                 or encircled_energy <= 0
             ):
-                raise ValueError("encircled_energy must be a number between (0, 1]")
+                raise ValueError("`encircled_energy` must be a number between (0, 1]")
         #
         # Make some useful variables
         #
@@ -1842,78 +1829,68 @@ class Photometry:
         # (N.B. Unlike background noise, aper_weight_scale and npix cancel out for the
         # source electron/s calculation below. Thus, just use the original _eff_npix and
         # source_weights below; no need for npix or aper_weight_scale)
-        if encircled_energy is None:
-            encircled_energy = self._source_aper_overlap_frac
-        for band in source_erate:
-            # Account for extinction
-            source_passband_mag = source_ab_mags[band] + (
-                self.TelescopeObj.extinction_coeffs[band] * reddening
-            )
-            # Convert extinction-corrected AB mag to electron/s using passband's
-            # photometric zero point and account for fraction of source within aperture
-            # REVIEW: is this calculation correct???
-            source_erate[band] = (
-                mag_to_flux(
+        #
+        # See Eq. (2) and Eq. (9) of
+        # <https://hst-docs.stsci.edu/acsihb/chapter-9-exposure-time-calculations/9-2-determining-count-rates-from-sensitivities#id-9.2DeterminingCountRatesfromSensitivities-9.2.1>.
+        if isinstance(self.SourceObj, PointSource):
+            if encircled_energy is None:
+                encircled_energy = self._encircled_energy
+            for band in source_erate:
+                # Account for extinction
+                source_passband_mag = source_ab_mags[band] + (
+                    self.TelescopeObj.extinction_coeffs[band] * reddening
+                )
+                # Convert extinction-corrected AB mag to electron/s using Eq. (2) from the
+                # link above and the passband's photometric zero point
+                erate_per_px = (
+                    mag_to_flux(
+                        source_passband_mag,
+                        zpt=self.TelescopeObj.phot_zpts[band],
+                    )[0]
+                    / self._eff_npix
+                )  # electron/s/pixel
+                source_erate[band] = (
+                    erate_per_px * self._aper_mask * encircled_energy
+                )  # array containing the source-produced electron/s for each pixel
+                # Note that the method below used to be exactly equivalent to Eq. (2)
+                # since the nansum of source_weights and _eff_npix were equal. But because
+                # I changed how the source_weights were rendered for a point source, I am
+                # using _aper_mask in lieu of source_weights (since nansum of _aper_mask
+                # is still equal to _eff_npix). Again, this is completely equivalent to
+                # Eq. (2) from the link above.
+                # erate_per_px = (
+                #     mag_to_flux(
+                #         source_passband_mag,
+                #         zpt=self.TelescopeObj.phot_zpts[band],
+                #     )[0]
+                #     / self._eff_npix
+                # )  # electron/s/pixel
+                # source_erate[band] = (
+                #     erate_per_px * self.source_weights * encircled_energy
+                # )  # array containing the source-produced electron/s for each pixel
+        else:
+            for band in source_erate:
+                # Account for extinction
+                source_passband_mag = source_ab_mags[band] + (
+                    self.TelescopeObj.extinction_coeffs[band] * reddening
+                )
+                # Convert extinction-corrected AB mag to electron/s using Eq. (9) from the
+                # link above and the passband's photometric zero point
+                erate_per_sq_arcsec_per_px = mag_to_flux(
                     source_passband_mag,
                     zpt=self.TelescopeObj.phot_zpts[band],
-                )[0]
-                * (self.source_weights / self._eff_npix)  # must norm by _eff_npix
-                * encircled_energy  # either user-provided or the source-aperture overlap
-            )
-            # NOTE: normalizing by _eff_npix and multiplying by the source-aperture
-            # fractional overlap is actually equivalent to the surface brightness approach
-            # (i.e., dividing by the area of the source and multiplying by the pixel area
-            # instead of dividing by _eff_npix and multiplying by the source-aperture
-            # fractional overlap) for extended sources! (Try it if you don't believe me.)
-            # There are 2 important things to note, however. First, since the "surface
-            # brightness" of our simulated source is based on the user-supplied
-            # dimensions, the surface brightness approach will differ from our current
-            # approach above when the area of the aperture is larger than the source. In
-            # this case, I believe that our approach above makes more sense since the
-            # surface brightness approach would lead to a source that increases in total
-            # brightness as the aperture increases! Second, the approach above works for
-            # point sources as well; further, the user can also specify the precise
-            # encircled energy fraction to replace the source-aperture area overlap
-            # approximation.
-        # # See Eq. (2) and Eq. (9) of
-        # # <https://hst-docs.stsci.edu/acsihb/chapter-9-exposure-time-calculations/9-2-determining-count-rates-from-sensitivities#id-9.2DeterminingCountRatesfromSensitivities-9.2.1>.
-        # if isinstance(self.SourceObj, PointSource):
-        #     for band in source_erate:
-        #         # Account for extinction
-        #         source_passband_mag = source_ab_mags[band] + (
-        #             self.TelescopeObj.extinction_coeffs[band] * reddening
-        #         )
-        #         # Convert extinction-corrected AB mag to electron/s using Eq. (2) from the
-        #         # link above and the passband's photometric zero point
-        #         # REVIEW: is this calculation correct???
-        #         source_erate[band] = (
-        #             mag_to_flux(
-        #                 source_passband_mag,
-        #                 zpt=self.TelescopeObj.phot_zpts[band],
-        #             )[0]
-        #             * (self.source_weights / self._eff_npix)  # must norm by _eff_npix
-        #             * self._source_aper_overlap_frac
-        #         )
-        # else:
-        #     for band in source_erate:
-        #         # Account for extinction
-        #         source_passband_mag = source_ab_mags[band] + (
-        #             self.TelescopeObj.extinction_coeffs[band] * reddening
-        #         )
-        #         # Convert extinction-corrected AB mag to electron/s using Eq. (9) from the
-        #         # link above and the passband's photometric zero point
-        #         # REVIEW: is this calculation correct???
-        #         # ! The following calculation doesn't make sense! Try having an aperture > source size...
-        #         # source_erate[band] = (
-        #         #     mag_to_flux(
-        #         #         source_passband_mag,
-        #         #         zpt=self.TelescopeObj.phot_zpts[band],
-        #         #     )[0]
-        #         #     * self.source_weights
-        #         #     * (
-        #         #         px_area_arcsec_sq / self.SourceObj.area.to(u.arcsec ** 2).value
-        #         #     )  # convert to surface brightness
-        #         # )
+                )[0] / (
+                    self._eff_npix * self.SourceObj.area.to(u.arcsec ** 2).value
+                )  # electron/s/arcsec^2/pixel
+                source_erate[band] = (
+                    erate_per_sq_arcsec_per_px
+                    * self.source_weights
+                    * self._aper_area.to(u.arcsec ** 2).value
+                )  # array containing the source-produced electron/s for each pixel
+                # Note that the source weights already account for the aperture
+                # overlapping different areas of the simulated source (e.g., an aperture
+                # overlapping just the edge of a galaxy will have different results
+                # compared to an aperture of the same area centered on the galaxy).
         #
         # Calculate red leak (electron/s) at each pixel
         #
