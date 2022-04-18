@@ -109,7 +109,7 @@ class Profiles:
         ----------
           a, b :: scalar or `astropy.Quantity` angles or None
             The semimajor and semiminor axes of the ellipse, respectively. If scalars,
-            they are assumed to be in arsec. If a pixel partially overlaps the ellipse,
+            they are assumed to be in arcsec. If a pixel partially overlaps the ellipse,
             the pixel will be weighted by its fractional overlap with the ellipse. If both
             None, generate uniform profile over the entire aperture.
 
@@ -161,12 +161,18 @@ class Profiles:
             """
             px_scale_x = (x[0][-1] - x[0][0]) / (len(x) - 1)  # arcsec per pixel
             px_scale_y = (y[-1][-1] - y[0][0]) / (len(y) - 1)  # arcsec per pixel
-            center_px = [0.5 * (x.shape[1] - 1), 0.5 * (y.shape[0] - 1)]
+            center_of_aper_px = np.array([0.5 * (x.shape[1] - 1), 0.5 * (y.shape[0] - 1)])
+            center_px = np.array([center[0] / px_scale_x, center[1] / px_scale_y])
+            print("center", center)
+            print("px_scale_x, px_scale_y, center_px", px_scale_x, px_scale_y, center_px)
             aper = EllipticalAperture(
-                positions=center_px, a=a / px_scale_x, b=b / px_scale_y, theta=angle
+                positions=center_of_aper_px - center_px,
+                a=a / px_scale_x,
+                b=b / px_scale_y,
+                theta=angle,
             )
             weights = aper.to_mask(method="exact").to_image(shape=x.shape)
-            weights[weights < 1e-12] = np.nan
+            # weights[weights < 1e-12] = 0
             return weights
 
         def _uniform_aper(x, y, center):
@@ -373,7 +379,7 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def __init__(self, profile, init_dimensions=True):
+    def __init__(self, profile, init_dimensions=True, check_profile=True):
         """
         Abstract method for all Source subclasses.
 
@@ -405,6 +411,10 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
             dist, angle_a, angle_b, rotation) to None. If False, do not initialize these
             attributes.
 
+          check_profile :: bool
+            If True, run some basic tests to check that the given profile accepts the
+            correct input types and returns the correct output types.
+
         Attributes
         ----------
           profile :: function with a header of
@@ -423,24 +433,25 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
         #
         # Check profile
         #
-        try:
-            _test_arr = np.arange(4, dtype=float).reshape((2, 2))
-            _test_result = profile(_test_arr, _test_arr, np.array([0.0, 0.0]))
-            if not isinstance(_test_result, np.ndarray) or (
-                np.shape(_test_result) != np.shape(_test_arr)
-            ):
-                raise TypeError(
-                    "`profile` should return a 2D array of floats. "
-                    + "See the docstring below for more details.\n"
-                    + Source.__init__.__doc__
+        if check_profile:
+            try:
+                _test_arr = np.arange(4, dtype=float).reshape((2, 2))
+                _test_result = profile(_test_arr, _test_arr, np.array([0.0, 0.0]))
+                if not isinstance(_test_result, np.ndarray) or (
+                    np.shape(_test_result) != np.shape(_test_arr)
+                ):
+                    raise TypeError(
+                        "`profile` should return a 2D array of floats. "
+                        + "See the docstring below for more details.\n"
+                        + Source.__init__.__doc__
+                    )
+            except Exception:
+                raise ValueError(
+                    "profile may not be of the correct form. "
+                    + "profile must be a function with 3 positional arguments "
+                    + "`(x, y, aper_center)` and return a 2D array of floats with the "
+                    + "same shape as x and y. Also check the traceback for more details."
                 )
-        except Exception:
-            raise ValueError(
-                "profile may not be of the correct form. "
-                + "profile must be a function with 3 positional arguments "
-                + "`(x, y, aper_center)` and return a 2D array of floats with the same "
-                + "shape as x and y. Also check the traceback for more details."
-            )
         self.profile = profile
         #
         # Initialize some potential future attributes
@@ -477,63 +488,19 @@ class PointSource(Source):
     Point source.
     """
 
-    def __init__(self, profile=None, angle=None, radius=None, dist=None):
+    def __init__(self):
         """
-        TODO: deprecate `angle`, `radius`, and `dist` parameters
-
-        Generate a circular point source (e.g., a star). Can optionally give either:
-          1. the angle subtended by the diameter of the source, or
-          2. the physical radius (i.e., with units of length) of the source & distance to
-          the source.
-
-        If item 2, this will calculate the angle subtended by a circular source of a given
-        radius at a certain distance.
-
-        Note that the angular diameter of a point source should be no larger than the
-        telescope's full-width at half-maximum (FWHM).
-
-        Parameters
-        ----------
-          profile :: function with a header of `profile(x, y, aper_center)` or None
-            Function with 3 positional parameters that describes the flux of the
-            source at each aperture pixel relative to the flux at the source center.
-              - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
-              of each pixel from the aperture's center,
-              - `aper_center` is a 2-element 1D array of floats representing the x- and y-
-              coordinates of the aperture's center relative to the source's center,
-              respectively.
-            If None, use a uniform flux profile with default arguments (i.e.,
-            `Profiles.uniform()`). This should be the preferred option in most, if not
-            all, cases.
-
-          angle :: int or float or `astropy.Quantity` or None
-            The angle subtended by the circular point source's diameter. If a scalar,
-            `angle` is assumed to be in arcsec. If `angle` is given, `radius` and `dist`
-            must both be None. If `angle`, `radius`, and `dist` are all None, use the
-            default telescope's FWHM (0.15 arcsec).
-            Internally, this will be assigned to the `angle_a` and `angle_b` attributes.
-
-          radius :: int or float or `astropy.Quantity` or None
-            The physical radius of the circular point source. If a scalar, `radius` is
-            assumed to be in units of solar radii. If `radius` is given, `dist` must also
-            be provided and `angle` must be None.
-            Internally, this will be assigned to the `a` (semimajor axis) and `b`
-            (semiminor axis) attributes as well as used to calculate the `angle_a` and
-            `angle_b` attributes.
-
-          dist :: int or float or `astropy.Quantity` or None
-            The distance to the source. If a scalar, `dist` is assumed to be in units of
-            kpc. If `dist` is given, `radius` must also be provided and `angle` must be
-            None.
-            Internally, this will be assigned to the `dist` attribute as well as used to
-            calculate the `angle_a` and `angle_b` attributes.
+        Generate a circular point source (e.g., a star).
 
         Attributes
         ----------
-          profile :: function with a header of
-                     `(x, y, aper_center) -> (2D array of floats)`
-            The 2D profile function specifying how the flux changes as a function of pixel
-            coordinates.
+          profile :: None
+            The 2D profile function specifying how the surface brightness changes as a
+            function of pixel coordinates. This will be handled in the `Photometry`
+            object.
+            TODO: in the future, use the sampled PSF to generate a profile here instead of
+            using a Gaussian in Photometry (currently setting the profile in Photometry
+            only because we are assuming PSF is Gaussian with FWHM = telescope FWHM)
 
           a, b :: `astropy.Quantity` lengths or None
             The physical semimajor and semiminor axis lengths of the circular point
@@ -557,49 +524,49 @@ class PointSource(Source):
         -------
           `PointSource` instance
         """
-        if profile is None:
-            profile = Profiles.uniform()
-        super().__init__(profile)
+        super().__init__(None, check_profile=False)
         #
         # Check inputs
         #
-        if angle is not None or radius is not None or dist is not None:
-            warnings.warn(
-                "The `angle`, `radius`, and `dist` parameters are deprecated.",
-                FutureWarning,  # don't use DeprecationWarning b/c it's ignored by default
-            )
-        if angle is None and radius is None and dist is None:
-            # angle = deepcopy(FWHM)  # must copy or else will pass by reference
-            angle = 1e-12 * u.arcsec  # super small value that is unlikely to be > FWHM
-        elif ((radius is None or dist is None) and angle is None) or (
-            angle is not None and (radius is not None or dist is not None)
-        ):
-            raise ValueError(
-                "`angle` and `radius`/`dist` cannot both be simultaneously specified."
-            )
-        #
-        # Assign attributes to source
-        #
-        if angle is None:
-            if not isinstance(radius, u.Quantity):
-                radius = radius * const.SUN_RADIUS  # cm
-            if not isinstance(dist, u.Quantity):
-                dist = dist * u.kpc
-            self.a = self.b = radius
-            self.dist = dist
-            if radius <= 0 or dist <= 0:
-                raise ValueError("`radius` and `dist` must be greater than zero.")
-            radius = radius.to(u.AU).value
-            dist = dist.to(u.pc).value
-            # Calculate the angle subtended by source radius (from definition of parsec)
-            angle = np.arctan(radius.value / dist.value) * u.arcsec
-        else:
-            if not isinstance(angle, u.Quantity):
-                angle = angle * u.arcsec
-            if angle <= 0:
-                raise ValueError("`angle` must be greater than zero.")
-            angle *= 0.5  # convert to angular radius
-        self.angle_a = self.angle_b = angle
+        # if angle is not None or radius is not None or dist is not None:
+        #     warnings.warn(
+        #         "The `angle`, `radius`, and `dist` parameters are deprecated.",
+        #         FutureWarning,  # don't use DeprecationWarning b/c it's ignored by default
+        #     )
+        # if angle is None and radius is None and dist is None:
+        #     # angle = deepcopy(FWHM)  # must copy or else will pass by reference
+        #     angle = 1e-12 * u.arcsec  # super small value that is unlikely to be > FWHM
+        # elif ((radius is None or dist is None) and angle is None) or (
+        #     angle is not None and (radius is not None or dist is not None)
+        # ):
+        #     raise ValueError(
+        #         "`angle` and `radius`/`dist` cannot both be simultaneously specified."
+        #     )
+        # #
+        # # Assign attributes to source
+        # #
+        # if angle is None:
+        #     if not isinstance(radius, u.Quantity):
+        #         radius = radius * const.SUN_RADIUS  # cm
+        #     if not isinstance(dist, u.Quantity):
+        #         dist = dist * u.kpc
+        #     self.a = self.b = radius
+        #     self.dist = dist
+        #     if radius <= 0 or dist <= 0:
+        #         raise ValueError("`radius` and `dist` must be greater than zero.")
+        #     radius = radius.to(u.AU).value
+        #     dist = dist.to(u.pc).value
+        #     # Calculate the angle subtended by source radius (from definition of parsec)
+        #     angle = np.arctan(radius.value / dist.value) * u.arcsec
+        # else:
+        #     if not isinstance(angle, u.Quantity):
+        #         angle = angle * u.arcsec
+        #     if angle <= 0:
+        #         raise ValueError("`angle` must be greater than zero.")
+        #     angle *= 0.5  # convert to angular radius
+
+        # Super small value that is unlikely to be > FWHM
+        self.angle_a = self.angle_b = 1e-12 * u.arcsec
         self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = 0.0
 
@@ -610,7 +577,15 @@ class ExtendedSource(Source):
     """
 
     def __init__(
-        self, profile, angle_a=None, angle_b=None, a=None, b=None, dist=None, rotation=0.0
+        self,
+        angle_a=None,
+        angle_b=None,
+        a=None,
+        b=None,
+        dist=None,
+        rotation=0.0,
+        profile="uniform",
+        exponential_scale_lengths=None,
     ):
         """
         Generate an extended source given either:
@@ -619,19 +594,17 @@ class ExtendedSource(Source):
           2. the physical semimajor (`a`) and semiminor (`b`) axis lengths and distance
           (`dist`) to the source.
 
+        The dimensions of the extended source (i.e., the quantities in the list above)
+        will be used to calculate the source's surface brightness. See the `profile`
+        parameter below for more details. In general, the smaller the extended source
+        (i.e., determined by `angle_a` and `angle_b`), the higher the surface brightness
+        assuming the source spectrum is normalized to the same value and everything else
+        is equal.
+
         Note that users should use the `GalaxySource` class to generate galaxies.
 
         Parameters
         ----------
-          profile :: function with a header of `profile(x, y, aper_center)`
-            Function with 3 positional parameters that describes the flux of the
-            source at each aperture pixel relative to the flux at the source center.
-              - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
-              of each pixel from the aperture's center,
-              - `aper_center` is a 2-element 1D array of floats representing the x- and y-
-              coordinates of the aperture's center relative to the source's center,
-              respectively.
-
           angle_a, angle_b :: int or float or `astropy.Quantity`
             The angle subtended by the extended source's semimajor and semiminor axes,
             respectively. If scalars, they are assumed to be in arcsec. If given, `a`,
@@ -658,12 +631,43 @@ class ExtendedSource(Source):
             to the x-axis, in degrees. At a rotation of 0 degrees, the source's semimajor
             axis is along the x-axis and the source's semiminor axis is along the y-axis.
 
+          profile :: "uniform" or "exponential" or
+                     a function with a header of `profile(x, y, aper_center)`
+            - If "uniform", the source will be generated as an ellipse with uniform
+              surface brightness. The dimensions (e.g., `angle_a` and `angle_b`) supplied
+              will be used to calculate the surface brightness of the source and the
+              surface brightness drops to zero outside this ellipse.
+            - If "exponential", the source will be generated as an ellipse with an
+              exponentially decaying surface brightness profile; the scale lengths for
+              this profile is specified by the `exponential_scale_lengths` parameter. The
+              dimensions (e.g., `angle_a` and `angle_b`) supplied will be used to
+              calculate the surface brightness of the source but this surface brightness
+              will not immediately drop to zero outside the ellipse; rather, the surface
+              brightness exponentially drops off according to the specified scale lengths.
+              `exponential_scale_lengths` must be provided if `profile` is "exponential".
+            - Otherwise, this must be a function with 3 positional parameters that
+              describes the surface brightness of the source at each aperture pixel
+              relative to the surface brightness at the source center.
+                - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
+                  of each pixel from the aperture's center,
+                - `aper_center` is a 2-element 1D array of floats representing the x- and
+                  y- coordinates of the aperture's center relative to the source's center,
+                  respectively.
+
+            exponential_scale_lengths :: 2-element 1D `astropy.Quantity` array or
+                                         2-element 1D array of floats or or None
+              The (a0, b0) "scale-lengths" along the ellipse's semimajor and semiminor
+              axes, respectively. That is, the surface brightness at the elliptical level
+              curve defined by a0 and b0 is a factor of e less than the surface brightness
+              at the center of the ellipse. If scalars, a0 and b0 are assumed to be in
+              arcsec.
+
         Attributes
         ----------
           profile :: function with a header of
                      `(x, y, aper_center) -> (2D array of floats)`
-            The 2D profile function specifying how the flux changes as a function of pixel
-            coordinates.
+            The 2D profile function specifying how the surface brightness changes as a
+            function of pixel coordinates.
 
           a, b :: `astropy.Quantity` lengths or None
             The physical semimajor and semiminor axis lengths of the extended source. If
@@ -685,7 +689,6 @@ class ExtendedSource(Source):
         -------
           `ExtendedSource` instance
         """
-        super().__init__(profile)
         #
         # Check inputs
         #
@@ -733,6 +736,34 @@ class ExtendedSource(Source):
                 self.angle_b = angle_b.to(u.arcsec)
             else:
                 self.angle_b = angle_b * u.arcsec
+        if exponential_scale_lengths is None and profile == "exponential":
+            raise ValueError(
+                "`exponential_scale_lengths` must be provided"
+                + "if `profile` is 'exponential'"
+            )
+        elif exponential_scale_lengths is not None and profile != "exponential":
+            raise ValueError(
+                "`exponential_scale_lengths` must not be provided"
+                + "if `profile` is not 'exponential'"
+            )
+        if isinstance(profile, str):
+            if profile == "uniform":
+                profile = Profiles.uniform(a=self.angle_a, b=self.angle_b, angle=rotation)
+            elif profile == "exponential":
+                if np.shape(exponential_scale_lengths) != (2,):
+                    raise ValueError(
+                        "`exponential_scale_lengths` must be a 2-element 1D array"
+                    )
+                profile = Profiles.ellipse(
+                    a0=exponential_scale_lengths[0],
+                    b0=exponential_scale_lengths[1],
+                    angle=rotation,
+                )
+            else:
+                raise ValueError(
+                    "`profile` must be 'uniform' or 'exponential' or a function."
+                )
+        super().__init__(profile, init_dimensions=False)
         self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = np.deg2rad(rotation)
 
@@ -759,6 +790,16 @@ class GalaxySource(Source):
           (`angle_b`) axes,
           2. the physical semimajor (`a`) and semiminor (`b`) axis lengths and distance
           (`dist`) to the source.
+
+        The dimensions of the galaxy (i.e., the quantities in the list above) will be used
+        to calculate its surface brightness when doing photometry calculations and is not
+        a hard limit on the galaxy's physical size (i.e., the surface brightness will not
+        immediately drop to zero outside of the given dimensions). In general, the smaller
+        the galaxy, the higher the surface brightness assuming the source spectrum is
+        normalized to the same value and everything else is equal.
+
+        Also see the `ExtendedSource` class for other profiles (e.g., uniform, exponential
+        decay with scale lengths).
 
         Parameters
         ----------
@@ -798,8 +839,8 @@ class GalaxySource(Source):
         ----------
           profile :: function with a header of
                      `(x, y, aper_center) -> (2D array of floats)`
-            The 2D profile function specifying how the flux changes as a function of pixel
-            coordinates. In this case, it is a Sersic profile.
+            The 2D profile function specifying how the surface brightness changes as a
+            function of pixel coordinates. In this case, it is a Sersic profile.
 
           a, b :: `astropy.Quantity` lengths or None
             The physical semimajor and semiminor axis lengths of the extended source. If
