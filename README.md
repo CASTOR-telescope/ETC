@@ -168,3 +168,14 @@ version number):
 ```bash
 docker cp castor_etc_v<VERSION>:<DOCKER_PATH_TO_COPY> <LOCAL_DESTINATION_PATH>
 ```
+
+## Known Issues
+
+- Rectangular aperture sometimes produces the incorrect number of pixels in the photometry
+  aperture. I believe this is actually a bug in `astropy` since the elliptical aperture
+  does not suffer from this problem and the aperture weights are clearly wrong (see the
+  photometry source code for an example that highlights this flaw)
+
+<!-- - Off-centered point source does not render properly through the aperture. The photometry
+  calculation and results are correct, but the visualization does not reflect any
+  off-centered aperture. -->
