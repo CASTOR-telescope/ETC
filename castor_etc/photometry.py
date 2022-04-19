@@ -460,7 +460,7 @@ class Photometry:
             )
             ax.tick_params(color="grey", which="both")
             cbar = fig.colorbar(img)
-            cbar.set_label("Relative Weight to Center of Aperture")
+            cbar.set_label("Fraction of Pixel Overlapping Aperture")
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
             ax.set_title(
@@ -607,6 +607,124 @@ class Photometry:
             )
         self.redleak_weights = redleak_weights
 
+    def _remove_aper_mask_nan_row_col(self, center):
+        """
+        Remove columns and rows of the aperture mask containing all NaNs. Modifies the
+        following attributes: `_aper_mask`, `source_weights`, `sky_background_weights`,
+        `dark_current_weights`, `redleak_weights`, `_aper_xs`, `_aper_ys`. Also updates
+        `_aper_extent` to reflect changed arrays.
+
+        Parameters
+        ----------
+          center :: 2-element 1D array of floats
+            The (x, y) center of the aperture relative to the center of the source in
+            arcsec. Positive values means the source is displaced to the bottom/left
+            relative to the aperture center.
+
+        Attributes
+        ----------
+          _aper_mask :: (M x N) 2D array of floats
+            The aperture mask, including fractional pixel weights. The aperture mask shows
+            the fractional overlap between the aperture and the pixel, ranging from (0,
+            1]. A pixel that is wholly contained in the aperture has an aperture weight
+            equal to 1. Similarly, a pixel that is partially contained in the aperture has
+            a weight between 0 and 1 (exclusive) directly proportional to the area of the
+            aperture that overlaps the pixel. A pixel that is wholly outside the aperture
+            has a weight of NaN. Now without rows and columns containing only NaNs.
+
+          source_weights :: (M x N) 2D array of floats
+            The pixel weights for the source. Now without rows and columns containing only
+            NaNs (based on _aper_mask). Note that changing the source weights for a point
+            source will not affect the final photometry calculation. Instead, set the
+            `encircled_energy` parameter in the `calc_snr_or_t()` method.
+
+          sky_background_weights :: (M x N) 2D array of floats
+            The pixel weights for the sky background. Now without rows and columns
+            containing only NaNs (based on _aper_mask).
+
+          dark_current_weights :: (M x N) 2D array of floats
+            The pixel weights for the dark current. Now without rows and columns
+            containing only NaNs (based on _aper_mask).
+
+          redleak_weights :: (M x N) 2D array of floats
+            The pixel weights for the red leak. Now without rows and columns containing
+            only NaNs (based on _aper_mask).
+
+          _aper_xs :: (M x N) 2D array of floats
+            The aperture array containing the x-coordinates (in arcsec) relative to the
+            center of the aperture. Now without rows and columns containing only NaNs
+            (based on _aper_mask).
+
+          _aper_ys :: (M x N) 2D array of floats
+            The aperture array containing the y-coordinates (in arcsec) relative to the
+            center of the aperture. Now without rows and columns containing only NaNs
+            (based on _aper_mask).
+
+          _aper_extent :: 4-element 1D list of floats
+            The [xmin, xmax, ymin, ymax] extent of the aperture in arcsec (for plotting
+            the weight arrays). Updated to reflect the extent containing only rows and
+            columns with at least 1 non-NaN value.
+
+        Returns
+        -------
+          None
+        """
+        # for arr in [
+        #     self._aper_mask,
+        #     self.source_weights,
+        #     self.sky_background_weights,
+        #     self.dark_current_weights,
+        #     self.redleak_weights,
+        #     self._aper_xs,
+        #     self._aper_ys,
+        # ]:
+        #     if arr is not None:
+        #         arr = arr[:, ~np.isnan(arr).all(axis=0)]  # remove all NaN columns
+        #         arr = arr[~np.isnan(arr).all(axis=1), :]  # remove all NaN rows
+        if self._aper_mask is not None:
+            isgood_columns = ~np.isnan(self._aper_mask).all(axis=0)
+            self._aper_mask = self._aper_mask[:, isgood_columns]  # remove all NaN columns
+            isgood_rows = ~np.isnan(self._aper_mask).all(axis=1)
+            self._aper_mask = self._aper_mask[isgood_rows, :]  # remove all NaN rows
+            for arr, arr_name in zip(
+                [
+                    self.source_weights,
+                    self.sky_background_weights,
+                    self.dark_current_weights,
+                    self.redleak_weights,
+                    self._aper_xs,
+                    self._aper_ys,
+                ],
+                [
+                    "source_weights",
+                    "sky_background_weights",
+                    "dark_current_weights",
+                    "redleak_weights",
+                    "_aper_xs",
+                    "_aper_ys",
+                ],
+            ):
+                if arr is not None:
+                    arr = arr[:, isgood_columns]  # remove all NaN columns
+                    arr = arr[isgood_rows, :]  # remove all NaN rows
+                    setattr(self, arr_name, arr)
+            if (
+                self._aper_extent is not None
+                and self._aper_xs is not None
+                and self._aper_ys is not None
+            ):
+                half_px_scale = 0.5 * self.TelescopeObj.px_scale.to(u.arcsec).value
+                first_column = self._aper_xs[:, 0][0]
+                last_column = self._aper_xs[:, -1][0]
+                first_row = self._aper_ys[0, :][0]
+                last_row = self._aper_ys[-1, :][0]
+                self._aper_extent = [
+                    first_column - half_px_scale + center[0],
+                    last_column + half_px_scale + center[0],
+                    first_row - half_px_scale + center[1],
+                    last_row + half_px_scale + center[1],
+                ]  # we use +/- half_px_scale to center matplotlib tickmarks on pixels
+
     def use_optimal_aperture(
         self, factor=_OPTIMAL_APER_FACTOR, quiet=False, overwrite=False
     ):
@@ -660,6 +778,15 @@ class Photometry:
 
         Attributes
         ----------
+          _aper_mask :: (M x N) 2D array of floats
+            The aperture mask, including fractional pixel weights. The aperture mask shows
+            the fractional overlap between the aperture and the pixel, ranging from (0,
+            1]. A pixel that is wholly contained in the aperture has an aperture weight
+            equal to 1. Similarly, a pixel that is partially contained in the aperture has
+            a weight between 0 and 1 (exclusive) directly proportional to the area of the
+            aperture that overlaps the pixel. A pixel that is wholly outside the aperture
+            has a weight of NaN.
+
           source_weights :: (M x N) 2D array of floats
             The pixel weights for the source.
             Note that changing the source weights for a point source will not affect the
@@ -748,6 +875,10 @@ class Photometry:
         if not quiet:
             print(f"INFO: Point source encircled energy = {self._encircled_energy:.2%}")
         #
+        # Remove columns and rows containing only NaNs from arrays
+        #
+        self._remove_aper_mask_nan_row_col(center)  # center already scalar pair in arcsec
+        #
         # Final sanity check
         #
         if abs(self._eff_npix - self._exact_npix) > 0.1:
@@ -813,6 +944,15 @@ class Photometry:
 
         Attributes
         ----------
+          _aper_mask :: (M x N) 2D array of floats
+            The aperture mask, including fractional pixel weights. The aperture mask shows
+            the fractional overlap between the aperture and the pixel, ranging from (0,
+            1]. A pixel that is wholly contained in the aperture has an aperture weight
+            equal to 1. Similarly, a pixel that is partially contained in the aperture has
+            a weight between 0 and 1 (exclusive) directly proportional to the area of the
+            aperture that overlaps the pixel. A pixel that is wholly outside the aperture
+            has a weight of NaN.
+
           source_weights :: (M x N) 2D array of floats
             The pixel weights for the source.
             Note that changing the source weights for a point source will not affect the
@@ -952,6 +1092,10 @@ class Photometry:
             if self._encircled_energy < 1e-14:
                 raise RuntimeError("Point source encircled energy is virtually zero!")
         #
+        # Remove columns and rows containing only NaNs from arrays
+        #
+        self._remove_aper_mask_nan_row_col(center)  # center already scalar pair in arcsec
+        #
         # Final sanity checks
         #
         if abs(self._eff_npix - self._exact_npix) > 0.1:
@@ -1014,6 +1158,15 @@ class Photometry:
 
         Attributes
         ----------
+          _aper_mask :: (M x N) 2D array of floats
+            The aperture mask, including fractional pixel weights. The aperture mask shows
+            the fractional overlap between the aperture and the pixel, ranging from (0,
+            1]. A pixel that is wholly contained in the aperture has an aperture weight
+            equal to 1. Similarly, a pixel that is partially contained in the aperture has
+            a weight between 0 and 1 (exclusive) directly proportional to the area of the
+            aperture that overlaps the pixel. A pixel that is wholly outside the aperture
+            has a weight of NaN.
+
           source_weights :: (M x N) 2D array of floats
             The pixel weights for the source.
             Note that changing the source weights for a point source will not affect the
@@ -1141,6 +1294,10 @@ class Photometry:
                 )
             if self._encircled_energy < 1e-14:
                 raise RuntimeError("Point source encircled energy is virtually zero!")
+        #
+        # Remove columns and rows containing only NaNs from arrays
+        #
+        self._remove_aper_mask_nan_row_col(center)  # center already scalar pair in arcsec
         #
         # Final sanity checks
         #
