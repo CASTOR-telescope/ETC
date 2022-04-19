@@ -669,18 +669,6 @@ class Photometry:
         -------
           None
         """
-        # for arr in [
-        #     self._aper_mask,
-        #     self.source_weights,
-        #     self.sky_background_weights,
-        #     self.dark_current_weights,
-        #     self.redleak_weights,
-        #     self._aper_xs,
-        #     self._aper_ys,
-        # ]:
-        #     if arr is not None:
-        #         arr = arr[:, ~np.isnan(arr).all(axis=0)]  # remove all NaN columns
-        #         arr = arr[~np.isnan(arr).all(axis=1), :]  # remove all NaN rows
         if self._aper_mask is not None:
             isgood_columns = ~np.isnan(self._aper_mask).all(axis=0)
             self._aper_mask = self._aper_mask[:, isgood_columns]  # remove all NaN columns
