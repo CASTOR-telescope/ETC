@@ -921,7 +921,7 @@ class SpectrumMixin:
           shape :: "gaussian" or "lorentzian"
             The absorption line profile.
 
-          abs_peak :: bool
+          abs_dip :: bool
             If True, ensure that the dip of the absorption line is at the given value.
             Otherwise, just subtract the given absorption line from the spectrum.
 
@@ -2133,7 +2133,9 @@ class NormMixin:
         # Normalize spectrum (originally in erg/s/cm^2/A)
         #
         erg_s_A = 4 * np.pi * dist * dist * self.spectrum  # erg/s/A
-        tot_luminosity = simpson(y=erg_s_A, x=self.wavelengths.value, even="avg")  # erg/s
+        tot_luminosity = simpson(
+            y=erg_s_A, x=self.wavelengths.to(u.AA).value, even="avg"
+        )  # erg/s
         norm_factor = luminosity / tot_luminosity  # dimensionless
         self.spectrum *= norm_factor  # erg/s/cm^2/A
 
