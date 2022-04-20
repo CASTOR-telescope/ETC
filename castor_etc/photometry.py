@@ -86,6 +86,8 @@ from .telescope import Telescope
 # The optimal aperture for a point source is a circular aperture with a radius equal
 # to the factor below times half the telescope's FWHM
 _OPTIMAL_APER_FACTOR = 1.4
+# This is the seed for the random number generator used for the Monte Carlo integrations
+_RNG_SEED = 3141592654
 
 
 class Photometry:
@@ -1049,6 +1051,7 @@ class Photometry:
             #
             # Monte Carlo integration
             #
+            rng = np.random.default_rng(_RNG_SEED)
             telescope_fwhm_arcsec = self.TelescopeObj.fwhm.to(u.arcsec).value
             a_arcsec = a.to(u.arcsec).value
             b_arcsec = b.to(u.arcsec).value
@@ -1056,7 +1059,7 @@ class Photometry:
             cos_rotation = np.cos(rotation)  # rotation already in radians
             # 1. Generate random samples
             telescope_standard_dev_sq = (telescope_fwhm_arcsec ** 2) / (4 * 2 * np.log(2))
-            psf_x, psf_y = np.random.multivariate_normal(
+            psf_x, psf_y = rng.multivariate_normal(
                 mean=[0, 0],
                 cov=[[telescope_standard_dev_sq, 0], [0, telescope_standard_dev_sq]],
                 size=100000,
@@ -1215,6 +1218,7 @@ class Photometry:
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
+        # Doesn't matter if half_width/half_length are exact multiples of pixel size
         half_width = 0.5 * width.value  # arcsec
         half_length = 0.5 * length.value  # arcsec
         center_px = self._create_aper_arrs(
@@ -1254,10 +1258,11 @@ class Photometry:
             #
             # Monte Carlo integration
             #
+            rng = np.random.default_rng(_RNG_SEED)
             telescope_fwhm_arcsec = self.TelescopeObj.fwhm.to(u.arcsec).value
             # 1. Generate random samples
             telescope_standard_dev_sq = (telescope_fwhm_arcsec ** 2) / (4 * 2 * np.log(2))
-            psf_x, psf_y = np.random.multivariate_normal(
+            psf_x, psf_y = rng.multivariate_normal(
                 mean=[0, 0],
                 cov=[[telescope_standard_dev_sq, 0], [0, telescope_standard_dev_sq]],
                 size=100000,
