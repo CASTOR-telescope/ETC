@@ -159,7 +159,7 @@ class Profiles:
               weights :: 2D array of floats
                 The flux at each pixel relative to the flux at the source center.
             """
-            px_scale_x = (x[0][-1] - x[0][0]) / (len(x) - 1)  # arcsec per pixel
+            px_scale_x = (x[0][-1] - x[0][0]) / (np.shape(x)[1] - 1)  # arcsec per pixel
             px_scale_y = (y[-1][-1] - y[0][0]) / (len(y) - 1)  # arcsec per pixel
             center_of_aper_px = np.array([0.5 * (x.shape[1] - 1), 0.5 * (y.shape[0] - 1)])
             center_px = np.array([center[0] / px_scale_x, center[1] / px_scale_y])
