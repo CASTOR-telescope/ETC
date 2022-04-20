@@ -163,8 +163,6 @@ class Profiles:
             px_scale_y = (y[-1][-1] - y[0][0]) / (len(y) - 1)  # arcsec per pixel
             center_of_aper_px = np.array([0.5 * (x.shape[1] - 1), 0.5 * (y.shape[0] - 1)])
             center_px = np.array([center[0] / px_scale_x, center[1] / px_scale_y])
-            print("center", center)
-            print("px_scale_x, px_scale_y, center_px", px_scale_x, px_scale_y, center_px)
             aper = EllipticalAperture(
                 positions=center_of_aper_px - center_px,
                 a=a / px_scale_x,
