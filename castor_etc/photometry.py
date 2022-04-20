@@ -2036,6 +2036,18 @@ class Photometry:
                 # overlapping different areas of the simulated source (e.g., an aperture
                 # overlapping just the edge of a galaxy will have different results
                 # compared to an aperture of the same area centered on the galaxy).
+                #
+                # This is actually exactly the same as Eq. (9) from the link above. This
+                # is because taking the total "flux" of the source (in electron per
+                # second) divided by source area and multiplied by the source weights give
+                # the (pixel-by-pixel) surface brightness profile of the source. Then
+                # multiplying this by the aperture area and dividing by the number of
+                # pixels is the same as multiplying by the pixel area! The only difference
+                # in this approach is that any discretization effects in the
+                # pixel-rendeing of the aperture will mostly be "cancelled out" in the
+                # multiplication (and eventual summation) of the source weights and the
+                # division by _eff_npix, since both the source weights and _eff_npix are
+                # based on the same aperture mask.
         #
         # Calculate red leak (electron/s) at each pixel
         #
