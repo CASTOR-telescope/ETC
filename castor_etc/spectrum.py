@@ -377,8 +377,8 @@ class SpectrumMixin:
         #
         # Generate BB spectrum with redshift
         #
-        # Factor in redshift & convert wavelengths from angstrom to cm
-        wavelengths = redshift_wavelengths(wavelengths, redshift) * 1e-8  # cm
+        # Convert wavelengths from angstrom to cm
+        wavelengths = wavelengths * 1e-8  # cm
         # Planck's radiation law
         lightspeed = const.LIGHTSPEED.value  # cm/s
         prefactor = (2 * const.PLANCK_H.value * lightspeed * lightspeed) / (
@@ -393,9 +393,9 @@ class SpectrumMixin:
         #
         spectrum *= 1e-8 * emissivity  # erg/s/cm^2/A/sr
         #
-        # Convert wavelengths back to angstroms
+        # Factor in redshift and convert wavelengths back to angstroms
         #
-        wavelengths *= 1e8  # angstrom
+        wavelengths = redshift_wavelengths(wavelengths, redshift) * 1e8  # angstrom
         #
         # Assign to `Source` object attributes. Spectrum is in erg/s/cm^2/A
         #
