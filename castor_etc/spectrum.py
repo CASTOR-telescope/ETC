@@ -614,7 +614,8 @@ class SpectrumMixin:
         gauss_wavelengths = center + np.arange(-5, 5.05, 0.1) * sigma
         sorted_wavelengths = np.unique(np.concatenate((wavelengths, gauss_wavelengths)))
         sorted_wavelengths = sorted_wavelengths[
-            (sorted_wavelengths > 0) & (sorted_wavelengths <= wavelengths[-1])
+            (sorted_wavelengths >= wavelengths[0])
+            & (sorted_wavelengths <= wavelengths[-1])
         ]
         sorted_spectrum = spectrum_interp(sorted_wavelengths)
         in_range = (sorted_wavelengths >= gauss_wavelengths[0]) & (
@@ -635,6 +636,10 @@ class SpectrumMixin:
         if np.any(is_negative_spectrum):
             sorted_spectrum[is_negative_spectrum] = 0.0
             warnings.warn("Setting negative flux in spectrum to zero.", RuntimeWarning)
+            # print(
+            #     "wavelengths with negative spectrum:",
+            #     sorted_wavelengths[is_negative_spectrum],
+            # )
         if wavelengths_unit is not None:
             sorted_wavelengths <<= wavelengths_unit  # convert to `astropy.Quantity` array
         return sorted_wavelengths, sorted_spectrum
@@ -787,14 +792,15 @@ class SpectrumMixin:
         # Ensure Lorentzian is well sampled by evaluating at the wavelengths within +/- 80
         # units of probable error from the center. This also prevents overflow errors
         # caused by calculations at wavelengths too far from the center.
-        gauss_wavelengths = center + np.arange(-80, 80.25, 0.5) * probable_error
-        sorted_wavelengths = np.unique(np.concatenate((wavelengths, gauss_wavelengths)))
+        lorentz_wavelengths = center + np.arange(-80, 80.25, 0.5) * probable_error
+        sorted_wavelengths = np.unique(np.concatenate((wavelengths, lorentz_wavelengths)))
         sorted_wavelengths = sorted_wavelengths[
-            (sorted_wavelengths > 0) & (sorted_wavelengths <= wavelengths[-1])
+            (sorted_wavelengths >= wavelengths[0])
+            & (sorted_wavelengths <= wavelengths[-1])
         ]
         sorted_spectrum = spectrum_interp(sorted_wavelengths)
-        in_range = (sorted_wavelengths >= gauss_wavelengths[0]) & (
-            sorted_wavelengths <= gauss_wavelengths[-1]
+        in_range = (sorted_wavelengths >= lorentz_wavelengths[0]) & (
+            sorted_wavelengths <= lorentz_wavelengths[-1]
         )
         if add:
             sorted_spectrum[in_range] += _lorentzian(
@@ -811,6 +817,10 @@ class SpectrumMixin:
         if np.any(is_negative_spectrum):
             sorted_spectrum[is_negative_spectrum] = 0.0
             warnings.warn("Setting negative flux in spectrum to zero.", RuntimeWarning)
+            # print(
+            #     "wavelengths with negative spectrum:",
+            #     sorted_wavelengths[is_negative_spectrum],
+            # )
         if wavelengths_unit is not None:
             sorted_wavelengths <<= wavelengths_unit  # convert to `astropy.Quantity` array
         return sorted_wavelengths, sorted_spectrum
@@ -821,6 +831,9 @@ class SpectrumMixin:
         """
         Add a well-sampled emission line to the spectrum. Note that the minimum/maximum
         wavelengths of the source spectrum will not change.
+
+        For generating an emission line spectrum (i.e., not adding/subtracting an emission
+        line to/from a spectrum), see the `generate_emission_line()` method instead.
 
         N.B. the order in which emission/absorption lines are added will affect the final
         spectrum if using the abs_peak/abs_dip flag. For instance, adding an emission line
@@ -957,6 +970,109 @@ class SpectrumMixin:
             tot_flux=tot_flux,
             add=False,
             abs_peak=abs_dip,
+        )
+
+    def generate_emission_line(
+        self,
+        center,
+        fwhm,
+        peak=None,
+        tot_flux=None,
+        shape="gaussian",
+        limits=[100, 1200] << u.nm,
+        overwrite=False,
+        quiet=False,
+    ):
+        """
+        Generate a spectrum representing a single emission line. The resolution of the
+        spectrum is at least 1% of the wavelength range.
+
+        To add/subtract a spectral line to/from a spectrum, see the `add_emission_line()`
+        and `add_absorption_line()` methods instead.
+
+        Parameters
+        ----------
+          center :: scalar or `astropy.Quantity`
+            The central wavelength of the emission line. If a scalar, it is assumed to be
+            in angstrom.
+
+          fwhm :: scalar or `astropy.Quantity`
+            The full-width at half-maximum of the emission line. If a scalar, it is
+            assumed to be in angstrom.
+
+          peak :: int or float
+            The peak flux of the emission line (i.e., the flux at the center wavelength).
+            Exactly one of peak or tot_flux must be specified.
+
+          tot_flux :: int or float
+            The total flux under the curve. Exactly one of peak or tot_flux must be
+            specified.
+
+          shape :: "gaussian" or "lorentzian"
+            The emission line profile.
+
+          limits :: 2-element 1D array of `astropy.Quantity` or scalars
+            The [min, max] wavelengths of the spectrum. If the elements are scalars, it is
+            assumed to be in angstrom. The center of the emission line must be within
+            these limits.
+
+          overwrite :: bool
+            If True, overwrite any existing wavelengths/spectrum. If False, raise an error
+            if wavelengths or spectrum is not None.
+
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
+
+        Attributes
+        ----------
+          wavelengths :: `astropy.Quantity` array
+            The wavelengths of the spectrum, in angstroms.
+
+          spectrum :: array of floats
+            The emission line spectrum in units of flam (erg/s/cm^2/A).
+
+        Returns
+        -------
+          None
+        """
+        #
+        # Check inputs
+        #
+        self._check_existing_spectrum(overwrite, quiet=quiet)
+        if isinstance(center, u.Quantity):
+            center = center.to(u.AA).value
+        limits_AA = []
+        for limit in limits:
+            if isinstance(limit, u.Quantity):
+                limit = limit.to(u.AA).value
+            limits_AA.append(limit)
+        if np.shape(limits_AA) != (2,):
+            raise ValueError(
+                "limits must be a 2-element 1D array of `astropy.Quantity` or scalars"
+            )
+        if (center < limits_AA[0]) or (center > limits_AA[1]):
+            raise ValueError("center must be within limits")
+        if shape == "gaussian":
+            spectrum_func = SpectrumMixin._generate_gaussian
+        elif shape == "lorentzian":
+            spectrum_func = SpectrumMixin._generate_lorentzian
+        else:
+            raise ValueError("Emission line shape must be 'gaussian' or 'lorentzian'")
+        #
+        # Generate spectrum
+        #
+        # Assume flat (zero) spectrum as baseline. Then add emission line on top of this
+        resolution = (limits_AA[1] - limits_AA[0]) / 100
+        wavelengths = np.arange(limits_AA[0], limits_AA[1] + 0.5 * resolution, resolution)
+        self.wavelengths, self.spectrum = spectrum_func(
+            wavelengths=wavelengths * u.AA,
+            spectrum=np.zeros(len(wavelengths), dtype=float),
+            center=center,
+            fwhm=fwhm,
+            peak=peak,
+            tot_flux=tot_flux,
+            add=True,
+            abs_peak=False,
         )
 
     def set_spectrum(self, wavelengths, spectrum, unit, overwrite=False, quiet=False):
