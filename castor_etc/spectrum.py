@@ -1976,6 +1976,11 @@ class NormMixin:
         """
         Normalize a spectrum to a given AB magnitude in a specified passband or to a given
         bolometric AB magnitude. The spectrum should be in units of flam (erg/s/cm^2/A).
+        The bolometric magnitude calculation assumes a perfect (unity) passband response.
+
+        WARNING: if the spectrum does not vanish at the edges (e.g., a uniform spectrum),
+        then the bolometric magnitude will depend on the length of the spectrum! This is
+        because the area under the curve does not converge!
 
         Parameters
         ----------
@@ -2026,186 +2031,6 @@ class NormMixin:
                 )
             current_ab_mag = current_ab_mag[passband]
         norm_factor = 10 ** (-0.4 * (ab_mag - current_ab_mag))
-        self.spectrum *= norm_factor
-
-    def norm_to_value(
-        self,
-        value,
-        value_type="mag",
-        passband=None,
-        telescopeObj=None,
-        passband_lims=None,
-        pivot_wavelength=None,
-    ):
-        """
-        ! DEPRECATED ! See `norm_to_AB_mag()` instead.
-
-        TODO: remove this function
-
-        Normalize the spectrum so that it's average flux density (in units of "flam",
-        erg/s/cm^2/A) or AB magnitude (based on mean flux density, erg/s/cm^2/A) is equal
-        to the given value, either over the whole wavelength range or within a passband.
-        The `Source` object should have its spectrum in units of flam (erg/s/cm^2/A) and
-        wavelengths in angstrom.
-
-        The higher the resolution of the spectrum, the more accurate the normalization.
-        Also, if passband or passband_lims is not None, note that some wavelength/spectrum
-        elements at the edges of the passband limits may not be included in the
-        normalization due to limited floating point precision. Typically, the relative
-        error should be less than 2%.
-
-        To normalize over the whole spectrum, do not specify any passband, passband_lims,
-        or pivot_wavelength. To normalize in a passband, either specify:
-          - both passband + telescopeObj, or
-          - passband_lims and/or pivot_wavelength (useful for normalizing in arbitrary
-            passbands).
-
-        Parameters
-        ----------
-          value :: int or float
-            The value to which the average value of the spectrum should equal. This value
-            should be in the same units as the spectrum.
-
-          value_type :: "flam" or "mag"
-            Flux density (erg/s/cm^2/A) or AB magnitude (mag).
-
-          passband :: valid `Telescope` passband string (e.g., "uv", "u", "g") or None
-            If not None, normalize the spectrum such that the average flux density within
-            the given telescopeObj passband is equal to the specified value; also requires
-            the telescopeObj parameter. Otherwise, normalize the spectrum such that the
-            mean flux density is equal to the specified value (after converting to the
-            correct units). Note that if the value_type is "mag" and passband is None,
-            then the passband response is taken to be unity for the purposes of
-            calculating a pivot wavelength. The pivot wavelength is required for this
-            normalization otherwise a different normalization factor would apply at each
-            wavelength.
-
-          telescopeObj :: `Telescope` object
-            The `Telescope` object containing the passband limits and pivot wavelengths of
-            each passband. Requires the passband parameter. Only relevant if passband is
-            not None.
-
-          passband_lims :: 2-element `astropy.Quantity` array or None
-            If not None, this gives the [lower, upper] bounds of the passband, inclusive.
-            In this case, the function will normalize the spectrum such that the flux
-            density within the given passband_lims is equal to the specified value. This
-            cannot be specified if telescopeObj or passband is given. if both passband and
-            passband_lims are None, normalize with respect to the entire spectrum.
-
-          pivot_wavelength :: scalar, `astropy.Quantity` length, or None
-            The pivot wavelength of the passband_lims. If a scalar, this is assumed to be
-            in angstrom. This parameter is only relevant if value_type is "mag". This
-            cannot be specified if telescopeObj or passband is given. If both passband and
-            passband_lims are None, the normalization applies to the entire spectrum; in
-            this case, the "passband response" is taken to be unity. Also see the
-            `castor_etc.Telescope.calc_pivot_wavelength()` function or the
-            `passband_pivots` attribute in the `Telescope` instance.
-
-        Attributes
-        ----------
-          spectrum :: array
-            Normalized spectrum in units of erg/s/cm^2/A.
-
-        Returns
-        -------
-          None
-        """
-
-        def _get_norm_factor(_value, _flam, _wavelengths, _lims):
-            # _tot_flam = simpson(y=_flam, x=_wavelengths, even="avg")  # erg/s/cm^2
-            # _avg_flam = _tot_flam / (_lims[1] - _lims[0])  # erg/s/cm^2/A
-            _avg_flam = simpson(y=_flam, x=_wavelengths, even="avg") / (
-                _lims[1] - _lims[0]
-            )  # erg/s/cm^2/A
-            return _value / _avg_flam
-
-        #
-        # Check inputs
-        #
-        print(
-            "WARNING: norm_to_value() is deprecated. Please use norm_to_AB_mag() instead."
-        )
-        if self.spectrum is None or self.wavelengths is None:
-            raise ValueError("Please generate a spectrum before normalizing.")
-        if value_type not in ["flam", "mag"]:
-            raise ValueError("value_type must be either 'flam' or 'mag'.")
-        if (passband is not None or telescopeObj is not None) and (
-            passband_lims is not None or pivot_wavelength is not None
-        ):
-            raise ValueError(
-                "passband/telescopeObj cannot be simultaneously specified with "
-                + "passband_lims or pivot_wavelength."
-            )
-        if passband is not None:
-            if telescopeObj is None:
-                raise ValueError(
-                    "A `Telescope` object must be given if normalizing within a passband."
-                )
-            try:
-                passband_lims = telescopeObj.passband_limits[passband]
-                pivot_wavelength = telescopeObj.passband_pivots[passband]
-            except Exception:
-                raise AttributeError("Desired passband not found in given telescopeObj.")
-        if isinstance(pivot_wavelength, u.Quantity):
-            pivot_wavelength = pivot_wavelength.to(self.wavelengths.unit)
-        if value_type == "mag" and pivot_wavelength is None:
-            if passband_lims is None:
-                in_passband = np.full(np.shape(self.wavelengths), True)
-            else:
-                in_passband = (self.wavelengths >= passband_lims[0]) & (
-                    self.wavelengths <= passband_lims[1]
-                )
-            pivot_wavelength = (
-                Telescope.calc_pivot_wavelength(
-                    self.wavelengths.value[in_passband],
-                    np.ones(np.shape(self.wavelengths[passband_lims]), dtype=float),
-                )
-                * self.wavelengths.unit
-            )
-        #
-        # Calculate normalization factor
-        #
-        if value_type == "mag":
-            # Convert desired AB magnitude to flam
-            value = convert_electron_flux_mag(
-                value, "mag", "flam", wavelengths=pivot_wavelength
-            )[0]
-        #
-        if passband is None and passband_lims is None:
-            wavelengths_AA = self.wavelengths.to(u.AA).value
-            norm_factor = _get_norm_factor(
-                value,
-                self.spectrum,
-                wavelengths_AA,
-                [wavelengths_AA[0], wavelengths_AA[-1]],
-            )
-        else:
-            if passband_lims is not None:
-                if np.size(passband_lims) != 2 or not isinstance(
-                    passband_lims, u.Quantity
-                ):
-                    raise ValueError(
-                        "passband_lims must be a 2-element `astropy.Quantity` array."
-                    )
-            else:  # passband is None
-                if not isinstance(passband, str):
-                    raise TypeError("passband must be a CASTOR passband string or None.")
-                if passband not in params.PASSBANDS:
-                    raise ValueError(
-                        "Invalid CASTOR passband. "
-                        + f"Valid passbands are: {params.PASSBANDS}"
-                    )
-                passband_lims = params.PASSBAND_LIMITS[passband]
-            is_in_passband = (self.wavelengths >= passband_lims[0]) & (
-                self.wavelengths <= passband_lims[1]
-            )
-            wavelengths_AA = self.wavelengths[is_in_passband].to(u.AA).value
-            norm_factor = _get_norm_factor(
-                value,
-                self.spectrum[is_in_passband],
-                wavelengths_AA,
-                passband_lims.to(u.AA).value,
-            )
         self.spectrum *= norm_factor
 
     def norm_luminosity_dist(self, luminosity, dist):
@@ -2259,7 +2084,12 @@ class NormMixin:
         """
         Calculate the AB magnitude of the source either through the telescope's passbands
         or over the whole spectrum (bolometric magnitude). Note that the source spectrum
-        should be in units of erg/s/cm^2/A.
+        should be in units of erg/s/cm^2/A. The bolometric magnitude calculation assumes a
+        perfect (unity) passband response.
+
+        WARNING: if the spectrum does not vanish at the edges (e.g., a uniform
+        spectrum), then the bolometric magnitude will depend on the length of the
+        spectrum! This is because the area under the curve does not converge!
 
         Parameters
         ----------
@@ -2326,111 +2156,3 @@ class NormMixin:
                     TelescopeObj.passband_curves[band]["response"][isgood_passband],
                 )
             return ab_mags
-
-    def get_avg_value(self, value_type="mag", TelescopeObj=None):
-        """
-        ! DEPRECATED ! Use `get_AB_mag` instead.
-
-        TODO: deprecate this.
-
-        Calculate the average value of the source spectrum (in either flam, erg/s/cm^2/A,
-        or AB magnitude) either over the whole spectrum or through a telescope's passbands
-        (in which case TelescopeObj is required).
-
-        For example, if `value_type="mag"` and `TelescopeObj` is provided, then the result
-        will be the source's AB magnitude through each of the `TelescopeObj` passbands.
-        Likewise, if `value_type="mag"` and `TelescopeObj` is not provided, the result
-        will be the source's average AB magnitude over the entire spectrum.
-
-        Note that, if calculating AB magnitudes, we use the mean flux density (in flam,
-        erg/s/cm^2/A) through a passband as the nominal flam value for that passband. In
-        other words, if this average flam was constant throughout the whole passband, the
-        integrated flux density in this passband (erg/s/cm^2) would be equal to the
-        original spectrum's integrated flux density in the same passband (erg/s/cm^2).
-        Thus, it is correct to use this average flam value (combined with the passband's
-        pivot wavelength) to calculate the source's AB magnitude in a passband. The same
-        argument applies to calculating an AB magnitude of the entire spectrum.
-
-        Parameters
-        ----------
-          value_type :: "flam" or "mag"
-            The desired output value type. If "flam", the output is in units of
-            erg/s/cm^2/A. If "mag", the output is in AB magnitudes---if TelescopeObj is
-            not provided, the pivot wavelength is automatically calculated assuming a flat
-            response function (i.e., perfect throughput/response over all the entire
-            spectrum).
-
-          TelescopeObj :: `Telescope` object or None
-            If provided, will calculate the average value in each of the telescope's
-            passbands.
-
-        Returns
-        -------
-          result :: scalar or dict of scalars
-            If TelescopeObj is None, the result is a scalar equal to the average value
-            (either erg/s/cm^2/A or AB magnitude) of the entire spectrum. If TelescopeObj
-            is not None, the result is a dict of average values in each of the telescope's
-            passbands.
-        """
-        print("WARNING: get_avg_value() is deprecated. Use get_AB_mag() instead.")
-        if value_type not in ["flam", "mag"]:
-            raise ValueError("value_type must be either 'flam' or 'mag'.")
-        source_AA = self.wavelengths.to(u.AA).value
-        if TelescopeObj is None:
-            avg_flam = simpson(y=self.spectrum, x=source_AA, even="avg") / (
-                source_AA[-1] - source_AA[0]
-            )  # erg/s/cm^2/A
-            if value_type == "mag":
-                pivot_wavelength = (
-                    Telescope.calc_pivot_wavelength(
-                        source_AA,
-                        np.ones(np.shape(source_AA), dtype=float),  # perfect response
-                    )
-                    * u.AA
-                )
-                # Use mean value of flux as nominal flux value. In other words, if
-                # avg_flam (above) was constant throughout the whole spectrum, the
-                # integrated flux (erg/s/cm^2) would be equal to the original spectrum's
-                # integrated flux (erg/s/cm^2). Thus, we will use this avg_flam value (as
-                # well as the spectrum's pivot wavelength) to calculate the source's
-                # bolometric AB magnitude.
-                result = convert_electron_flux_mag(
-                    avg_flam,
-                    "flam",
-                    "mag",
-                    wavelengths=pivot_wavelength,
-                )[0]
-            else:
-                result = avg_flam
-        else:
-            result = dict.fromkeys(TelescopeObj.passbands)
-            for band in TelescopeObj.passbands:
-                passband_lims_AA = TelescopeObj.passband_limits[band].to(u.AA).value
-                is_in_passband = (source_AA >= passband_lims_AA[0]) & (
-                    source_AA <= passband_lims_AA[1]
-                )
-                avg_flam = (  # erg/s/cm^2/A
-                    simpson(
-                        y=self.spectrum[is_in_passband],
-                        x=source_AA[is_in_passband],
-                        even="avg",
-                    )
-                    / (passband_lims_AA[1] - passband_lims_AA[0])
-                )
-                if value_type == "mag":
-                    # Use mean value of flux through passband as nominal flux value. In
-                    # other words, if avg_flam (above) was constant throughout the whole
-                    # passband, the integrated flux in this passband (erg/s/cm^2) would be
-                    # equal to the original spectrum's integrated flux in the same
-                    # passband (erg/s/cm^2). Thus, we will use this avg_flam value (as
-                    # well as the passband's pivot wavelength) to calculate the source's
-                    # AB magnitude in this passband.
-                    result[band] = convert_electron_flux_mag(
-                        avg_flam,
-                        "flam",
-                        "mag",
-                        wavelengths=TelescopeObj.passband_pivots[band],
-                    )[0]
-                else:
-                    result[band] = avg_flam
-        return result
