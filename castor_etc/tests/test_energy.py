@@ -3,9 +3,7 @@ test_energy.py
 
 Unit tests for the energy module.
 
-Copyright 2022, CASTOR Mission Team
-Author: Isaac Cheng
-Contact: isaac.cheng.ca@gmail.com
+OUTDATED AND NO LONGER RELEVANT TO CURRENT VERSION.
 """
 import unittest
 

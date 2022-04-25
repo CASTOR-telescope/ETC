@@ -2,13 +2,13 @@
 CASTOR Exposure Time Calculator (ETC)
 =====================================
 
-A Python package for easy analysis of CASTOR performance and modifications to CASTOR
-parameters in Python scripts. See the `ETC_frontend` GitHub repository for a graphical
-user interface to complement this package.
+A modular, user-friendly Python package for easy estimation and analysis of CASTOR imaging
+performance. See the [`ETC_frontend`](https://github.com/CASTOR-telescope/ETC_frontend)
+GitHub repository for a graphical user interface to complement this package.
 
 Includes:
   1. Astronomical source generation and background noise estimation
-  2. Telescope imaging chain simulation (both photometry and spectroscopy)
+  2. Telescope imaging chain simulation, featuring a pixel-based photometry approach
   3. Convenience functions for converting between useful quantities (e.g., flux to
      electron/s to AB magnitude)
 

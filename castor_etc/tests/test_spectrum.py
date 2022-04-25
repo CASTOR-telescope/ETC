@@ -3,9 +3,7 @@ test_conversions.py
 
 Unit tests for the spectrum module.
 
-Copyright 2022, CASTOR Mission Team
-Author: Isaac Cheng
-Contact: isaac.cheng.ca@gmail.com
+OUTDATED AND NO LONGER RELEVANT TO CURRENT VERSION.
 """
 
 import unittest
