@@ -1388,7 +1388,9 @@ class Photometry:
                     + f"at 1 or more wavelengths in {band}-band. "
                     + "This may just be caused by the source spectrum not being "
                     + f"defined at all wavelengths present in the {band}-band definition "
-                    + f"file (which goes up to {round(max(redleak_wavelengths), 2)} A) "
+                    + "file (which runs from "
+                    + f"{round(min(full_response_curve_wavelengths_AA), 2)} A "
+                    + f"to {round(max(full_response_curve_wavelengths_AA), 2)} A)."
                     + "and is typically not a reason to worry. "
                     + "This warning can be suppressed with `quiet=True`.",
                     RuntimeWarning,
@@ -1521,7 +1523,8 @@ class Photometry:
                         + f"at 1 or more wavelengths in {band}-band. "
                         + "This may just be caused by the source spectrum not being "
                         + f"defined at all wavelengths present in the {band}-band "
-                        + "definition file (which goes up to "
+                        + "definition file (here, the relevant wavelengths range from "
+                        + f"{round(min(redleak_wavelengths), 2)} A to "
                         + f"{round(max(redleak_wavelengths), 2)} A) "
                         + "and is typically not a reason to worry. "
                         + "This warning can be suppressed with `quiet=True`.",
