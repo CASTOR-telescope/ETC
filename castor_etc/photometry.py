@@ -1415,10 +1415,11 @@ class Photometry:
                 )
             if np.isfinite(redleak_frac):
                 redleak_fracs[band] = redleak_frac
-            else:
-                raise RuntimeError(
+            elif not quiet:
+                warnings.warn(
                     "Source red leak fraction could not be calculated "
-                    + f"in {band}-band!"
+                    + f"in {band}-band!",
+                    RuntimeWarning,
                 )
         return redleak_fracs
 
@@ -1554,10 +1555,11 @@ class Photometry:
                     # weights will be double-counted when the redleak_fracs arrays are
                     # multiplied by the source_erates...
                     redleak_fracs[band] = redleak_frac * self.redleak_weights
-                else:
-                    raise RuntimeError(
+                elif not quiet:
+                    warnings.warn(
                         "Source in-passband red leak fraction could not be calculated "
-                        + f"in {band}-band!"
+                        + f"in {band}-band!",
+                        RuntimeWarning,
                     )
         #
         # Calculate red leak from in-passband red leak fraction
