@@ -494,35 +494,45 @@ class PointSource(Source):
         ----------
           profile :: None
             The 2D profile function specifying how the surface brightness changes as a
-            function of pixel coordinates. This will be handled in the `Photometry`
-            object.
-            TODO: in the future, use the sampled PSF to generate a profile here instead of
-            using a Gaussian in Photometry (currently setting the profile in Photometry
-            only because we are assuming PSF is Gaussian with FWHM = telescope FWHM)
-
-          a, b :: `astropy.Quantity` lengths or None
-            The physical semimajor and semiminor axis lengths of the circular point
-            source; since this source is circular, these will be equal. If radius was not
-            specified, these attributes will be None.
-
-          dist :: `astropy.Quantity` lengths or None
-            The distance to the source. If dist was not specified, this attribute will be
-            None.
+            function of pixel coordinates. This is set to None and will be handled in the
+            `Photometry` object instead (where the "profile" of a point source is the
+            telescope's PSF).
+            TODO: in the future, use the telescope's sampled PSF to generate a profile
+            here (or in `photometry.py`) instead of using a Gaussian in `photometry.py`
+            (currently setting the profile in `photometry.py` only because we are assuming
+            PSF is Gaussian with FWHM = telescope FWHM)
 
           angle_a, angle_b :: `astropy.Quantity` angles
             The angles subtended by the circular point source's radius. Since this source
-            is circular, these will be equal.
+            is circular, these will be equal. By default, these are both set to 1e-12
+            arcsec to approximate a very small source. Although required attributes, the
+            actual values of these do not matter too much since `PointSource` objects use
+            the encircled energy (which is dependent on the telescope's PSF) rather than
+            surface brightness to perform photometry calculations.
+
+          area :: `astropy.Quantity` angle
+            The angular area subtended by the point source. Although a required attribute,
+            the exact value of this does not matter in photometry calculations.
 
           rotation :: float
             The CCW rotation of the source relative to the x-axis, in radians. Since this
             is a circular point source, this rotation does not have any effect and is set
             to zero for simplicity.
 
+          a, b :: None
+            The physical semimajor and semiminor axis lengths of the circular point
+            source. These are set to None since they are not required attributes.
+
+          dist :: None
+            The distance to the source. This is set to None since it is not a required
+            attribute.
+
+
         Returns
         -------
           `PointSource` instance
         """
-        super().__init__(None, check_profile=False)
+        super().__init__(None, init_dimensions=True, check_profile=False)
         #
         # Check inputs
         #
@@ -563,7 +573,7 @@ class PointSource(Source):
         #         raise ValueError("`angle` must be greater than zero.")
         #     angle *= 0.5  # convert to angular radius
 
-        # Super small value that is unlikely to be > FWHM
+        # Set size of point source to be a super small value that is unlikely to be > FWHM
         self.angle_a = self.angle_b = 1e-12 * u.arcsec
         self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = 0.0
@@ -678,6 +688,9 @@ class ExtendedSource(Source):
           angle_a, angle_b :: `astropy.Quantity` angles
             The angles subtended by the extended source's semimajor and semiminor axes.
 
+          area :: `astropy.Quantity` angle
+            The angular area subtended by the extended source.
+
           rotation :: float
             The CCW rotation of the source's semimajor axis relative to the x-axis, in
             radians. At a rotation of 0 radians, the source's semimajor axis is along the
@@ -705,7 +718,7 @@ class ExtendedSource(Source):
         #
         # Assign attributes to source
         #
-        if angle_a is None:
+        if angle_a is None:  # a, b, and dist were provided
             if not isinstance(a, u.Quantity):
                 a = a * u.kpc
             self.a = a
@@ -723,7 +736,10 @@ class ExtendedSource(Source):
             # Calculate the angle subtended by source radius from definition of parsec
             self.angle_a = np.arctan(a.value / dist.value) * u.arcsec
             self.angle_b = np.arctan(a.value / dist.value) * u.arcsec
-        else:
+        else:  # angle_a, angle_b were provided
+            self.a = None
+            self.b = None
+            self.dist = None
             if angle_a <= 0 or angle_b <= 0:
                 raise ValueError("`angle_a` and `angle_b` must be greater than zero.")
             if isinstance(angle_a, u.Quantity):
@@ -775,58 +791,38 @@ class GalaxySource(Source):
         self,
         r_eff,
         n,
-        angle_a=None,
-        angle_b=None,
-        a=None,
-        b=None,
-        dist=None,
+        axial_ratio,
         rotation=0.0,
     ):
         """
-        Generate a galaxy with a specific effective radius and Sersic index given either:
-          1. the angles subtended by the source's semimajor (`angle_a`) and semiminor
-          (`angle_b`) axes,
-          2. the physical semimajor (`a`) and semiminor (`b`) axis lengths and distance
-          (`dist`) to the source.
+        Generate a galaxy with a specific effective radius (`sqrt(a * b)`), Sersic index
+        (`n`), and axial ratio (`b/a`).
 
-        The dimensions of the galaxy (i.e., the quantities in the list above) will be used
+        The dimensions of the galaxy (i.e., the semimajor and semiminor axis) will be used
         to calculate its surface brightness when doing photometry calculations and is not
         a hard limit on the galaxy's physical size (i.e., the surface brightness will not
-        immediately drop to zero outside of the given dimensions). In general, the smaller
-        the galaxy, the higher the surface brightness assuming the source spectrum is
-        normalized to the same value and everything else is equal.
+        immediately drop to zero outside of the ellipse defined by the semimajor/semiminor
+        axis). In general, the smaller the galaxy, the higher the surface brightness
+        assuming the source spectrum is normalized to the same value and everything else
+        is equal.
 
         Also see the `ExtendedSource` class for other profiles (e.g., uniform, exponential
         decay with scale lengths).
 
         Parameters
         ----------
-          r_eff :: scalar or `astropy.Quantity` angle
+          r_eff :: int or float or `astropy.Quantity` angle
             Effective (half-light) radius. If a scalar, r_eff is assumed to be in arsec.
+            This is also known as the half-light radius and is conventially equal to the
+            square root of the product of the semimajor axis and the semiminor axis (i.e.,
+            `r_eff = sqrt(a * b)`).
 
-          n :: scalar
+          n :: int or float
             Sersic index of the galaxy.
 
-          angle_a, angle_b :: int or float or `astropy.Quantity`
-            The angle subtended by the extended source's semimajor and semiminor axes,
-            respectively. If scalars, they are assumed to be in arcsec. If given, `a`,
-            `b`, and `dist` must all be None. If not given, `a`, `b`, and `dist` must all
-            be provided.
-
-          a, b :: int or float or `astropy.Quantity`
-            The physical semimajor and semiminor axes of the extended source,
-            respectively. If scalars, they are assumed to be in units of kpc. If given,
-            `dist` must also be provided and `angle_a` & `angle_b` must both be None. If
-            not given, `angle_a` and `angle_b` must both be provided. Internally, these
-            values along with the distance will be used to calculate the `angle_a` and
-            `angle_b` attributes.
-
-          dist :: int or float or `astropy.Quantity`
-            The distance to the source. If a scalar, `dist` is assumed to be in units of
-            kpc. If given, `a` & `b` must also be provided and `angle_a` & `angle_b` must
-            both be None. If not given, `angle_a` & `angle_b` must both be provided.
-            Internally, these values along with the semimajor and semiminor axis lengths
-            will be used to calculate the `angle_a` and `angle_b` attributes.
+          axial_ratio :: int or float
+            The ratio of the semiminor axis (b) to the semimajor axis (a). This must be a
+            number between (0, 1].
 
           rotation :: int or float
             The counter-clockwise (CCW) rotation of the source's semimajor axis relative
@@ -840,23 +836,25 @@ class GalaxySource(Source):
             The 2D profile function specifying how the surface brightness changes as a
             function of pixel coordinates. In this case, it is a Sersic profile.
 
-          a, b :: `astropy.Quantity` lengths or None
-            The physical semimajor and semiminor axis lengths of the extended source. If
-            parameters `a` and `b` were not specified, these attributes will be None.
-
-          dist :: `astropy.Quantity` lengths or None
-            The distance to the source. If the parameter `dist` was not specified, this
-            attribute will be None.
-
           angle_a, angle_b :: `astropy.Quantity` angles
             The angles subtended by the extended source's semimajor and semiminor axes.
-            These attributes were also used to calculate the eccentricity of the galaxy's
-            Sersic profile.
+            These attributes were calculated from the given `r_eff` and `axial_ratio`.
+
+          area :: `astropy.Quantity` angle
+            The angular area subtended by the extended source.
 
           rotation :: float
             The CCW rotation of the source's semimajor axis relative to the x-axis, in
             radians. At a rotation of 0 radians, the source's semimajor axis is along the
             x-axis and the source's semiminor axis is along the y-axis.
+
+          a, b :: None
+            The physical semimajor and semiminor axis lengths of the galaxy. These are set
+            to None since they are not required attributes.
+
+          dist :: None
+            The distance to the source. This is set to None since it is not a required
+            attribute.
 
         Returns
         -------
@@ -865,52 +863,22 @@ class GalaxySource(Source):
         #
         # Check inputs
         #
-        if (
-            (a is None or b is None or dist is None)
-            and (angle_a is None or angle_b is None)
-        ) or (
-            (angle_a is not None or angle_b is not None)
-            and (a is not None or b is not None or dist is not None)
-        ):
-            raise ValueError(
-                "Exactly one of (angle_a, angle_b) or (a, b, dist) must be provided"
-            )
+        if not isinstance(axial_ratio, Number) or axial_ratio <= 0 or axial_ratio > 1:
+            raise ValueError("`axial_ratio` must be between (0, 1].")
         if not isinstance(rotation, Number):
             raise ValueError("The rotation angle must be an int/float.")
+        if isinstance(r_eff, u.Quantity):
+            r_eff = r_eff.to(u.arcsec).value
+        if r_eff <= 0:
+            raise ValueError("`r_eff` must be greater than zero.")
         #
         # Assign attributes to source
         #
-        if angle_a is None:
-            if not isinstance(a, u.Quantity):
-                a = a * u.kpc
-            self.a = a
-            if not isinstance(b, u.Quantity):
-                b = b * u.kpc
-            self.b = b
-            if not isinstance(dist, u.Quantity):
-                dist = dist * u.kpc
-            self.dist = dist
-            a = a.to(u.AU).value
-            b = b.to(u.AU).value
-            dist = dist.to(u.pc).value
-            if a <= 0 or b <= 0 or dist <= 0:
-                raise ValueError("`a`, `b`, and `dist` must all be greater than zero.")
-            # Calculate the angle subtended by source radius from definition of parsec
-            self.angle_a = np.arctan(a.value / dist.value) * u.arcsec
-            self.angle_b = np.arctan(a.value / dist.value) * u.arcsec
-        else:
-            if isinstance(angle_a, u.Quantity):
-                self.angle_a = angle_a.to(u.arcsec)
-            else:
-                self.angle_a = angle_a * u.arcsec
-            if isinstance(angle_b, u.Quantity):
-                self.angle_b = angle_b.to(u.arcsec)
-            else:
-                self.angle_b = angle_b * u.arcsec
-            if angle_a <= 0 or angle_b <= 0:
-                raise ValueError("`angle_a` and `angle_b` must be greater than zero.")
-        eccentricity = np.sqrt(1 - (self.angle_b.value / self.angle_a.value) ** 2)
+        r_eff_sq = r_eff * r_eff
+        eccentricity = np.sqrt(1 - (axial_ratio * axial_ratio))
         profile = Profiles.sersic(r_eff, n, e=eccentricity, angle=rotation)
-        super().__init__(profile, init_dimensions=False)
+        super().__init__(profile, init_dimensions=True)
+        self.angle_a = np.sqrt(r_eff_sq / axial_ratio) * u.arcsec
+        self.angle_b = np.sqrt(r_eff_sq * axial_ratio) * u.arcsec
         self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = np.deg2rad(rotation)
