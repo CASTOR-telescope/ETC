@@ -25,7 +25,7 @@ package as the mission matures (see the [changelog](CHANGELOG.md) for more detai
    [ETC_frontend](https://github.com/CASTOR-telescope/ETC_frontend) repository.
 6. [Known issues](#known-issues)
 7. [Roadmap](#roadmap)
-8. [Questions & Issues](#questions--issues)
+8. [Questions, Issues, Suggestions, and Other Feedback](#questions--issues)
 
 ## Installation
 
@@ -92,10 +92,17 @@ Here are some future plans for the ETC:
   (we currently assume the point source PSF is a Gaussian).
 - Add slitless grism and multi-object spectroscopic capabilities to the ETC
 
-## Questions & Issues
+Important: do not hesitate to reach out (using one of the methods detailed
+[below](#questions-issues-suggestions-and-other-feedback)) if there are any features you
+would like the ETC to have. This tool is meant to be used by the community, after all!
 
-Please reach out if you have any questions, either through email
+## Questions, Issues, Suggestions, and Other Feedback
+
+Please reach out if you have any questions, suggestions, or other feedback related to this
+software—either through email
 ([isaac.cheng.ca@gmail.com](mailto:isaac.cheng.ca@gmail.com)) or the [discussions
 page](https://github.com/CASTOR-telescope/ETC/discussions). You can also ping me on Slack
 or even set up an online video/audio call! Larger issues or feature requests can be posted
 and tracked via the [issues page](https://github.com/CASTOR-telescope/ETC/issues).
+Finally, you can also reach out to Dr. Tyrone Woods, the Science Planning Tools Lead for
+CASTOR.
