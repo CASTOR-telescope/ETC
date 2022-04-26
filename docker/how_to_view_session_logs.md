@@ -99,3 +99,22 @@ Following is a full list of commands taken from the
 > ```bash
 > curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session/<sessionID>?view=events
 > ```
+
+---
+
+## Starting and Stopping from the Terminal
+
+- To start a session:
+
+  ```bash
+  curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session \
+       -d "name=<mySessionName>" \
+       -d "image=images.canfar.net/<folderName>/<imageName>:<version>"
+  ```
+
+- To delete a session:
+
+   ```bash
+   curl -E ~/.ssl/cadcproxy.pem https://ws-uv.canfar.net/skaha/session/<sessionId> \
+        -X DELETE
+   ```

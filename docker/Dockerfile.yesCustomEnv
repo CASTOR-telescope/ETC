@@ -46,10 +46,3 @@ RUN pip install .
 USER ${NB_UID}
 
 WORKDIR ${NOTEBOOK_DIR}
-
-# #
-# # VS Code configuration
-# # (see <https://code.visualstudio.com/remote/advancedcontainers/avoid-extension-reinstalls)
-# #
-# RUN mkdir -p ${HOME}/.vscode-server/extensions \
-#     && chown -R ${NB_USER} ${HOME}/.vscode-server
