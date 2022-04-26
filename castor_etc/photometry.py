@@ -1218,9 +1218,11 @@ class Photometry:
         #
         # Recall all internal angle aperture angles are in arcsec
         center = center.to(u.arcsec).value
-        # Doesn't matter if half_width/half_length are exact multiples of pixel size
-        half_width = 0.5 * width.value  # arcsec
-        half_length = 0.5 * length.value  # arcsec
+        # Doesn't matter if half_width/half_length are exact multiples of pixel size, but
+        # do it anyway for consistency
+        px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
+        half_width = np.ceil(0.5 * width.value / px_scale_arcsec) * px_scale_arcsec
+        half_length = np.ceil(0.5 * length.value / px_scale_arcsec) * px_scale_arcsec
         center_px = self._create_aper_arrs(
             half_width,  # width is along x
             half_length,  # length is along y
@@ -1231,7 +1233,6 @@ class Photometry:
         #
         # Create aperture
         #
-        px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
         aper = RectangularAperture(
             positions=center_px,
             w=(width / px_scale_arcsec).value,
@@ -1271,11 +1272,13 @@ class Photometry:
             #    in arcsec). N.B. rectangle may be off-center, so can't just compare abs()
             psf_x += center[0]
             psf_y += center[1]
+            exact_half_width = 0.5 * width.value
+            exact_half_length = 0.5 * length.value
             is_within_rectangle = (
-                (psf_x >= -half_width)
-                & (psf_x <= half_width)
-                & (psf_y >= -half_length)
-                & (psf_y <= half_length)
+                (psf_x >= -exact_half_width)
+                & (psf_x <= exact_half_width)
+                & (psf_y >= -exact_half_length)
+                & (psf_y <= exact_half_length)
             )
             self._encircled_energy = np.sum(is_within_rectangle) / np.size(
                 is_within_rectangle
