@@ -1,5 +1,7 @@
 """
-Simulates different astronomical sources and contains different flux profiles.
+Simulates different astronomical sources and contains different flux profiles. Also
+supports arbitrary surface brightness profiles (either from a function or from a FITS
+file).
 
 Predefined flux profiles:
   - uniform
@@ -9,7 +11,8 @@ Predefined flux profiles:
 
 Predefined source types:
   - point (e.g., for stars)
-  - extended (e.g., for supernova remnants, galaxies)
+  - extended (e.g., for supernova remnants)
+  - galaxies
 
 ---
 
@@ -81,11 +84,14 @@ from numbers import Number
 
 import astropy.units as u
 import numpy as np
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
 from astropy.modeling.models import Sersic2D
+from astropy.wcs import WCS
+from astropy.wcs.utils import proj_plane_pixel_scales
 from photutils.aperture import EllipticalAperture
+from scipy.interpolate import interp2d
 
-from . import constants as const
-from .parameters import FWHM
 from .spectrum import NormMixin, SpectrumMixin
 
 
@@ -147,7 +153,9 @@ class Profiles:
             Parameters
             ----------
               x, y :: 2D arrays of floats
-                Elements are angular distance, in arcsec, from aperture center.
+                Elements are angular distance, in arcsec, from aperture center. For this
+                function, these arrays must represent points on a regular rectangular
+                grid.
 
               center :: 2-element 1D array of floats
                 The x- and y-angular offset, in arcsec, of the aperture center from the
@@ -160,7 +168,7 @@ class Profiles:
                 The flux at each pixel relative to the flux at the source center.
             """
             px_scale_x = (x[0][-1] - x[0][0]) / (np.shape(x)[1] - 1)  # arcsec per pixel
-            px_scale_y = (y[-1][-1] - y[0][0]) / (len(y) - 1)  # arcsec per pixel
+            px_scale_y = (y[-1][0] - y[0][0]) / (len(y) - 1)  # arcsec per pixel
             center_of_aper_px = np.array([0.5 * (x.shape[1] - 1), 0.5 * (y.shape[0] - 1)])
             center_px = np.array([center[0] / px_scale_x, center[1] / px_scale_y])
             aper = EllipticalAperture(
@@ -386,9 +394,9 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
           profile :: function with a header of
                      `(x, y, aper_center) -> (2D array of floats)`
 
-            `profile` is a function that describes how the flux of the source varies as a
-            function of x- & y-axis distance (in arcsec) from the center of the source
-            relative to the flux at the source's center.
+            `profile` is a function that describes how the flux or surface brightness of
+            the source varies as a function of x- & y-axis distance (in arcsec) from the
+            center of the source relative to the flux at the source's center.
 
             The function signature for `profile` must have exactly 3 positional arguments,
             `(x, y, aper_center)`, and return an array of floats.
@@ -433,10 +441,12 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
         #
         if check_profile:
             try:
-                _test_arr = np.arange(4, dtype=float).reshape((2, 2))
-                _test_result = profile(_test_arr, _test_arr, np.array([0.0, 0.0]))
+                _test_xs, _test_ys = np.meshgrid(
+                    [-1.0, 0.0, 1.0], [-1.0, 0.0, 1.0], indexing="xy"
+                )
+                _test_result = profile(_test_xs, _test_ys, np.array([0.0, 0.0]))
                 if not isinstance(_test_result, np.ndarray) or (
-                    np.shape(_test_result) != np.shape(_test_arr)
+                    np.shape(_test_result) != np.shape(_test_xs)
                 ):
                     raise TypeError(
                         "`profile` should return a 2D array of floats. "
@@ -451,6 +461,7 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
                     + "same shape as x and y. Also check the traceback for more details."
                 )
         self.profile = profile
+        self.passband = None  # for custom surface brightness profiles from a file
         #
         # Initialize some potential future attributes
         #
@@ -493,10 +504,10 @@ class PointSource(Source):
         Attributes
         ----------
           profile :: None
-            The 2D profile function specifying how the surface brightness changes as a
-            function of pixel coordinates. This is set to None and will be handled in the
-            `Photometry` object instead (where the "profile" of a point source is the
-            telescope's PSF).
+            The 2D profile function specifying how the flux changes as a function of x- &
+            y-axis distance (in arcsec) from the center of the source. This is set to None
+            and will be handled in the `Photometry` object instead (where the "profile" of
+            a point source is the telescope's PSF).
             TODO: in the future, use the telescope's sampled PSF to generate a profile
             here (or in `photometry.py`) instead of using a Gaussian in `photometry.py`
             (currently setting the profile in `photometry.py` only because we are assuming
@@ -527,6 +538,9 @@ class PointSource(Source):
             The distance to the source. This is set to None since it is not a required
             attribute.
 
+          passband :: None
+            The passband of the custom surface brightness profile. This is set to None
+            since this source is not a `CustomSource`.
 
         Returns
         -------
@@ -654,8 +668,9 @@ class ExtendedSource(Source):
               brightness exponentially drops off according to the specified scale lengths.
               `exponential_scale_lengths` must be provided if `profile` is "exponential".
             - Otherwise, this must be a function with 3 positional parameters that
-              describes the surface brightness of the source at each aperture pixel
-              relative to the surface brightness at the source center.
+              describes the surface brightness of the source relative to the brightness at
+              the source's centre, as a function of x- & y-axis distance (in arcsec) from
+              the center of the source.
                 - `x` and `y` are 2D arrays representing the angular distance, in arcsec,
                   of each pixel from the aperture's center,
                 - `aper_center` is a 2-element 1D array of floats representing the x- and
@@ -695,6 +710,10 @@ class ExtendedSource(Source):
             The CCW rotation of the source's semimajor axis relative to the x-axis, in
             radians. At a rotation of 0 radians, the source's semimajor axis is along the
             x-axis and the source's semiminor axis is along the y-axis.
+
+          passband :: None
+            The passband of the custom surface brightness profile. This is set to None
+            since this source is not a `CustomSource`.
 
         Returns
         -------
@@ -834,7 +853,8 @@ class GalaxySource(Source):
           profile :: function with a header of
                      `(x, y, aper_center) -> (2D array of floats)`
             The 2D profile function specifying how the surface brightness changes as a
-            function of pixel coordinates. In this case, it is a Sersic profile.
+            function of x- & y-axis distance (in arcsec) from the center of the source. In
+            this case, it is a Sersic profile.
 
           angle_a, angle_b :: `astropy.Quantity` angles
             The angles subtended by the extended source's semimajor and semiminor axes.
@@ -855,6 +875,10 @@ class GalaxySource(Source):
           dist :: None
             The distance to the source. This is set to None since it is not a required
             attribute.
+
+          passband :: None
+            The passband of the custom surface brightness profile. This is set to None
+            since this source is not a `CustomSource`.
 
         Returns
         -------
@@ -882,3 +906,168 @@ class GalaxySource(Source):
         self.angle_b = np.sqrt(r_eff_sq * axial_ratio) * u.arcsec
         self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = np.deg2rad(rotation)
+
+
+class CustomSource(Source):
+    """
+    A source with a custom surface brightness profile from a FITS file.
+    """
+
+    def __init__(self, profile_filepath, passband, center=None, px_scale_unit=u.deg):
+        """
+        Create a source with a custom surface brightness profile from a FITS file. The
+        FITS file should be an image that contains, at each pixel, the electron/s induced
+        by the source in the given passband; the data should not contain any NaNs/infs.
+        These data will be linearly interpolated to a given telescope's pixel scale when
+        doing photometry calculations. Note that any user-requested values outside the
+        given data's extent will be set to zero.
+
+        This `Source` class is useful if you want to bypass the internal source surface
+        brightness profile and spectrum generation while using the ETC's other
+        functionality (e.g., aperture photometry, sky background estimation, etc.). An
+        important limitation, however, is that photometry calculations using a
+        `CustomSource` object will not include red leak, as `CustomSource` objects do not
+        support a separate spectrum.
+
+        Parameters
+        ----------
+          profile_filepath :: str
+            The path to the FITS file containing the surface brightness profile of the
+            source.
+
+          passband :: str
+            A valid `Telescope` passband name (e.g., "uv", "u", "g"). The valid passband
+            names depend on the specific `Telescope` instance.
+
+          center :: 2-tuple of scalars or `astropy.coordinates.SkyCoord` object or None
+            The (x, y) center of the source. If scalars, they are assumed to be in pixel
+            coordinates. If None, use the center of the image as the center of the source.
+
+          px_scale_unit :: `astropy.units.Unit`
+            The unit of the pixel scale (i.e., the "CUNIT" or "CUNIT1"/"CUNIT2" header
+            keyword).
+
+        Attributes
+        ----------
+          profile :: function with a header of
+                     `(x, y, aper_center) -> (2D array of floats)`
+            The 2D profile function specifying how the surface brightness changes as a
+            function of x- & y-axis distance (in arcsec) from the center of the source.
+            For this source, the `x` and `y` arrays must represent points on a regular,
+            rectangular grid (i.e., they should be generated via ```python
+            np.meshgrid(..., indexing="xy") ``` ).
+
+          passband :: str
+            The passband of the custom surface brightness profile.
+
+          angle_a, angle_b :: None
+            The angles subtended by the extended source's semimajor and semiminor axes.
+            These are set to None since they are irrelavant for a custom source.
+
+          area :: None
+            The angular area subtended by the extended source. This is set to None since
+            it is irrelavant for a custom source.
+
+          rotation :: None
+            The CCW rotation of the source's semimajor axis relative to the x-axis, in
+            radians. At a rotation of 0 radians, the source's semimajor axis is along the
+            x-axis and the source's semiminor axis is along the y-axis. This is set to
+            None since it is irrelavant for a custom source.
+
+          a, b :: None
+            The physical semimajor and semiminor axis lengths of the galaxy. These are set
+            to None since they are irrelavant for a custom source.
+
+          dist :: None
+            The distance to the source. This is set to None since it is irrelavant for a
+            custom source.
+
+        Returns
+        -------
+          `CustomSource` instance
+        """
+        #
+        # Check inputs
+        #
+        try:
+            data, header = fits.getdata(profile_filepath, header=True)
+        except Exception:
+            raise RuntimeError("Could not read FITS file.")
+        try:
+            wcs = WCS(header)
+        except Exception:
+            raise RuntimeError("Unable to read WCS from FITS header.")
+        if np.any(~np.isfinite(data)):
+            raise ValueError("The FITS data must not contain any NaNs/infs.")
+        if data.ndim != 2:
+            raise ValueError("The FITS data must be 2D.")
+        if not isinstance(passband, str):
+            raise ValueError("`passband` must be a string.")
+        if center is None:
+            center = (0.5 * data.shape[1], 0.5 * data.shape[0])
+        elif isinstance(center, SkyCoord):
+            center = wcs.world_to_pixel(center)
+        #
+        # Make coordinate arrays
+        #
+        arcsec_per_px = proj_plane_pixel_scales(wcs.celestial) * px_scale_unit.to(
+            u.arcsec
+        )
+        ysize, xsize = data.shape
+        # xs, ys = np.meshgrid(np.arange(xsize), np.arange(ysize), indexing="xy")
+        xs = np.arange(xsize)  # must use 1D array to prevent interp2d overflow errors
+        ys = np.arange(ysize)  # must use 1D array to prevent interp2d overflow errors
+        xs = (xs - center[0]) * arcsec_per_px[1]
+        ys = (ys - center[1]) * arcsec_per_px[0]
+        # NOTE: the coordinate arrays are now in units of arcsec and centered at the
+        # source (i.e., (0, 0) is the source's center)
+        #
+        # Create 2D interpolation function
+        #
+        profile_interp = interp2d(
+            xs,
+            ys,
+            data.astype(np.float64),
+            kind="linear",
+            bounds_error=False,
+            fill_value=0.0,
+        )
+
+        def profile(x, y, center):
+            """
+            Custom surface brightness profile.
+
+            Parameters
+            ----------
+              x, y :: 2D arrays of floats
+                Elements are angular distance, in arcsec, from aperture center. For this
+                profile, these arrays must represent points on a regular, rectangular grid
+                (i.e., they should be generated via `np.meshgrid(..., indexing="xy")`)!
+
+              center :: 2-element 1D array of floats
+                The x- and y-angular offset, in arcsec, of the aperture center from the
+                source center.
+
+            Returns
+            -------
+              weights :: 2D array of floats
+                The flux at each pixel relative to the flux at the source center.
+            """
+            #
+            # Convert 2D to 1D
+            #
+            if np.any(x[0] != x[-1]) or np.any(y[:, 0] != y[:, -1]):
+                raise ValueError(
+                    "For this profile, the x- and y-coordinate arrays should be "
+                    + "generated via `np.meshgrid(..., indexing='xy')`!"
+                )
+            x_1d = x[0]
+            y_1d = y[:, 0]
+            #
+            # Calculate source weights
+            #
+            weights_1d = profile_interp(x_1d + center[0], y_1d + center[1])
+            return weights_1d.reshape(np.shape(x))  # reshape to 2D
+
+        super().__init__(profile, init_dimensions=True)
+        self.passband = passband

@@ -77,7 +77,7 @@ from scipy.interpolate import interp1d
 
 from .background import Background
 from .conversions import calc_photon_energy, mag_to_flux
-from .sources import PointSource, Source
+from .sources import CustomSource, PointSource, Source
 from .telescope import Telescope
 
 # TODO: convolve with PSF (waiting for data file)
@@ -139,6 +139,15 @@ class Photometry:
             raise TypeError("SourceObj must be a `castor_etc.Source` object")
         if not isinstance(BackgroundObj, Background):
             raise TypeError("BackgroundObj must be a `castor_etc.Background` object")
+        if (
+            isinstance(SourceObj, CustomSource)
+            and SourceObj.passband not in TelescopeObj.passbands
+        ):
+            raise ValueError(
+                "The `CustomSource` object's surface brightness profile passband "
+                + f"('{SourceObj.passband}') is not a valid `TelescopeObj` "
+                + f"passband ({TelescopeObj.passbands})"
+            )
         #
         # Assign attributes
         #
@@ -402,7 +411,12 @@ class Photometry:
             cbar = fig.colorbar(img)
             if mark_source:
                 ax.plot(0, 0, "co", ms=source_markersize)
-            cbar.set_label("Flux Relative to Center of Source (incl. fractional pixels)")
+            if isinstance(self.SourceObj, CustomSource):
+                cbar.set_label("Custom Surface Brightness (incl. fractional pixels)")
+            else:
+                cbar.set_label(
+                    "Flux Relative to Center of Source (incl. fractional pixels)"
+                )
             ax.set_xlabel("$x$ [arcsec]")
             ax.set_ylabel("$y$ [arcsec]")
             ax.set_title(
@@ -1343,6 +1357,8 @@ class Photometry:
           redleak_fracs :: dict of floats
             Dictionary containing the red leak fraction in each passband.
         """
+        if isinstance(self.SourceObj, CustomSource):
+            raise AttributeError("Custom sources do not have red leak fractions!")
         #
         # Calculate red leak fraction (red leak electron/s to total electron/s)
         #
@@ -1467,6 +1483,8 @@ class Photometry:
         #
         redleak_fracs = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
         if include_redleak:
+            if isinstance(self.SourceObj, CustomSource):
+                raise AttributeError("Custom sources do not have red leak fractions!")
             #
             # Make useful source spectrum-derived quantities
             #
@@ -1567,7 +1585,10 @@ class Photometry:
         #
         # Calculate red leak from in-passband red leak fraction
         #
-        redleaks = dict.fromkeys(self.TelescopeObj.passbands)
+        if isinstance(self.SourceObj, CustomSource):
+            redleaks = dict.fromkeys([self.SourceObj.passband])
+        else:
+            redleaks = dict.fromkeys(self.TelescopeObj.passbands)
         for band in redleaks:
             # (Recall source_erate includes fractional pixel weighting from aperture mask)
             redleaks[band] = redleak_fracs[band] * source_erate[band]
@@ -1811,7 +1832,16 @@ class Photometry:
         integration time (t) required to reach a given SNR.
 
         Again, note that the `Source` object associated with the `Photometry` instance
-        should have its spectrum in units of flam (erg/s/cm^2/A).
+        should have its spectrum in units of flam (erg/s/cm^2/A) unless it is a
+        `CustomSource` object.
+
+        Note that calculations involving the `CustomSource` object do not include red leak
+        noise, as `CustomSource` instances do not support a source spectrum. For the same
+        reason, the `reddening` parameter will be ignored since the `CustomSource`
+        object's surface brightness profile should already be in units of electron/s
+        (given for each pixel). Additionally, the SNR/integration time calculation will
+        only be performed for the passband corresponding to the `CustomSource` object's
+        surface brightness profile.
 
         Parameters
         ----------
@@ -1857,8 +1887,10 @@ class Photometry:
         Returns
         -------
           results :: dict
-            If t is given, this is the snr reached after t seconds. If snr is given, this
-            is the time in seconds required to reach the given snr.
+            If `t` is given, this is the SNR reached after `t` seconds. If `snr` is given,
+            this is the time in seconds required to reach the given SNR. The results are
+            given for each `TelescopeObj` passband or, if using a `CustomSource`, for the
+            passband defined in the `CustomSource` object.
         """
         #
         # Check some inputs (npix and nread will be checked later, in other functions)
@@ -1878,6 +1910,12 @@ class Photometry:
                 or encircled_energy <= 0
             ):
                 raise ValueError("`encircled_energy` must be a number between (0, 1]")
+        if isinstance(self.SourceObj, CustomSource) and include_redleak:
+            print(
+                "INFO: Red leak noise is not supported for `CustomSource` objects. "
+                + "Setting `include_redleak` to False..."
+            )
+            include_redleak = False
         #
         # Make some useful variables
         #
@@ -1982,8 +2020,11 @@ class Photometry:
         #
         # Calculate signal in each passband (flam -> electron/s)
         #
-        source_erate = dict.fromkeys(self.TelescopeObj.passbands, np.nan)
-        source_ab_mags = self.SourceObj.get_AB_mag(self.TelescopeObj)
+        if isinstance(self.SourceObj, CustomSource):
+            source_erate = dict.fromkeys([self.SourceObj.passband], np.nan)
+        else:
+            source_erate = dict.fromkeys(self.TelescopeObj.passbands, np.nan)
+            source_ab_mags = self.SourceObj.get_AB_mag(self.TelescopeObj)
         # (N.B. Unlike background noise, aper_weight_scale and npix cancel out for the
         # source electron/s calculation below. Thus, just use the original _eff_npix and
         # source_weights below; no need for npix or aper_weight_scale)
@@ -2010,23 +2051,20 @@ class Photometry:
                 source_erate[band] = (
                     erate_per_px * self._aper_mask * encircled_energy
                 )  # array containing the source-produced electron/s for each pixel
-                # Note that the method below used to be exactly equivalent to Eq. (2)
-                # since the nansum of source_weights and _eff_npix were equal. But because
-                # I changed how the source_weights were rendered for a point source, I am
-                # using _aper_mask in lieu of source_weights (since nansum of _aper_mask
-                # is still equal to _eff_npix). Again, this is completely equivalent to
-                # Eq. (2) from the link above.
-                # erate_per_px = (
-                #     mag_to_flux(
-                #         source_passband_mag,
-                #         zpt=self.TelescopeObj.phot_zpts[band],
-                #     )[0]
-                #     / self._eff_npix
-                # )  # electron/s/pixel
-                # source_erate[band] = (
-                #     erate_per_px * self.source_weights * encircled_energy
-                # )  # array containing the source-produced electron/s for each pixel
+        elif isinstance(self.SourceObj, CustomSource):
+            # The user's surface brightness profile should already give the electron/s
+            # induced by the source in the given passband for each pixel. The source
+            # weights are simply the user's inputted data, linearly interpolated to the
+            # TelescopeObj's pixel scale, and masked with the aperture mask.
+            source_erate[self.SourceObj.passband] = self.source_weights
         else:
+            surface_brightness_per_sq_arcsec = (
+                self.source_weights / self.SourceObj.area.to(u.arcsec ** 2).value
+            )
+            # Note that the source weights already account for the aperture overlapping
+            # different areas of the simulated source (e.g., an aperture overlapping just
+            # the edge of a galaxy will have different results compared to an aperture of
+            # the same area centered on the galaxy).
             for band in source_erate:
                 # Account for extinction
                 source_passband_mag = source_ab_mags[band] + (
@@ -2034,33 +2072,55 @@ class Photometry:
                 )
                 # Convert extinction-corrected AB mag to electron/s using Eq. (9) from the
                 # link above and the passband's photometric zero point
-                erate_per_sq_arcsec_per_px = mag_to_flux(
+                passband_erate = mag_to_flux(  # electron/s
                     source_passband_mag,
                     zpt=self.TelescopeObj.phot_zpts[band],
-                )[0] / (
-                    self._eff_npix * self.SourceObj.area.to(u.arcsec ** 2).value
-                )  # electron/s/arcsec^2/pixel
+                )[0]
                 source_erate[band] = (
-                    erate_per_sq_arcsec_per_px
-                    * self.source_weights
-                    * self._aper_area.to(u.arcsec ** 2).value
+                    passband_erate * surface_brightness_per_sq_arcsec * px_area_arcsec_sq
                 )  # array containing the source-produced electron/s for each pixel
-                # Note that the source weights already account for the aperture
-                # overlapping different areas of the simulated source (e.g., an aperture
-                # overlapping just the edge of a galaxy will have different results
-                # compared to an aperture of the same area centered on the galaxy).
-                #
-                # This is actually exactly the same as Eq. (9) from the link above. This
-                # is because taking the total "flux" of the source (in electron per
-                # second) divided by source area and multiplied by the source weights give
-                # the (pixel-by-pixel) surface brightness profile of the source. Then
-                # multiplying this by the aperture area and dividing by the number of
-                # pixels is the same as multiplying by the pixel area! The only difference
-                # in this approach is that any discretization effects in the
-                # pixel-rendeing of the aperture will mostly be "cancelled out" in the
-                # multiplication (and eventual summation) of the source weights and the
-                # division by _eff_npix, since both the source weights and _eff_npix are
-                # based on the same aperture mask.
+                # Note that procedure is actually exactly the same as Eq. (9) from the
+                # link above. This is because taking the total "flux" of the source (in
+                # electron per second) and dividing by source area and multiplying by the
+                # source weights give the (pixel-by-pixel) surface brightness profile of
+                # the source (per square arcsecond). Then we simply multiply by the pixel
+                # area (in square arseconds) to get the (pixel-by-pixel) electron/s
+                # induced by the source!
+        # else:
+        #     for band in source_erate:
+        #         # Account for extinction
+        #         source_passband_mag = source_ab_mags[band] + (
+        #             self.TelescopeObj.extinction_coeffs[band] * reddening
+        #         )
+        #         # Convert extinction-corrected AB mag to electron/s using Eq. (9) from the
+        #         # link above and the passband's photometric zero point
+        #         erate_per_sq_arcsec_per_px = mag_to_flux(
+        #             source_passband_mag,
+        #             zpt=self.TelescopeObj.phot_zpts[band],
+        #         )[0] / (
+        #             self._eff_npix * self.SourceObj.area.to(u.arcsec ** 2).value
+        #         )  # electron/s/arcsec^2/pixel
+        #         source_erate[band] = (
+        #             erate_per_sq_arcsec_per_px
+        #             * self.source_weights
+        #             * self._aper_area.to(u.arcsec ** 2).value
+        #         )  # array containing the source-produced electron/s for each pixel
+        #         # Note that the source weights already account for the aperture
+        #         # overlapping different areas of the simulated source (e.g., an aperture
+        #         # overlapping just the edge of a galaxy will have different results
+        #         # compared to an aperture of the same area centered on the galaxy).
+        #         #
+        #         # This is actually exactly the same as Eq. (9) from the link above. This
+        #         # is because taking the total "flux" of the source (in electron per
+        #         # second) divided by source area and multiplied by the source weights give
+        #         # the (pixel-by-pixel) surface brightness profile of the source. Then
+        #         # multiplying this by the aperture area and dividing by the number of
+        #         # pixels is the same as multiplying by the pixel area! The only difference
+        #         # in this approach is that any discretization effects in the
+        #         # pixel-rendeing of the aperture will mostly be "cancelled out" in the
+        #         # multiplication (and eventual summation) of the source weights and the
+        #         # division by _eff_npix, since both the source weights and _eff_npix are
+        #         # based on the same aperture mask.
         #
         # Calculate red leak (electron/s) at each pixel
         #
@@ -2070,7 +2130,10 @@ class Photometry:
         #
         # Calculate desired results (either integration time given SNR or SNR given time)
         #
-        results = dict.fromkeys(self.TelescopeObj.passbands)
+        if isinstance(self.SourceObj, CustomSource):
+            results = dict.fromkeys([self.SourceObj.passband])
+        else:
+            results = dict.fromkeys(self.TelescopeObj.passbands)
         dark_current = (
             self.TelescopeObj.dark_current * self.dark_current_weights * aper_weight_scale
         )

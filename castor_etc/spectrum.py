@@ -92,14 +92,7 @@ from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from . import constants as const
-from . import parameters as params
-from .conversions import (
-    calc_photon_energy,
-    convert_electron_flux_mag,
-    flam_to_AB_mag,
-    mag_to_flux,
-    fnu_to_flam,
-)
+from .conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
 from .filepaths import DATAPATH
 from .telescope import Telescope
 
@@ -131,9 +124,11 @@ class SpectrumMixin:
 
     def _check_existing_spectrum(self, overwrite, quiet=False):
         """
-        Check for existing spectrum. If self.wavelengths and/or self.spectrum is not None,
-        raise an error if overwrite is False; otherwise print a message notifying user
-        that the method will overwrite the existing spectrum (unless `quiet` is True).
+        Check for existing spectrum and if the source is a `CustomSource` instance. If the
+        object is a `CustomSource` instance, raise an error. If self.wavelengths and/or
+        self.spectrum is not None, raise an error if overwrite is False; otherwise print a
+        message notifying user that the method will overwrite the existing spectrum
+        (unless `quiet` is True).
 
         Parameters
         ----------
@@ -150,6 +145,9 @@ class SpectrumMixin:
         -------
           None
         """
+        from .sources import CustomSource  # avoid circular import error
+        if isinstance(self, CustomSource):
+            raise ValueError("A `CustomSource` object does not support a spectrum.")
         if self.wavelengths is not None or self.spectrum is not None:
             if not overwrite:
                 raise ValueError(
@@ -2124,6 +2122,10 @@ class NormMixin:
             #
             # Calculate the AB magnitude through each of the telescope's passbands
             #
+            if not isinstance(TelescopeObj, Telescope):
+                raise TypeError(
+                    "`TelescopeObj` must be a `castor_etc.telescope.Telescope` object."
+                )
             ab_mags = dict.fromkeys(TelescopeObj.passbands)
             spectrum_interp = interp1d(
                 x=wavelengths_AA,

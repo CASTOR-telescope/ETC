@@ -92,10 +92,12 @@ Here are some future plans for the ETC:
   Additionally, point sources should use the sampled PSF to calculate its encircled energy
   (we currently assume the point source PSF is a Gaussian).
 - Add slitless grism and multi-object spectroscopic capabilities to the ETC
-- Arbitrary source profiles (i.e., surface brightness profiles) based on a FITS file? Need
-  example file to see what information is typically provided.
+- Arbitrary source profiles (i.e., surface brightness profiles) based on a FITS file
+  _with_ spectrum? Not sure what I would be asking the user for in this case (e.g., what
+  unit should the FITS file data be in?)... Please let me know if you have any ideas!
 - Support simulating multiple sources within the same aperture (e.g., a point source on
   top of a galaxy).
+- Make unit tests and implement continuous integration.
 
 Important: do not hesitate to reach out (using one of the methods detailed
 [below](#questions-issues-suggestions-and-other-feedback)) if there are any features you

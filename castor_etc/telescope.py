@@ -496,10 +496,6 @@ class Telescope:
             not all(isinstance(band, str) for band in passbands)
         ):
             raise TypeError("passbands must be a 1D list of strings")
-        # if any(band not in params.PASSBANDS for band in passbands):
-        #     raise ValueError(
-        #         f"Invalid passbands. Valid passbands are: {params.PASSBANDS}"
-        #     )
         try:
             _ = passband_resolution.to(u.AA)
         except Exception:
