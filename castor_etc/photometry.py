@@ -1892,6 +1892,8 @@ class Photometry:
             given for each `TelescopeObj` passband or, if using a `CustomSource`, for the
             passband defined in the `CustomSource` object.
         """
+        # TODO: can further optimize case when source is a `CustomSource` (i.e., only
+        # calculate quantities in available passband)
         #
         # Check some inputs (npix and nread will be checked later, in other functions)
         #
