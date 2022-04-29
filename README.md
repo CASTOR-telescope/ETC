@@ -15,18 +15,51 @@ software. Likewise, there may be frequent updates to this package as the mission
 
 ## Table of Contents
 
-1. [Installation](#installation)
-2. [Building the Docker image for CANFAR/local machine](docker/README.md)
-3. [Viewing CANFAR Jupyter notebook session logs and Other Terminal
+1. [Launching on CANFAR](#launching-on-canfar)
+2. [Installation](#installation)
+3. [Building the Docker image for CANFAR/local machine](docker/README.md)
+4. [Viewing CANFAR Jupyter notebook session logs and Other Terminal
    Commands](docker/how_to_view_session_logs.md)
-4. Getting started and specific use-case examples: See the
+5. Getting started and specific use-case examples: See the
    [ETC_notebooks](https://github.com/CASTOR-telescope/ETC_notebooks) repository
    containing examples in Jupyter notebooks.
-5. The browser-based graphical user interface to complement this ETC is located in the
+6. The browser-based graphical user interface to complement this ETC is located in the
    [ETC_frontend](https://github.com/CASTOR-telescope/ETC_frontend) repository.
-6. [Known issues](#known-issues)
-7. [Roadmap](#roadmap)
-8. [Questions, Issues, Suggestions, and Other Feedback](#questions--issues)
+7. [Known issues](#known-issues)
+8. [Roadmap](#roadmap)
+9. [Questions, Issues, Suggestions, and Other Feedback](#questions--issues)
+
+## Launching on CANFAR
+
+1. Ensure you have a Canadian Astronomy Data Centre account (or [request
+   one](https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html) if you do not
+   have one yet).
+2. Go to [CANFAR](https://www.canfar.net/en/) and sign in to the [Science
+   Portal](https://www.canfar.net/science-portal/). If you cannot access this, then you
+   must send an email to [support@canfar.net](mailto:support@canfar.net) requesting access
+   to the Science Portal.
+3. Inside the [Science Portal](https://www.canfar.net/science-portal/), click the "`+`"
+   icon to launch a new session. Under "`type`", select "`notebook`". If multiple
+   `castor_etc` versions are available, you can select the specific version you would like
+   to use under the "`container image`" field. The version number is denoted by the string
+   following the colon (e.g., `images.canfar.net/castor/castor_etc:1.0.0` means version
+   `1.0.0` of the `castor_etc` notebook image).
+4. Assign a name to your Jupyter notebook container and choose the maximum amount of
+   memory (RAM) and maximum number of CPU cores you would like to have available for your
+   notebook container. Note that RAM and CPU are shared resources. A reasonable amount to
+   use, for example, would be 16 GB of RAM and 4 CPU cores. Larger RAM and CPU requests
+   are not uncommon, but please be mindful of others using the Science Portal.
+5. Click the blue "`Launch`" button to start your new `castor_etc` notebook session. It
+   can take up to a minute to launch the session depending on which computing node you are
+   assigned to and the last time the image was launched. Additionally, only 1 session of
+   each type is allowed at a time and they automatically shut down after 14 consecutive
+   days.
+6. The [JupyterLab](https://jupyter.org/) environment is set up to work "out of the box"
+   with the `castor_etc` Python package. You do not need to install the `castor_etc`
+   package separately; everything is running inside a
+   [`conda`](https://docs.conda.io/en/latest/) environment. In addition to `LaTeX`, other
+   convenience tools like `git` are preloaded as well. Feel free to suggest any changes to
+   the default configuration.
 
 ## Installation
 
