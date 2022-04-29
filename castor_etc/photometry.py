@@ -346,9 +346,9 @@ class Photometry:
         See the docstring of `show_aper_weights()` for more details.
 
         Note that changing the source weights for a point source will not affect the final
-        photometry calculation. Instead, set the `encircled_energy` parameter in the
-        `calc_snr_or_t()` method. These weights are still useful in visualizing the point
-        source.
+        photometry calculation (again, only for point sources). Instead, set the
+        `encircled_energy` parameter in the `calc_snr_or_t()` method. These weights are
+        still useful in visualizing the point source.
 
         Parameters
         ----------
@@ -388,7 +388,7 @@ class Photometry:
             print(
                 "INFO: Note that, while these weights are useful in visualizing the point "
                 + "source, changing the source weights for a point source will not affect "
-                + "the final photometry calculation."
+                + "the final photometry calculation (again, only for point sources)."
                 + "\n      Instead, set the `encircled_energy` parameter in the "
                 + "`calc_snr_or_t()` method to affect the signal-to-noise or "
                 + "integration time calculations."
