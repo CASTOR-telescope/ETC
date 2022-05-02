@@ -922,12 +922,9 @@ class CustomSource(Source):
         doing photometry calculations. Note that any user-requested values outside the
         given data's extent will be set to zero.
 
-        This `Source` class is useful if you want to bypass the internal source surface
-        brightness profile and spectrum generation while using the ETC's other
-        functionality (e.g., aperture photometry, sky background estimation, etc.). An
-        important limitation, however, is that photometry calculations using a
-        `CustomSource` object will not include red leak, as `CustomSource` objects do not
-        support a separate spectrum.
+        This `CustomSource` class is useful if you want to bypass the internal source
+        surface brightness profile and spectrum generation while using the ETC's other
+        functionality (e.g., aperture photometry, sky background estimation, etc.).
 
         Parameters
         ----------

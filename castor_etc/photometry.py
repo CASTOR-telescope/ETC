@@ -161,7 +161,6 @@ class Photometry:
         self.source_weights = None
         self.sky_background_weights = None
         self.dark_current_weights = None
-        self.redleak_weights = None
         # Attributes for internal use
         self._aper_area = None  # exact area of the aperture from given aperture params
         self._aper_xs = None  # array containing x-coordinates of pixels
@@ -251,10 +250,6 @@ class Photometry:
             The pixel weights for the dark current. This is currently all ones (1) (i.e.,
             uniform noise).
 
-          redleak_weights :: (M x N) 2D array of floats
-            The pixel weights for the redleak. This is currently all ones (1) (i.e.,
-            uniform noise).
-
         Returns
         -------
           center_px :: 2-element 1D list of floats
@@ -267,7 +262,7 @@ class Photometry:
                 "An aperture for this `Photometry` object already exists. "
                 + "Use `overwrite=True` to allow overwriting of the aperture "
                 + " and all associated weights (i.e., source, sky background, "
-                + "dark current, and red leak weights will all be reset)."
+                + "and dark current weights will all be reset)."
             )
         px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
         half_px_scale = 0.5 * px_scale_arcsec  # to ensure correct arange/extent
@@ -283,10 +278,9 @@ class Photometry:
             ys[-1] + half_px_scale + center[1],
         ]  # we use +/- half_px_scale to center matplotlib tickmarks on pixels
 
-        # Assume uniform background noise, dark current, and red leak
+        # Assume uniform background noise and dark current over photometry aperture
         self.sky_background_weights = np.ones_like(self._aper_xs)
         self.dark_current_weights = np.ones_like(self._aper_xs)
-        self.redleak_weights = np.ones_like(self._aper_xs)
 
         # Find pixel that corresponds to center of the source
         center_px = [
@@ -580,55 +574,12 @@ class Photometry:
             )
         self.dark_current_weights = dark_current_weights
 
-    def set_redleak_weights(self, redleak_weights):
-        """
-        Set the pixel weights for the red leak. The value of these weights represent the
-        amount of red leak contamination in each pixel. By default, the red leak weights
-        are uniform (i.e., equal to 1.0) over the aperture. Unlike all the other pixel
-        weights, the red leak weights do NOT include fractional pixel weighting based on
-        the aperture mask to prevent double-counting of the aperture weights during the
-        red leak calculation.
-
-        When doing photometry calculations, these red leak weights will be multiplied with
-        the calculated red leak value per pixel and summed pixel-by-pixel to determine the
-        total red leak noise; any pixels with a value of NaN are excluded from the
-        summation.
-
-        No restrictions are placed on the value of the red leak weights, but the user is
-        responsible for ensuring they make sense in the relevant context. For example, if
-        one pixel in the aperture has double the red leak flux while the rest of the
-        pixels have the average red leak value, the user should set that one pixel to have
-        a red leak weight of 2.0 and keep the other red leak weights at 1.0 (as opposed to
-        setting that one pixel weight to 1.0 while changing the other weights to 0.5). As
-        a reminder, this is because the total red leak contamination is based on
-        multiplying the red leak per pixel by these red leak weights---the latter scenario
-        would decrease the total red leak value as opposed to slightly increasing it...
-
-        Parameters
-        ----------
-          redleak_weights :: (M x N) 2D array of floats
-            The pixel weights for the redleak. The shape must match the shape of the
-            aperture array (see `source_weights` attribute).
-
-        Attributes
-        -------
-          redleak_weights :: (M x N) 2D array of floats
-            The pixel weights for the redleak.
-        """
-        if self.source_weights is None:
-            raise ValueError("Please select an aperture first.")
-        if redleak_weights.shape != self.source_weights.shape:
-            raise ValueError(
-                "`redleak_weights` must have same shape as `source_weights`."
-            )
-        self.redleak_weights = redleak_weights
-
     def _remove_aper_mask_nan_row_col(self, center):
         """
         Remove columns and rows of the aperture mask containing all NaNs. Modifies the
         following attributes: `_aper_mask`, `source_weights`, `sky_background_weights`,
-        `dark_current_weights`, `redleak_weights`, `_aper_xs`, `_aper_ys`. Also updates
-        `_aper_extent` to reflect changed arrays.
+        `dark_current_weights`, `_aper_xs`, `_aper_ys`. Also updates `_aper_extent` to
+        reflect changed arrays.
 
         Parameters
         ----------
@@ -662,10 +613,6 @@ class Photometry:
             The pixel weights for the dark current. Now without rows and columns
             containing only NaNs (based on _aper_mask).
 
-          redleak_weights :: (M x N) 2D array of floats
-            The pixel weights for the red leak. Now without rows and columns containing
-            only NaNs (based on _aper_mask).
-
           _aper_xs :: (M x N) 2D array of floats
             The aperture array containing the x-coordinates (in arcsec) relative to the
             center of the aperture. Now without rows and columns containing only NaNs
@@ -695,7 +642,6 @@ class Photometry:
                     self.source_weights,
                     self.sky_background_weights,
                     self.dark_current_weights,
-                    self.redleak_weights,
                     self._aper_xs,
                     self._aper_ys,
                 ],
@@ -703,7 +649,6 @@ class Photometry:
                     "source_weights",
                     "sky_background_weights",
                     "dark_current_weights",
-                    "redleak_weights",
                     "_aper_xs",
                     "_aper_ys",
                 ],
@@ -803,9 +748,6 @@ class Photometry:
           dark_current_weights :: (M x N) 2D array of floats
             The pixel weights for the dark current.
 
-          redleak_weights :: (M x N) 2D array of floats
-            The pixel weights for the red leak.
-
         Returns
         -------
           None
@@ -866,11 +808,6 @@ class Photometry:
         self.source_weights = source_weights * aper_mask
         self.sky_background_weights *= aper_mask
         self.dark_current_weights *= aper_mask
-        # (Do NOT include fractional pixel weights for red leak weights to prevent
-        # double-counting of fractional pixel weights in `_calc_redleaks()`)
-        self.redleak_weights *= np.ma.masked_where(
-            np.isfinite(aper_mask), aper_mask, copy=True
-        ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
         #
         # Find the encircled energy fraction
@@ -969,9 +906,6 @@ class Photometry:
           dark_current_weights :: (M x N) 2D array of floats
             The pixel weights for the dark current.
 
-          redleak_weights :: (M x N) 2D array of floats
-            The pixel weights for the red leak.
-
         Returns
         -------
           None
@@ -1052,11 +986,6 @@ class Photometry:
         self.source_weights = source_weights * aper_mask
         self.sky_background_weights *= aper_mask
         self.dark_current_weights *= aper_mask
-        # (Do NOT include fractional pixel weights for red leak weights to prevent
-        # double-counting of fractional pixel weights in `_calc_redleaks()`)
-        self.redleak_weights *= np.ma.masked_where(
-            np.isfinite(aper_mask), aper_mask, copy=True
-        ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
         #
         # Find the encircled energy if doing point source photometry
@@ -1184,9 +1113,6 @@ class Photometry:
           dark_current_weights :: (M x N) 2D array of floats
             The pixel weights for the dark current.
 
-          redleak_weights :: (M x N) 2D array of floats
-            The pixel weights for the red leak.
-
         Returns
         -------
           None
@@ -1260,11 +1186,6 @@ class Photometry:
         self.source_weights = source_weights * aper_mask
         self.sky_background_weights *= aper_mask
         self.dark_current_weights *= aper_mask
-        # (Do NOT include fractional pixel weights for red leak weights to prevent
-        # double-counting of fractional pixel weights in `_calc_redleaks()`)
-        self.redleak_weights *= np.ma.masked_where(
-            np.isfinite(aper_mask), aper_mask, copy=True
-        ).filled(1.0)
         self._eff_npix = np.nansum(aper_mask)
         #
         # Find the encircled energy if doing point source photometry
@@ -1442,166 +1363,12 @@ class Photometry:
                 )
         return redleak_fracs
 
-    def _calc_redleaks(
-        self, source_erate, mirror_area_cm_sq, include_redleak=True, quiet=False
-    ):
-        """
-        Calculate the red leak of a source (in electron/s) from its in-passband red leak
-        fraction. The in-passband red leak fraction is defined to be the ratio of red leak
-        electron/s to in-passband electron/s.
-
-        This is a robust way to calculate red leaks that is independent of how
-        source_erate is determined and independent of any normalizations. It simply scales
-        each pixel's electron rate (i.e., electron/s) in each passband by its respective
-        in-passband red leak fraction to get the red leak electron rate.
-
-        Parameters
-        ----------
-          source_erate :: dict of 2D arrays
-            Dictionary containing the pixel-by-pixel electron rate (i.e., electron/s)
-            induced by the source in each passband. In other words, this is the
-            pixel-by-pixel signal in each passband.
-
-          mirror_area_cm_sq :: float
-            The area of the telescope's mirror in square centimeters.
-
-          include_redleak :: bool
-            If False, do not include red leak (i.e., the returned dictionary will be
-            zeroes).
-
-          quiet :: bool
-            If True, suppress warnings from in-passband red leak fraction calculations.
-
-        Returns
-        -------
-          redleaks :: dict of 2D arrays
-            Dictionary containing the pixel-by-pixel red leak values (in electron/s).
-        """
-        #
-        # Calculate in-passband redleak fraction (red leak electron/s to passband
-        # electron/s)
-        #
-        redleak_fracs = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
-        if include_redleak:
-            if isinstance(self.SourceObj, CustomSource):
-                raise AttributeError("Custom sources do not have red leak fractions!")
-            #
-            # Make useful source spectrum-derived quantities
-            #
-            source_wavelengths_AA = self.SourceObj.wavelengths.to(u.AA).value
-            source_photon_s_A = (  # photon/s/A
-                self.SourceObj.spectrum  # erg/s/cm^2/A
-                * mirror_area_cm_sq  # cm^2
-                / calc_photon_energy(wavelength=source_wavelengths_AA)[0]  # photon/erg
-            )
-            source_interp = interp1d(
-                source_wavelengths_AA,
-                source_photon_s_A,
-                kind="linear",
-                bounds_error=False,
-                fill_value=np.nan,
-            )  # photon/s/A
-            #
-            # Find in-passband redleak fraction per band
-            #
-            for band in redleak_fracs:
-                full_response_curve_wavelengths_AA = (
-                    self.TelescopeObj.full_passband_curves[band]["wavelength"]
-                    .to(u.AA)
-                    .value
-                )
-                is_redleak = (
-                    full_response_curve_wavelengths_AA
-                    > self.TelescopeObj.redleak_thresholds[band].to(u.AA).value
-                )
-                is_in_passband = (
-                    full_response_curve_wavelengths_AA
-                    >= self.TelescopeObj.passband_limits[band][0].to(u.AA).value
-                ) & (
-                    full_response_curve_wavelengths_AA
-                    <= self.TelescopeObj.passband_limits[band][1].to(u.AA).value
-                )
-                redleak_wavelengths = full_response_curve_wavelengths_AA[is_redleak]
-                in_passband_wavelengths = full_response_curve_wavelengths_AA[
-                    is_in_passband
-                ]
-                redleak_per_A = (
-                    source_interp(redleak_wavelengths)
-                    * self.TelescopeObj.full_passband_curves[band]["response"][is_redleak]
-                )  # electron/s/A
-                passband_erate_per_A = (
-                    source_interp(in_passband_wavelengths)
-                    * self.TelescopeObj.full_passband_curves[band]["response"][
-                        is_in_passband
-                    ]
-                )  # electron/s/A
-                isgood_redleak = np.isfinite(redleak_per_A)  # don't include NaNs
-                isgood_passband = np.isfinite(passband_erate_per_A)  # don't include NaNs
-                if not quiet and (
-                    not np.all(isgood_redleak) or not np.all(isgood_passband)
-                ):
-                    warnings.warn(
-                        "Could not estimate in-passband red leak fraction "
-                        + f"at 1 or more wavelengths in {band}-band. "
-                        + "This may just be caused by the source spectrum not being "
-                        + f"defined at all wavelengths present in the {band}-band "
-                        + "definition file (here, the relevant wavelengths range from "
-                        + f"{round(min(redleak_wavelengths), 2)} A to "
-                        + f"{round(max(redleak_wavelengths), 2)} A) "
-                        + "and is typically not a reason to worry. "
-                        + "This warning can be suppressed with `quiet=True`.",
-                        RuntimeWarning,
-                    )
-                try:
-                    redleak_per_px = simpson(  # electron/s (per px)
-                        y=redleak_per_A[isgood_redleak],
-                        x=redleak_wavelengths[isgood_redleak],
-                        even="avg",
-                    )
-                    passband_erate_per_px = simpson(  # electron/s (per px)
-                        y=passband_erate_per_A[isgood_passband],
-                        x=in_passband_wavelengths[isgood_passband],
-                        even="avg",
-                    )
-                    redleak_frac = redleak_per_px / passband_erate_per_px
-                except Exception:
-                    raise RuntimeError(
-                        "Unable to calculate in-passband red leak fraction for "
-                        + f"{band}-band! Please ensure there is at least 1 wavelength "
-                        + "that is above the red leak threshold."
-                    )
-                if np.isfinite(redleak_frac):
-                    # Important: note that redleak_weights should not have fractional
-                    # pixel weighting based on the aperture mask or else the aperture
-                    # weights will be double-counted when the redleak_fracs arrays are
-                    # multiplied by the source_erates...
-                    redleak_fracs[band] = redleak_frac * self.redleak_weights
-                elif not quiet:
-                    warnings.warn(
-                        "Source in-passband red leak fraction could not be calculated "
-                        + f"in {band}-band!",
-                        RuntimeWarning,
-                    )
-        #
-        # Calculate red leak from in-passband red leak fraction
-        #
-        if isinstance(self.SourceObj, CustomSource):
-            redleaks = dict.fromkeys([self.SourceObj.passband])
-        else:
-            redleaks = dict.fromkeys(self.TelescopeObj.passbands)
-        for band in redleaks:
-            # (Recall source_erate includes fractional pixel weighting from aperture mask)
-            redleaks[band] = redleak_fracs[band] * source_erate[band]
-        #
-        return redleaks
-
     @staticmethod
     def _calc_snr_from_t(
         t,
         signal,
         totskynoise,
         darkcurrent,
-        redleak,
         readnoise,
         read_npix,
         nread=1,
@@ -1618,22 +1385,22 @@ class Photometry:
           - t is the integration time in seconds
           - Q is the total signal due to the source in electrons/s
           - N_pix is the number of pixels occupied by the source on the detector
-          - Other_Poisson = (B_Earthshine + B_zodi + B_geocoronal + Darkcurrent + Redleak)
-          is the total Poisson noise due to the sky backgorund (Earthshine, zodiacal
-          light, and geocoronal emission), dark current, and red leak in electrons/s (per
-          pixel)
+          - Other_Poisson = (B_Earthshine + B_zodi + B_geocoronal + Darkcurrent)
+            is the total Poisson noise due to the sky backgorund (Earthshine, zodiacal
+            light, and geocoronal emission), and dark current in electrons/s (per
+            pixel)
           - N_read is the number of detector readouts
           - Read is the detector read noise in electrons (per pixel)
         The equation above is based on the formula detailed here:
         <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-6-estimating-exposure-times>.
 
         In practice, the calculation takes in 2D arrays for the source signal, sky
-        background, dark current, and red leak. The factor of N_pix is already included
-        for these arrays since they have fractional pixel weighting. Therefore, simply
-        summing up these arrays (excluding NaNs) is enough to calculate the total
-        contribution from that element without further multiplying by N_pix. The only
-        exception is N_read and the read noise, which are scalars and must be multiplied
-        by an integer number of pixels.
+        background, and dark current. The factor of N_pix is already included for these
+        arrays since they have fractional pixel weighting. Therefore, simply summing up
+        these arrays (excluding NaNs) is enough to calculate the total contribution from
+        that element without further multiplying by N_pix. The only exception is N_read
+        and the read noise, which are scalars and must be multiplied by an integer number
+        of pixels.
 
 
         Parameters
@@ -1657,11 +1424,6 @@ class Photometry:
             aperture. This should include fractional pixel weighting from the aperture
             mask.
 
-          darkcurrent :: (M x N) 2D array of scalars
-            2D array giving the red leak in electron/s for each pixel in the
-            aperture. This should include fractional pixel weighting from the aperture
-            mask.
-
           readnoise :: int or float
             The detector read noise in electron (per pixel).
 
@@ -1680,7 +1442,7 @@ class Photometry:
         #
         # Check inputs
         #
-        variables = [t, signal, totskynoise, readnoise, darkcurrent, redleak, nread]
+        variables = [t, signal, totskynoise, readnoise, darkcurrent, nread]
         if np.any([isinstance(var, u.Quantity) for var in variables]):
             raise ValueError(
                 "All inputs must be scalars or scalar arrays. "
@@ -1696,7 +1458,7 @@ class Photometry:
         signal_t = np.nansum(signal * t)  # electron
         noise = np.sqrt(
             signal_t
-            + np.nansum(t * (totskynoise + darkcurrent + redleak))
+            + np.nansum(t * (totskynoise + darkcurrent))
             + (read_npix * readnoise * readnoise * nread)
         )  # electron
         snr = signal_t / noise
@@ -1708,7 +1470,6 @@ class Photometry:
         signal,
         totskynoise,
         darkcurrent,
-        redleak,
         readnoise,
         read_npix,
         nread=1,
@@ -1731,10 +1492,10 @@ class Photometry:
           - t is the integration time in seconds
           - Q is the total signal due to the source in electrons/s
           - N_pix is the number of pixels occupied by the source on the detector
-          - Other_Poisson = (B_Earthshine + B_zodi + B_geocoronal + Darkcurrent + Redleak)
-          is the total Poisson noise due to the sky backgorund (Earthshine, zodiacal
-          light, and geocoronal emission), dark current, and red leak in electrons/s (per
-          pixel)
+          - Other_Poisson = (B_Earthshine + B_zodi + B_geocoronal + Darkcurrent)
+            is the total Poisson noise due to the sky backgorund (Earthshine, zodiacal
+            light, and geocoronal emission), and dark current in electrons/s (per
+            pixel)
           - N_read is the number of detector readouts
           - Read is the detector read noise in electrons (per pixel)
         Note that this is simply the quadratic formula applied to the generic SNR
@@ -1742,12 +1503,12 @@ class Photometry:
         <https://hst-docs.stsci.edu/wfc3ihb/chapter-9-wfc3-exposure-time-calculation/9-6-estimating-exposure-times>.
 
         In practice, the calculation takes in 2D arrays for the source signal, sky
-        background, dark current, and red leak. The factor of N_pix is already included
-        for these arrays since they have fractional pixel weighting. Therefore, simply
-        summing up these arrays (excluding NaNs) is enough to calculate the total
-        contribution from that element without further multiplying by N_pix. The only
-        exception is N_read and the read noise, which are scalars and must be multiplied
-        by an integer number of pixels.
+        background, and dark current. The factor of N_pix is already included for these
+        arrays since they have fractional pixel weighting. Therefore, simply summing up
+        these arrays (excluding NaNs) is enough to calculate the total contribution from
+        that element without further multiplying by N_pix. The only exception is N_read
+        and the read noise, which are scalars and must be multiplied by an integer number
+        of pixels.
 
         Parameters
         ----------
@@ -1770,11 +1531,6 @@ class Photometry:
             aperture. This should include fractional pixel weighting from the aperture
             mask.
 
-          darkcurrent :: (M x N) 2D array of scalars
-            2D array giving the red leak in electron/s for each pixel in the
-            aperture. This should include fractional pixel weighting from the aperture
-            mask.
-
           readnoise :: int or float
             The detector read noise in electron (per pixel).
 
@@ -1790,7 +1546,7 @@ class Photometry:
           t :: float
             The time required to reach the given SNR in seconds.
         """
-        variables = [snr, signal, totskynoise, readnoise, darkcurrent, redleak, nread]
+        variables = [snr, signal, totskynoise, readnoise, darkcurrent, nread]
         if np.any([isinstance(var, u.Quantity) for var in variables]):
             raise ValueError(
                 "All inputs must be scalars or scalar arrays. "
@@ -1806,7 +1562,7 @@ class Photometry:
         snr_sq = snr * snr
         tot_sig = np.nansum(signal)
         signal_sq = tot_sig * tot_sig
-        poisson_noise = tot_sig + np.nansum(totskynoise + darkcurrent + redleak)
+        poisson_noise = tot_sig + np.nansum(totskynoise + darkcurrent)
         #
         # Calculate time to reach target SNR
         #
@@ -1824,7 +1580,6 @@ class Photometry:
         encircled_energy=None,
         npix=None,
         nread=1,
-        include_redleak=True,
         quiet=False,
     ):
         """
@@ -1835,13 +1590,11 @@ class Photometry:
         should have its spectrum in units of flam (erg/s/cm^2/A) unless it is a
         `CustomSource` object.
 
-        Note that calculations involving the `CustomSource` object do not include red leak
-        noise, as `CustomSource` instances do not support a source spectrum. For the same
-        reason, the `reddening` parameter will be ignored since the `CustomSource`
-        object's surface brightness profile should already be in units of electron/s
-        (given for each pixel). Additionally, the SNR/integration time calculation will
-        only be performed for the passband corresponding to the `CustomSource` object's
-        surface brightness profile.
+        Note that, for `CustomSource` objects, the `reddening` parameter will be ignored
+        since the `CustomSource` object's surface brightness profile should already be in
+        units of electron/s (given for each pixel). Additionally, the SNR/integration time
+        calculation will only be performed for the passband corresponding to the
+        `CustomSource` object's surface brightness profile.
 
         Parameters
         ----------
@@ -1876,13 +1629,9 @@ class Photometry:
           nread :: int
             Number of detector readouts.
 
-          include_redleak :: bool
-            If False, the redleak contribution to the total noise is not included. May be
-            useful if the source spectrum is, for example, uniform.
-
           quiet :: bool
-            If True, suppress warning messages from any red leak calculations. Only
-            matters if include_redleak is True.
+            If True, do not print an info message about ignoring the `reddening` parameter
+            when using a `CustomSource`.
 
         Returns
         -------
@@ -1912,10 +1661,10 @@ class Photometry:
                 or encircled_energy <= 0
             ):
                 raise ValueError("`encircled_energy` must be a number between (0, 1]")
-        if isinstance(self.SourceObj, CustomSource) and include_redleak:
+        if isinstance(self.SourceObj, CustomSource) and not quiet:
             print(
-                "INFO: Red leak noise is not supported for `CustomSource` objects. "
-                + "Setting `include_redleak` to False..."
+                "INFO: The `reddening` parameter is ignored for `CustomSource` objects. "
+                + "You can silence this message by setting `quiet=True`."
             )
             include_redleak = False
         #
@@ -2126,12 +1875,6 @@ class Photometry:
         #         # division by _eff_npix, since both the source weights and _eff_npix are
         #         # based on the same aperture mask.
         #
-        # Calculate red leak (electron/s) at each pixel
-        # REVIEW: red leak is not a separate term in Poisson noise?
-        #
-        redleaks = self._calc_redleaks(
-            source_erate, mirror_area_cm_sq, include_redleak=include_redleak, quiet=quiet
-        )
         #
         # Calculate desired results (either integration time given SNR or SNR given time)
         #
@@ -2149,7 +1892,6 @@ class Photometry:
                     signal=source_erate[band],
                     totskynoise=sky_background_erate[band],
                     darkcurrent=dark_current,
-                    redleak=redleaks[band],
                     readnoise=self.TelescopeObj.read_noise,  # constant per pixel
                     read_npix=int(np.ceil(npix)),  # only used for readnoise and nread
                     nread=nread,
@@ -2161,7 +1903,6 @@ class Photometry:
                     signal=source_erate[band],
                     totskynoise=sky_background_erate[band],
                     darkcurrent=dark_current,
-                    redleak=redleaks[band],
                     readnoise=self.TelescopeObj.read_noise,  # constant per pixel
                     read_npix=int(np.ceil(npix)),  # only used for readnoise and nread
                     nread=nread,
