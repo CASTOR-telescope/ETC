@@ -1921,11 +1921,6 @@ class Photometry:
         #
         # Make some useful variables
         #
-        response_curve_wavelengths_AA = dict.fromkeys(self.TelescopeObj.passbands)
-        for band in response_curve_wavelengths_AA:
-            response_curve_wavelengths_AA[band] = (
-                self.TelescopeObj.passband_curves[band]["wavelength"].to(u.AA).value
-            )
         if npix is None:
             aper_weight_scale = 1.0  # don't scale aperture weights
             npix = self._eff_npix
@@ -1977,6 +1972,11 @@ class Photometry:
         #
         # Add geocoronal emission line contribution to sky background
         #
+        passband_limits_AA = dict.fromkeys(self.TelescopeObj.passband_limits)
+        for band in passband_limits_AA:
+            passband_limits_AA[band] = (
+                self.TelescopeObj.passband_limits[band].to(u.AA).value
+            )
         # REVIEW: remove requirement for linewidth? Unused here... Maybe need it for spectroscopy?
         for gw, gf, gl in zip(
             self.BackgroundObj.geo_wavelength,
@@ -1985,8 +1985,8 @@ class Photometry:
         ):
             for band in self.TelescopeObj.passbands:
                 # Add geocoronal emission (electron/s) to proper passband(s)
-                if (gw >= response_curve_wavelengths_AA[band][0]) and (
-                    gw <= response_curve_wavelengths_AA[band][-1]
+                if (gw >= passband_limits_AA[band][0]) and (
+                    gw <= passband_limits_AA[band][-1]
                 ):
                     # (Doing this in the if statement since each geocoronal emission line
                     # is likely only in 1 band. Reduces unnecessary computation)
@@ -1997,8 +1997,10 @@ class Photometry:
                         / calc_photon_energy(wavelength=gw)[0]
                     )  # photon/s
                     response_interp = interp1d(
-                        response_curve_wavelengths_AA[band],
-                        self.TelescopeObj.passband_curves[band]["response"],
+                        self.TelescopeObj.full_passband_curves[band]["wavelength"]
+                        .to(u.AA)
+                        .value,
+                        self.TelescopeObj.full_passband_curves[band]["response"],
                         kind="linear",
                         bounds_error=False,
                         fill_value=np.nan,
@@ -2125,6 +2127,7 @@ class Photometry:
         #         # based on the same aperture mask.
         #
         # Calculate red leak (electron/s) at each pixel
+        # REVIEW: red leak is not a separate term in Poisson noise?
         #
         redleaks = self._calc_redleaks(
             source_erate, mirror_area_cm_sq, include_redleak=include_redleak, quiet=quiet

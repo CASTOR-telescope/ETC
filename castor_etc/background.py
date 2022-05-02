@@ -319,7 +319,7 @@ class Background:
         for band in TelescopeObj.passband_limits:
             sky_background_flam = 0.0
             passband_wavelengths = (
-                TelescopeObj.passband_curves[band]["wavelength"].to(u.AA).value
+                TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
             )
             if (
                 self.earthshine_flam is not None
@@ -349,7 +349,7 @@ class Background:
                 mags_per_sq_arcsec[band] = flam_to_AB_mag(
                     passband_wavelengths[isgood_passband],
                     sky_background_flam[isgood_passband],
-                    TelescopeObj.passband_curves[band]["response"][isgood_passband],
+                    TelescopeObj.full_passband_curves[band]["response"][isgood_passband],
                 )
         return mags_per_sq_arcsec
 

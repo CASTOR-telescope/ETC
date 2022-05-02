@@ -146,6 +146,7 @@ class SpectrumMixin:
           None
         """
         from .sources import CustomSource  # avoid circular import error
+
         if isinstance(self, CustomSource):
             raise ValueError("A `CustomSource` object does not support a spectrum.")
         if self.wavelengths is not None or self.spectrum is not None:
@@ -286,7 +287,7 @@ class SpectrumMixin:
         redshift=0.0,
         emissivity=1.0,
         wavelengths=None,
-        limits=[0.1, 1.2] << u.um,
+        limits=[0.09, 1.2] << u.um,
         resolution=1 << u.nm,
         radius=1,
         dist=1 << u.kpc,
@@ -2136,7 +2137,7 @@ class NormMixin:
             )
             for band in TelescopeObj.passband_limits:
                 passband_wavelengths = (
-                    TelescopeObj.passband_curves[band]["wavelength"].to(u.AA).value
+                    TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
                 )
                 passband_spectrum = spectrum_interp(passband_wavelengths)
                 isgood_passband = np.isfinite(passband_spectrum)  # do not integrate NaNs
@@ -2155,6 +2156,6 @@ class NormMixin:
                 ab_mags[band] = flam_to_AB_mag(
                     passband_wavelengths[isgood_passband],
                     passband_spectrum[isgood_passband],
-                    TelescopeObj.passband_curves[band]["response"][isgood_passband],
+                    TelescopeObj.full_passband_curves[band]["response"][isgood_passband],
                 )
             return ab_mags

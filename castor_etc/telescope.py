@@ -340,6 +340,8 @@ class Telescope:
             produces 1 electron/s in the passband.
 
           passband_curves :: dict of dicts
+            ! This has since been deprecated and is not used anymore !
+            ! See `full_passband_curves` instead !
             Dictionary containing the passband response curves for each passband
             interpolated to the given `passband_resolution`, only spanning the wavelength
             range of each passband. The dictionary keys are the passband names and each
@@ -369,12 +371,13 @@ class Telescope:
             `passband_response_filepaths`) and interpolated to the given
             `passband_resolution`.
             Note that, to minimize NaNs at the edges of the passband response curves
-            caused by floating point errors in the interpolation evaluation, the maximum
-            wavelength of these full passband curves is 1 `passband_resolution` unit less
-            than the max wavelength from the passband definition files. For example, if a
-            passband file goes up to 11000 A and the desired interpolation resolution is
-            10 A, the maximum wavelength in this `full_passband_curves` entry will be
-            10990 A.
+            caused by floating point errors in the interpolation evaluation, the minimum
+            and maximum wavelength of these full passband curves is 0.5
+            `passband_resolution` unit more/less than the min/max wavelength from the
+            passband definition files, respectively. For example, if a passband file
+            contains wavelengths between [1000, 11000] A and the desired interpolation
+            resolution is 10 A, the minimum and maximum wavelengths in this
+            `full_passband_curves` entry will be 1005 A and 10995 A, respectively.
 
           fwhm :: `astropy.Quantity` angle
             The angular full-width at half-maximum of the telescope's PSF.
@@ -621,7 +624,7 @@ class Telescope:
 
         if phot_zpts is None:
             phot_zpts = Telescope.calc_phot_zpts(
-                self.passband_curves,
+                self.full_passband_curves,
                 mirror_area=self.mirror_area.to(u.cm ** 2).value,
                 **phot_zpts_kwargs,
             )
@@ -632,8 +635,8 @@ class Telescope:
             for band in passbands:
                 passband_pivots[band] = (
                     Telescope.calc_pivot_wavelength(
-                        self.passband_curves[band]["wavelength"].value,
-                        self.passband_curves[band]["response"],
+                        self.full_passband_curves[band]["wavelength"].value,
+                        self.full_passband_curves[band]["response"],
                         response_func="EE",
                     )
                     * passband_response_fileunits[band]
@@ -734,8 +737,9 @@ class Telescope:
             wavelength limits for that passband (inclusive). For example:
             `{"uv": [150, 300] * u.nm, "u": [300, 400] * u.nm, "g": [400, 550] * u.nm}.`
             If None, the limits will be the minimum and maximum wavelength in the files
-            (note that the maximum wavelength might be slightly greater/smaller than the
-            actual maximum wavelength in the file because of floating point errors).
+            (note that, if resolution is not None, the minimum/maximum wavelength will be
+            slightly greater/smaller than the actual minimum/maximum wavelength in the
+            file to mitigate floating point errors).
 
           file_units :: dict of `astropy.Quantity` lengths
             The units of the wavelength data in the passband response curve files.
@@ -819,13 +823,14 @@ class Telescope:
             if resolutions is not None:
                 for band in limits:
                     limits[band] = [
-                        curves[band][0].values[0],
+                        curves[band][0].values[0] + 0.5 * resolutions[band],
                         curves[band][0].values[-1] - 0.5 * resolutions[band],
-                        # N.B. the subtraction above helps avoid overestimating the max
-                        # wavelength (due to floating point errors), which would result in
-                        # NaNs. This is at the expense of not including the lastmost data
-                        # point. (But again, the lastmost data point might be NaN anyway
-                        # because of floating point errors...)
+                        # N.B. the subtraction above helps avoid
+                        # underestimating/overestimating the min/max wavelength (due to
+                        # floating point errors), which would result in NaNs. This is at
+                        # the expense of not including the outermost data points. (But
+                        # again, the outermost data points might be NaN anyway because of
+                        # floating point errors...)
                     ]
             else:
                 for band in limits:
