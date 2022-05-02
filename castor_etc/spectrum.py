@@ -2135,7 +2135,7 @@ class NormMixin:
                 bounds_error=False,
                 fill_value=np.nan,
             )
-            for band in TelescopeObj.passband_limits:
+            for band in TelescopeObj.passbands:
                 passband_wavelengths = (
                     TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
                 )

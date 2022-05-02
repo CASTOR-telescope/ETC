@@ -1624,7 +1624,7 @@ class Photometry:
             integer. Finally, this value does not affect the total signal of the
             source---only the non-signal-derived noise values are affected (e.g., higher
             npix means higher total sky background, dark current, and read noise but not
-            higher signal nor redleak).
+            higher signal).
 
           nread :: int
             Number of detector readouts.
