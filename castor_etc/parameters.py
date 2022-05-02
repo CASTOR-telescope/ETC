@@ -83,28 +83,8 @@ PASSBAND_LIMITS = {
     "g": [0.400, 0.550] << u.um,
 }  # microns
 
-# Total wavelength range spanned by the passbands
-# PASSBAND_TOT_LIMITS = [
-#     min(PASSBAND_LIMITS.values(), key=lambda x: x[0])[0],
-#     max(PASSBAND_LIMITS.values(), key=lambda x: x[1])[1],
-# ]
-
 # Resolution of the passband response curves
 PASSBAND_RESOLUTION = 1 << u.nm  # nanometres
-
-# Photometric zero-points for the different filters
-# CASTOR SMS values (scaled from HST effective area curves)
-# PHOT_ZPTS = {"uv": 24.23, "u": 24.71, "g": 24.78}  # AB mag for 1 electron/s
-# My calculations (from root-finding)
-# PHOT_ZPTS = {"uv": 24.463, "u": 24.511, "g": 24.766}  # AB mag for 1 electron/s
-
-# Passband pivot wavelengths
-# (CASTOR SMS values)
-# PASSBAND_PIVOTS = {"uv": 226 << u.nm, "u": 345 << u.nm, "g": 478 << u.nm}  # nanometres
-# My calculations (EE convention)
-# PASSBAND_PIVOTS = {"uv": 225 << u.nm, "u": 346 << u.nm, "g": 475 << u.nm}  # nanometres
-# My calculations (QE convention)
-# PASSBAND_PIVOTS = {"uv": 220 << u.nm, "u": 344 << u.nm, "g": 471 << u.nm}  # nanometres
 
 # Filepaths to the passband response curves
 PASSBAND_FILEPATHS = {

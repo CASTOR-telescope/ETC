@@ -176,8 +176,8 @@ class Telescope:
         passband_response_filepaths=params.PASSBAND_FILEPATHS,
         passband_response_fileunits=params.PASSBAND_FILEUNITS,
         passband_resolution=params.PASSBAND_RESOLUTION,
-        passband_pivots=None,  # force auto-calculation of passband_pivots
-        phot_zpts=None,  # force auto-calculation of phot_zpts
+        passband_pivots=None,
+        phot_zpts=None,
         phot_zpts_kwargs={
             "ab_mags": {"uv": [25.5, 23.5], "u": [25.5, 23.5], "g": [25.5, 23.5]},
             "method": "secant",
