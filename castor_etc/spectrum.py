@@ -1913,6 +1913,120 @@ class SpectrumMixin:
         else:
             return fig, ax
 
+    def calc_redleak_frac(self, TelescopeObj, quiet=False):
+        """
+        Calculate a source's red leak fraction. The red leak fraction is defined to be the
+        ratio of the electron rate (i.e., electron/s) induced by red leak flux to the
+        total electron rate induced by the entire spectrum.
+
+        Parameters
+        ----------
+          TelescopeObj :: `castor_etc.Telescope` instance
+            The `Telescope` object containing the passband response curves to use for the
+            red leak calculation.
+
+          quiet :: bool
+            If True, suppress warnings from red leak fraction calculations.
+
+        Returns
+        -------
+          redleak_fracs :: dict of floats
+            Dictionary containing the red leak fraction in each passband.
+        """
+        from .sources import CustomSource  # avoid circular import error
+
+        if isinstance(self, CustomSource):
+            raise AttributeError("Custom sources do not have red leak fractions!")
+        if self.wavelengths is None or self.spectrum is None:
+            raise ValueError("Please generate or load a spectrum first")
+        #
+        # Calculate red leak fraction (red leak electron/s to total electron/s)
+        #
+        redleak_fracs = dict.fromkeys(TelescopeObj.passbands, 0.0)
+        #
+        # Make useful source spectrum-derived quantities
+        #
+        source_wavelengths_AA = self.wavelengths.to(u.AA).value
+        source_photon_s_A = (  # photon/s/A
+            self.spectrum  # erg/s/cm^2/A
+            * TelescopeObj.mirror_area.to(u.cm ** 2).value  # cm^2
+            / calc_photon_energy(wavelength=source_wavelengths_AA)[0]  # photon/erg
+        )
+        source_interp = interp1d(
+            source_wavelengths_AA,
+            source_photon_s_A,
+            kind="linear",
+            bounds_error=False,
+            fill_value=np.nan,
+        )  # photon/s/A
+        #
+        # Find red leak fraction per band
+        #
+        for band in redleak_fracs:
+            full_response_curve_wavelengths_AA = (
+                TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
+            )
+            is_redleak = (
+                full_response_curve_wavelengths_AA
+                > TelescopeObj.redleak_thresholds[band].to(u.AA).value
+            )
+            redleak_wavelengths = full_response_curve_wavelengths_AA[is_redleak]
+            redleak_per_A = (
+                source_interp(redleak_wavelengths)
+                * TelescopeObj.full_passband_curves[band]["response"][is_redleak]
+            )  # electron/s/A
+            total_erate_per_A = (
+                source_interp(full_response_curve_wavelengths_AA)
+                * TelescopeObj.full_passband_curves[band]["response"]
+            )  # electron/s/A
+            isgood_redleak = np.isfinite(redleak_per_A)  # don't include NaNs
+            isgood_total = np.isfinite(total_erate_per_A)  # don't include NaNs
+            if not quiet and (not np.all(isgood_redleak) or not np.all(isgood_total)):
+                warnings.warn(
+                    "Could not estimate red leak fraction "
+                    + f"at 1 or more wavelengths in {band}-band. "
+                    + "This may just be caused by the source spectrum not being "
+                    + f"defined at all wavelengths present in the {band}-band definition "
+                    + "file (which runs from "
+                    + f"{round(min(full_response_curve_wavelengths_AA), 2)} A "
+                    + f"to {round(max(full_response_curve_wavelengths_AA), 2)} A)."
+                    + "and is typically not a reason to worry. "
+                    + "This warning can be suppressed with `quiet=True`.",
+                    RuntimeWarning,
+                )
+            try:
+                redleak_per_px = simpson(  # electron/s (per px)
+                    y=redleak_per_A[isgood_redleak],
+                    x=redleak_wavelengths[isgood_redleak],
+                    even="avg",
+                )
+                total_erate_per_px = simpson(  # electron/s (per px)
+                    y=total_erate_per_A[isgood_total],
+                    x=full_response_curve_wavelengths_AA[isgood_total],
+                    even="avg",
+                )
+                redleak_frac = redleak_per_px / total_erate_per_px
+            except Exception:
+                raise RuntimeError(
+                    f"Unable to calculate red leak fraction for {band}-band! "
+                    + "Please ensure there is at least 1 wavelength that is above "
+                    + "the red leak threshold."
+                )
+            if np.isfinite(redleak_frac):
+                if redleak_frac > 1:
+                    # Catch errors caused by very small electron/s rates
+                    # (e.g., single emission line spectrum)
+                    redleak_fracs[band] = 1.0
+                else:
+                    redleak_fracs[band] = redleak_frac
+            elif not quiet:
+                warnings.warn(
+                    "Source red leak fraction could not be calculated "
+                    + f"in {band}-band!",
+                    RuntimeWarning,
+                )
+        return redleak_fracs
+
 
 class NormMixin:
     """
