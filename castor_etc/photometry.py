@@ -71,13 +71,14 @@ from numbers import Number
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import math #TEW: Need to include math as well
 from photutils.aperture import EllipticalAperture, RectangularAperture
 from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from .background import Background
 from .conversions import calc_photon_energy, mag_to_flux
-from .sources import CustomSource, PointSource, Source
+from .sources import GalaxySource, CustomSource, PointSource, Source
 from .telescope import Telescope
 
 # TODO: convolve with PSF (waiting for data file)
@@ -1728,9 +1729,22 @@ class Photometry:
                     source_passband_mag,
                     zpt=self.TelescopeObj.phot_zpts[band],
                 )[0]
-                source_erate[band] = (
-                    passband_erate * surface_brightness_per_sq_arcsec * px_area_arcsec_sq
-                )  # array containing the source-produced electron/s for each pixel
+                
+                #TEW: Need to normalize spatial distribution
+
+                if isinstance(self.SourceObj, GalaxySource): 
+                	Re = (self.SourceObj.angle_a.value*self.SourceObj.angle_b.value)**0.5
+                	dummySource = self.SourceObj.copy()
+                	dummyPhot = Photometry(self.TelescopeObj, dummySource, self.BackgroundObj)
+                	dummyPhot.use_elliptical_aperture(a=1*Re*u.arcsec, b=1*Re*u.arcsec, center = [0,0]*u.arcsec, rotation=0)
+                	passband_erate = 0.5*passband_erate/(np.nansum(dummyPhot.source_weights))
+                	source_erate[band] = passband_erate*self.source_weights
+                else:
+                #TEW: For extended source spatial profiles other than galaxies;
+                # we still need to check if thiswork properly 
+                	source_erate[band] = (
+                	passband_erate * surface_brightness_per_sq_arcsec * px_area_arcsec_sq
+                	)  # array containing the source-produced electron/s for each pixel
                 # Note that procedure is actually exactly the same as Eq. (9) from the
                 # link above. This is because taking the total "flux" of the source (in
                 # electron per second) and dividing by source area and multiplying by the
