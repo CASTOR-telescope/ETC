@@ -1733,15 +1733,15 @@ class Photometry:
                 #TEW: Need to normalize spatial distribution
 
                 if isinstance(self.SourceObj, GalaxySource): 
-                	Re = (self.SourceObj.angle_a.value*self.SourceObj.angle_b.value)**0.5
+                	#Re = (self.SourceObj.angle_a.value*self.SourceObj.angle_b.value)**0.5
                 	dummySource = self.SourceObj.copy()
                 	dummyPhot = Photometry(self.TelescopeObj, dummySource, self.BackgroundObj)
-                	dummyPhot.use_elliptical_aperture(a=1*Re*u.arcsec, b=1*Re*u.arcsec, center = [0,0]*u.arcsec, rotation=0)
+                	dummyPhot.use_elliptical_aperture(a=self.SourceObj.angle_a, b=self.SourceObj.angle_b, center = [0,0]*u.arcsec, rotation=0)
                 	passband_erate = 0.5*passband_erate/(np.nansum(dummyPhot.source_weights))
                 	source_erate[band] = passband_erate*self.source_weights
                 else:
                 #TEW: For extended source spatial profiles other than galaxies;
-                # we still need to check if thiswork properly 
+                # we still need to check if this works properly 
                 	source_erate[band] = (
                 	passband_erate * surface_brightness_per_sq_arcsec * px_area_arcsec_sq
                 	)  # array containing the source-produced electron/s for each pixel
