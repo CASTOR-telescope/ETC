@@ -124,7 +124,7 @@ DARK_CURRENT = 1e-4  # electrons/s/pixel
 
 BIAS = 100  # electron
 
-READ_NOISE = 2.0  # electron/pixel (high-gain). Read noise is 30 electrons for high-gain
+READ_NOISE = 2.0  # electron/pixel (high-gain). Read noise is 30 electrons for low-gain
 
 GAIN = 2.0  # electron/ADU
 
