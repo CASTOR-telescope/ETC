@@ -14,6 +14,22 @@ The following description is from Table 6.4 of the STIS Instrument Handbook, v20
 "The high sky values [of Earthshine and zodiacal light] are defined as the earthshine at
 38° from the limb and by the high zodiacal light of m_V = 22.1 arcsec^-2."
 
-I've checked that the Earthshine and zodiacal light values in the link above closely match
-those given in `earthshine.fits` and `zodi.fits` (albeit the values in Table 6.4 are less
-precise and of lower resolution than the data in this folder).
+And the following is from Figure 6.1 of the STIS Instrument Handbook, v20.0
+(<https://hst-docs.stsci.edu/stisihb/chapter-6-exposure-time-calculations/6-6-tabular-sky-backgrounds>):
+"In the ETCs and in this Handbook, the choices for earthshine of 'shadow,' 'average,' and
+'extremely high' correspond to 0, 50% of, and twice the 'high' values in Table 6.4. For
+the zodiacal sky background, the values in Table 6.4 correspond to a high value of m_V =
+22.1 arcsec^-2 from Table 6.2, while the low and average zodiacal light are scaled to m_V
+= 23.3 arcsec^-2 and 22.7 arcsec^-2, respectively."
+
+I've checked that the "high" Earthshine values in Table 6.4 of the STIS Instrument
+Handbook closely match those given in `earthshine.fits` (albeit the values in Table 6.4
+are less precise and of lower resolution than the data in this folder).
+
+In contrast, the "high" zodiacal light numbers tabulated in Table 6.4 are noticeably
+higher than those in `zodi.fits`; the `zodi.fits` values are probably the "low" values. (I
+calculated a bolometric AB mag of 23.39 and a V-band AB magnitude of 23.16 using the
+coarse Bessel V passband curve available here:
+<http://spiff.rit.edu/classes/phys440/lectures/filters/bess-v.pass>. I suspect the V-band
+magnitude calculation will be in better agreement with the "low" zodiacal light
+normalization of m_V = 23.3 given a higher-resolution filter transmission curve.)
