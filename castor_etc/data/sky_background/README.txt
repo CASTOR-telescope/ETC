@@ -27,9 +27,13 @@ Handbook closely match those given in `earthshine.fits` (albeit the values in Ta
 are less precise and of lower resolution than the data in this folder).
 
 In contrast, the "high" zodiacal light numbers tabulated in Table 6.4 are noticeably
-higher than those in `zodi.fits`; the `zodi.fits` values are probably the "low" values. (I
-calculated a bolometric AB mag of 23.39 and a V-band AB magnitude of 23.16 using the
-coarse Bessel V passband curve available here:
-<http://spiff.rit.edu/classes/phys440/lectures/filters/bess-v.pass>. I suspect the V-band
-magnitude calculation will be in better agreement with the "low" zodiacal light
-normalization of m_V = 23.3 given a higher-resolution filter transmission curve.)
+higher than those in `zodi.fits`. Upon thinking about it more, I don't actually think the
+`zodi.fits` spectrum corresponds to a particular "high"/"average"/"low" level of zodiacal
+light. Instead, I think the `zodi.fits` spectrum is renormalized to match certain
+heuristics (also see <https://github.com/CASTOR-telescope/ETC/issues/6>). FYI, I
+calculated a bolometric AB mag of 23.39, a V-band AB magnitude of 23.16 using the coarse
+Bessel V passband curve available here:
+<http://spiff.rit.edu/classes/phys440/lectures/filters/bess-v.pass>, and a V-band AB
+magnitude of 23.19 using the Johnson V passband curve available here:
+<https://github.com/spacetelescope/pysynphot/blob/master/pysynphot/data/generic/johnson_v.fits>.
+So I guess `zodi.fits` is appproximately the "low" zodiacal light estimate (m_V = 23.3).
