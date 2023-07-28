@@ -92,7 +92,8 @@ from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from . import constants as const
-from .conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
+from .conversions import (calc_photon_energy, flam_to_AB_mag, fnu_to_flam,
+                          mag_to_flux)
 from .filepaths import DATAPATH
 from .telescope import Telescope
 
@@ -381,7 +382,7 @@ class SpectrumMixin:
         # Planck's radiation law
         lightspeed = const.LIGHTSPEED.value  # cm/s
         prefactor = (2 * const.PLANCK_H.value * lightspeed * lightspeed) / (
-            wavelengths ** 5
+            wavelengths**5
         )
         denom = np.expm1(
             (const.PLANCK_H.value * lightspeed) / (wavelengths * const.K_B.value * T)
@@ -1949,7 +1950,7 @@ class SpectrumMixin:
         source_wavelengths_AA = self.wavelengths.to(u.AA).value
         source_photon_s_A = (  # photon/s/A
             self.spectrum  # erg/s/cm^2/A
-            * TelescopeObj.mirror_area.to(u.cm ** 2).value  # cm^2
+            * TelescopeObj.mirror_area.to(u.cm**2).value  # cm^2
             / calc_photon_energy(wavelength=source_wavelengths_AA)[0]  # photon/erg
         )
         source_interp = interp1d(
@@ -2242,34 +2243,56 @@ class NormMixin:
                     "`TelescopeObj` must be a `castor_etc.telescope.Telescope` object."
                 )
             ab_mags = dict.fromkeys(TelescopeObj.passbands)
-            spectrum_interp = interp1d(
-                x=wavelengths_AA,
-                y=self.spectrum,
-                kind="linear",
-                bounds_error=False,
-                fill_value=np.nan,
-            )
             for band in TelescopeObj.passbands:
+                # Interpolate passband to spectrum resolution
                 passband_wavelengths = (
                     TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
                 )
-                passband_spectrum = spectrum_interp(passband_wavelengths)
-                isgood_passband = np.isfinite(passband_spectrum)  # do not integrate NaNs
+                passband_interp = interp1d(
+                    x=passband_wavelengths,
+                    # y=passband_response,
+                    y=TelescopeObj.full_passband_curves[band]["response"],
+                    kind="linear",
+                    bounds_error=False,
+                    fill_value=np.nan,
+                )
+                passband_response = passband_interp(wavelengths_AA)
+                # Do not integrate NaNs
+                isgood_passband = np.isfinite(passband_response)
+                isgood_spectrum = np.isfinite(self.spectrum)
                 if np.any(~isgood_passband):
                     if np.all(~isgood_passband):
                         raise RuntimeError(
-                            "Source spectrum could not be estimated "
-                            + f"at any {band}-band wavelength"
+                            f"{band}-band response could not be estimated "
+                            + "at any source spectrum wavelength"
                         )
-                    else:
+                    elif np.any(
+                        ~isgood_passband[
+                            (wavelengths_AA >= passband_wavelengths.min())
+                            & (wavelengths_AA <= passband_wavelengths.max())
+                        ]
+                    ):  # only warn if there are NaNs/infs in the passband range
                         warnings.warn(
-                            "Source spectrum could not be estimated "
-                            + f"at some {band}-band wavelengths",
+                            f"{band}-band response could not be estimated "
+                            + "at some source spectrum wavelengths",
+                            RuntimeWarning,
+                        )
+                if np.any(~isgood_spectrum):
+                    if np.all(~isgood_spectrum):
+                        raise RuntimeError("Source spectrum values are all non-finite!")
+                    elif np.any(
+                        ~isgood_spectrum[
+                            (wavelengths_AA >= passband_wavelengths.min())
+                            & (wavelengths_AA <= passband_wavelengths.max())
+                        ]
+                    ):  # only warn if there are NaNs/infs in the passband range
+                        warnings.warn(
+                            "Source spectrum values are not finite at some wavelengths",
                             RuntimeWarning,
                         )
                 ab_mags[band] = flam_to_AB_mag(
-                    passband_wavelengths[isgood_passband],
-                    passband_spectrum[isgood_passband],
-                    TelescopeObj.full_passband_curves[band]["response"][isgood_passband],
+                    wavelengths_AA[isgood_passband & isgood_spectrum],
+                    self.spectrum[isgood_passband & isgood_spectrum],
+                    passband_response[isgood_passband & isgood_spectrum],
                 )
             return ab_mags
