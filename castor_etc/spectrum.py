@@ -92,8 +92,7 @@ from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from . import constants as const
-from .conversions import (calc_photon_energy, flam_to_AB_mag, fnu_to_flam,
-                          mag_to_flux)
+from .conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
 from .filepaths import DATAPATH
 from .telescope import Telescope
 
