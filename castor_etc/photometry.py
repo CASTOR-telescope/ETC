@@ -1588,7 +1588,6 @@ class Photometry:
                 "INFO: The `reddening` parameter is ignored for `CustomSource` objects. "
                 + "You can silence this message by setting `quiet=True`."
             )
-            include_redleak = False
         #
         # Make some useful variables
         #
