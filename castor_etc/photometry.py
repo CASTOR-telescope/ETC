@@ -87,6 +87,9 @@ from .telescope import Telescope
 _OPTIMAL_APER_FACTOR = 1.4
 # This is the seed for the random number generator used for the Monte Carlo integrations
 _RNG_SEED = 3141592654
+# The default number of samples to use in the Monte Carlo integration for calculating the
+# encircled energy of a point source
+_NUM_MC_SAMPLES = 20000000
 
 
 class Photometry:
@@ -836,6 +839,7 @@ class Photometry:
         center=[0, 0] << u.arcsec,
         rotation=0,
         quiet=False,
+        num_mc_samples=_NUM_MC_SAMPLES,
         overwrite=False,
     ):
         """
@@ -877,6 +881,11 @@ class Photometry:
           quiet :: bool
             If True and doing point source photometry, do not print encircled energy
             fraction.
+
+          num_mc_samples :: int
+            The number of Monte Carlo samples to use when calculating the encircled energy
+            of a `castor_etc.sources.PointSource` object. This parameter has no effect for
+            non-PointSource objects.
 
           overwrite :: bool
             If True, allow overwriting of any existing aperture associated with this
@@ -934,6 +943,8 @@ class Photometry:
             b = b * self.TelescopeObj.px_scale.to(u.arcsec)
         if not isinstance(rotation, Number):
             raise TypeError("rotation must be an int or float")
+        if not isinstance(num_mc_samples, (int, np.integer)):
+            raise TypeError("num_mc_samples must be an integer.")
         #
         # Calculate exact aperture area and number of pixels in aperture
         #
@@ -1004,7 +1015,7 @@ class Photometry:
             psf_x, psf_y = rng.multivariate_normal(
                 mean=[0, 0],
                 cov=[[telescope_standard_dev_sq, 0], [0, telescope_standard_dev_sq]],
-                size=100000,
+                size=num_mc_samples,
             ).T
             # 2. Find fraction within ellipse (center already in arcsec)
             ellipse_x = (
@@ -1048,7 +1059,13 @@ class Photometry:
                 )
 
     def use_rectangular_aperture(
-        self, width, length, center=[0, 0] << u.arcsec, quiet=False, overwrite=False
+        self,
+        width,
+        length,
+        center=[0, 0] << u.arcsec,
+        quiet=False,
+        num_mc_samples=_NUM_MC_SAMPLES,
+        overwrite=False,
     ):
         """
         Use a rectangular aperture.
@@ -1084,6 +1101,11 @@ class Photometry:
           quiet :: bool
             If True and doing point source photometry, do not print encircled energy
             fraction.
+
+          num_mc_samples :: int
+            The number of Monte Carlo samples to use when calculating the encircled energy
+            of a `castor_etc.sources.PointSource` object. This parameter has no effect for
+            non-PointSource objects.
 
           overwrite :: bool
             If True, allow overwriting of any existing aperture associated with this
@@ -1147,6 +1169,8 @@ class Photometry:
             raise ValueError(
                 "aperture dimensions larger than telescope's IFOV dimensions"
             )
+        if not isinstance(num_mc_samples, (int, np.integer)):
+            raise TypeError("num_mc_samples must be an integer.")
         #
         # Calculate exact aperture area and number of pixels in aperture
         #
@@ -1200,7 +1224,7 @@ class Photometry:
             psf_x, psf_y = rng.multivariate_normal(
                 mean=[0, 0],
                 cov=[[telescope_standard_dev_sq, 0], [0, telescope_standard_dev_sq]],
-                size=100000,
+                size=num_mc_samples,
             ).T
             # 2. Find fraction within rectangle (center, half_width, half_length already
             #    in arcsec). N.B. rectangle may be off-center, so can't just compare abs()
