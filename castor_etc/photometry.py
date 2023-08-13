@@ -71,14 +71,12 @@ from numbers import Number
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
-import math #TEW: Need to include math as well
 from photutils.aperture import EllipticalAperture, RectangularAperture
-from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from .background import Background
 from .conversions import calc_photon_energy, mag_to_flux
-from .sources import GalaxySource, CustomSource, PointSource, Source
+from .sources import CustomSource, GalaxySource, PointSource, Source
 from .telescope import Telescope
 
 # TODO: convolve with PSF (waiting for data file)
@@ -208,8 +206,8 @@ class Photometry:
           None
         """
         self._exact_npix = (
-            self._aper_area.to(u.arcsec ** 2)
-            / self.TelescopeObj.px_area.to(u.arcsec ** 2)
+            self._aper_area.to(u.arcsec**2)
+            / self.TelescopeObj.px_area.to(u.arcsec**2)
         ).value
 
     def _create_aper_arrs(self, half_x, half_y, center, overwrite=False):
@@ -775,7 +773,7 @@ class Photometry:
         #
         aper_radius_arcsec = factor * 0.5 * self.TelescopeObj.fwhm.to(u.arcsec).value
         self._aper_area = (
-            np.pi * aper_radius_arcsec * aper_radius_arcsec * (u.arcsec ** 2)
+            np.pi * aper_radius_arcsec * aper_radius_arcsec * (u.arcsec**2)
         )
         self._assign_exact_npix()
         #
@@ -1002,7 +1000,7 @@ class Photometry:
             sin_rotation = np.sin(rotation)  # rotation already in radians
             cos_rotation = np.cos(rotation)  # rotation already in radians
             # 1. Generate random samples
-            telescope_standard_dev_sq = (telescope_fwhm_arcsec ** 2) / (4 * 2 * np.log(2))
+            telescope_standard_dev_sq = (telescope_fwhm_arcsec**2) / (4 * 2 * np.log(2))
             psf_x, psf_y = rng.multivariate_normal(
                 mean=[0, 0],
                 cov=[[telescope_standard_dev_sq, 0], [0, telescope_standard_dev_sq]],
@@ -1015,7 +1013,7 @@ class Photometry:
             ellipse_y = (
                 (psf_y + center[1]) * cos_rotation - (psf_x + center[0]) * sin_rotation
             ) / b_arcsec
-            is_within_ellipse = (ellipse_x ** 2 + ellipse_y ** 2) <= 1.0
+            is_within_ellipse = (ellipse_x**2 + ellipse_y**2) <= 1.0
             self._encircled_energy = np.sum(is_within_ellipse) / np.size(
                 is_within_ellipse
             )
@@ -1198,7 +1196,7 @@ class Photometry:
             rng = np.random.default_rng(_RNG_SEED)
             telescope_fwhm_arcsec = self.TelescopeObj.fwhm.to(u.arcsec).value
             # 1. Generate random samples
-            telescope_standard_dev_sq = (telescope_fwhm_arcsec ** 2) / (4 * 2 * np.log(2))
+            telescope_standard_dev_sq = (telescope_fwhm_arcsec**2) / (4 * 2 * np.log(2))
             psf_x, psf_y = rng.multivariate_normal(
                 mean=[0, 0],
                 cov=[[telescope_standard_dev_sq, 0], [0, telescope_standard_dev_sq]],
@@ -1580,8 +1578,8 @@ class Photometry:
         # (incl. Earthshine & zodiacal light, excl. geocoronal emission lines)
         #
         sky_background_erate = dict.fromkeys(self.TelescopeObj.passbands, 0.0)
-        px_area_arcsec_sq = self.TelescopeObj.px_area.to(u.arcsec ** 2).value
-        mirror_area_cm_sq = self.TelescopeObj.mirror_area.to(u.cm ** 2).value
+        px_area_arcsec_sq = self.TelescopeObj.px_area.to(u.arcsec**2).value
+        mirror_area_cm_sq = self.TelescopeObj.mirror_area.to(u.cm**2).value
         # Use passband photometric zero points + sky background AB magnitudes (per sq.
         # arcsec) to calculate sky background electron/s.
         # Note that this is completely equivalent to convolving the sky background spectra
@@ -1712,7 +1710,7 @@ class Photometry:
             source_erate[self.SourceObj.passband] = self.source_weights
         else:
             surface_brightness_per_sq_arcsec = (
-                self.source_weights / self.SourceObj.area.to(u.arcsec ** 2).value
+                self.source_weights / self.SourceObj.area.to(u.arcsec**2).value
             )
             # Note that the source weights already account for the aperture overlapping
             # different areas of the simulated source (e.g., an aperture overlapping just
@@ -1729,22 +1727,33 @@ class Photometry:
                     source_passband_mag,
                     zpt=self.TelescopeObj.phot_zpts[band],
                 )[0]
-                
-                #TEW: Need to normalize spatial distribution
 
-                if isinstance(self.SourceObj, GalaxySource): 
-                	#Re = (self.SourceObj.angle_a.value*self.SourceObj.angle_b.value)**0.5
-                	dummySource = self.SourceObj.copy()
-                	dummyPhot = Photometry(self.TelescopeObj, dummySource, self.BackgroundObj)
-                	dummyPhot.use_elliptical_aperture(a=self.SourceObj.angle_a, b=self.SourceObj.angle_b, center = [0,0]*u.arcsec, rotation=0)
-                	passband_erate = 0.5*passband_erate/(np.nansum(dummyPhot.source_weights))
-                	source_erate[band] = passband_erate*self.source_weights
+                # TEW: Need to normalize spatial distribution
+
+                if isinstance(self.SourceObj, GalaxySource):
+                    # Re = (self.SourceObj.angle_a.value*self.SourceObj.angle_b.value)**0.5
+                    dummySource = self.SourceObj.copy()
+                    dummyPhot = Photometry(
+                        self.TelescopeObj, dummySource, self.BackgroundObj
+                    )
+                    dummyPhot.use_elliptical_aperture(
+                        a=self.SourceObj.angle_a,
+                        b=self.SourceObj.angle_b,
+                        center=[0, 0] * u.arcsec,
+                        rotation=0,
+                    )
+                    passband_erate = (
+                        0.5 * passband_erate / (np.nansum(dummyPhot.source_weights))
+                    )
+                    source_erate[band] = passband_erate * self.source_weights
                 else:
-                #TEW: For extended source spatial profiles other than galaxies;
-                # we still need to check if this works properly 
-                	source_erate[band] = (
-                	passband_erate * surface_brightness_per_sq_arcsec * px_area_arcsec_sq
-                	)  # array containing the source-produced electron/s for each pixel
+                    # TEW: For extended source spatial profiles other than galaxies;
+                    # we still need to check if this works properly
+                    source_erate[band] = (
+                        passband_erate
+                        * surface_brightness_per_sq_arcsec
+                        * px_area_arcsec_sq
+                    )  # array containing the source-produced electron/s for each pixel
                 # Note that procedure is actually exactly the same as Eq. (9) from the
                 # link above. This is because taking the total "flux" of the source (in
                 # electron per second) and dividing by source area and multiplying by the
