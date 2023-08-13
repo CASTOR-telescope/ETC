@@ -30,7 +30,7 @@ container.
    installed.
 
 4. Then follow the instructions detailed on the skaha GitHub for [session
-   containers](https://github.com/opencadc/skaha/tree/master/containers#publishing-skaha-containers).
+   containers](https://github.com/opencadc/science-platform/tree/5ba10bb1450b99a21f9f36aa2fd633c4801dd9be/containers#publishing-skaha-containers).
    Remember to tag the pushed image as `notebook` on [Harbor](https://images.canfar.net)
    to be able to access it via the Science Portal drop-down menu!
 
