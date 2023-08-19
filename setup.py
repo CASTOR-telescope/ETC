@@ -95,20 +95,22 @@ setup(
     packages=[
         "castor_etc",
         "castor_etc.data",
-        "castor_etc.data.passbands",
-        "castor_etc.data.sky_background",
-        "castor_etc.data.galaxy_spectra",
-        "castor_etc.data.pickles_spectra",
         "castor_etc.data.UVMOS_data",
+        "castor_etc.data.galaxy_spectra",
+        "castor_etc.data.passbands",
+        "castor_etc.data.pickles_spectra",
+        "castor_etc.data.psfs",
+        "castor_etc.data.sky_background",
         "castor_etc.data.transit_data",
         "castor_etc.data.grism_data"
     ],
     package_data={
-        "castor_etc.data.passbands": ["*.uv", "*.u", "*.g"],
-        "castor_etc.data.sky_background": ["*.fits", "*.txt"],
+        "castor_etc.data.UVMOS_data": ["*.dat", "*.txt"],
         "castor_etc.data.galaxy_spectra": ["*.txt"],
+        "castor_etc.data.passbands": ["*.uv", "*.u", "*.g"],
         "castor_etc.data.pickles_spectra": ["dat/*.dat"],  # must use forward slash
-        "castor_etc.data.UVMOS_data":["*.dat", "*.txt"],
+        "castor_etc.data.psfs": ["*.fits"],
+        "castor_etc.data.sky_background": ["*.fits", "*.txt"],
         "castor_etc.data.transit_data":["*.txt","instrument_data/*.csv","instrument_data/transmission_functions/*.dat","stellar_models/*.txt"],
         "castor_etc.data.grism_data":["*_profile_uv.txt", "*_dispersion_uv.txt", "*_dispersion_u.txt", "*_efficiency_.uv.txt", "*_efficiency_.u.txt"]
     },
@@ -117,4 +119,3 @@ setup(
     python_requires=">=3.9",
     platforms=["Linux"],  # only tested on Ubuntu. MacOS and Windows likely okay.
 )
-
