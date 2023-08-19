@@ -95,22 +95,23 @@ setup(
     packages=[
         "castor_etc",
         "castor_etc.data",
-        "castor_etc.data.passbands",
-        "castor_etc.data.sky_background",
-        "castor_etc.data.galaxy_spectra",
-        "castor_etc.data.pickles_spectra",
         "castor_etc.data.UVMOS_data",
+        "castor_etc.data.galaxy_spectra",
+        "castor_etc.data.passbands",
+        "castor_etc.data.pickles_spectra",
+        "castor_etc.data.psfs",
+        "castor_etc.data.sky_background",
     ],
     package_data={
-        "castor_etc.data.passbands": ["*.uv", "*.u", "*.g"],
-        "castor_etc.data.sky_background": ["*.fits", "*.txt"],
+        "castor_etc.data.UVMOS_data": ["*.dat", "*.txt"],
         "castor_etc.data.galaxy_spectra": ["*.txt"],
+        "castor_etc.data.passbands": ["*.uv", "*.u", "*.g"],
         "castor_etc.data.pickles_spectra": ["dat/*.dat"],  # must use forward slash
-        "castor_etc.data.UVMOS_data":["*.dat", "*.txt"],
+        "castor_etc.data.psfs": ["*.fits"],
+        "castor_etc.data.sky_background": ["*.fits", "*.txt"],
     },
     install_requires=["numpy", "scipy", "matplotlib", "astropy", "pandas", "photutils"],
     license="GPLv3",
     python_requires=">=3.9",
     platforms=["Linux"],  # only tested on Ubuntu. MacOS and Windows likely okay.
 )
-
