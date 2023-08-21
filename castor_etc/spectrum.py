@@ -9,7 +9,6 @@ Includes:
   - generic spiral and elliptical galaxy spectra
   - stellar spectra from the Pickles catalog
   - stellar spectra from the 'ATLAS9' and 'BTSettl' catalogs
-  - stellar spectra from the 'ATLAS9' and 'BTSettl' catalogs
   - normalization functions:
     - normalize a blackbody spectrum to a star of given radius and distance
     - normalize a spectrum to some average value or AB magnitude, either within a passband
@@ -98,6 +97,272 @@ from . import constants as const
 from .conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
 from .filepaths import DATAPATH
 from .telescope import Telescope
+
+from astroquery.gaia import Gaia
+from astropy.coordinates import SkyCoord
+from astropy.constants import R_sun, pc
+from astropy.wcs import WCS
+
+path = '/Users/dhananjhaybansal/Applications/POET/'
+
+def getStarData(temperature, metallicity, logg, 
+                    model_grid='ATLAS9', # 'ATLAS9', 'BTSettl'
+                    ):
+    """
+    Reads in star data from atlas directory, according to temperature, metallicity, and log(G) values.
+    
+    Parameters
+    ---------- 
+        temperature :: float
+            Temperature of the reference star in kelvin.
+
+        metallicity :: 'p/m00','p/m05','p/m10','p/m15','p/m20', where p is plus, m is minus.
+            Metallicity of the reference star. Accepted inputs. 
+
+        logg :: g00,g05,g10,g15,g20,g25,g30,g35,g40,g45,g50
+            log(G) value for the reference star.
+    
+    Returns
+    -------- 
+        wavelengths :: `astropy.Quantity` wavelength  
+            wavelength of the reference star in AA. 
+
+        flux :: array of floats
+         Flux of the reference star in units erg s^-1 cm^-2 A^-1
+    """
+
+    # Default to ATLAS9 model
+    #     If Teff < 3500 K (i.e., min Teff in ATLAS9 grid, switch to BTSettl grid)
+    if ( (model_grid == 'BTSettl') | (temperature < 3500) ):
+        if not os.path.exists(os.path.join(path,"stellar_models/BTSettl_CIFIST/")):
+            raise RuntimeError(
+                f"The specified directory path `{path}` does not contain the stellar_model directory." + "Please modify the path variable."
+            )
+        else:
+            grid_dir = os.path.join(path, "stellar_models/BTSettl_CIFIST/")
+
+        # Scan directory to inventory model grid
+        # Assumes all files starting with 'lte' are model files
+        # Only stored solar metallicity models; may need to update for other metallicities
+        dir_flist = os.listdir(grid_dir)
+        model_flist = []
+        grid_param = []
+        for n,fname in enumerate(dir_flist):
+            if fname.startswith('lte'):
+                _teff = float(fname[3:6]) * 100
+                if fname[6] == '+':
+                    _logg = -1 * float(fname[7:10])
+                else:
+                    _logg = float(fname[7:10])
+                _mh = float(fname[11:14])
+                model_flist.append(fname)
+                grid_param.append([_teff, _logg, _mh])
+        grid_param = np.vstack(grid_param)
+        model_flist = np.array(model_flist)
+
+        # Identify closest model prioritizing teff, logg, then metallicity
+        mi = np.argmin(np.abs(grid_param[:,0] - temperature))
+        ti = np.where(grid_param[:,0] == grid_param[mi,0])[0]
+        grid_param = grid_param[ti]
+        model_flist = model_flist[ti]
+
+        mi = np.argmin(np.abs(grid_param[:,1] - logg))
+        ti = np.where(grid_param[:,1] == grid_param[mi,1])[0]
+        grid_param = grid_param[ti]
+        model_flist = model_flist[ti]
+
+        mi = np.argmin(np.abs(grid_param[:,2] - metallicity))
+        ti = np.where(grid_param[:,2] == grid_param[mi,2])[0]
+        grid_param = grid_param[ti]
+        model_flist = model_flist[ti]
+
+        # Read in selected model
+        d = np.loadtxt(grid_dir + model_flist[0])
+        wv = d[:,0] * u.AA
+        flux = d[:,1] # [erg/s/cm2/angstrom]
+
+    elif model_grid == 'ATLAS9':
+        if not os.path.exists(os.path.join(path, "stellar_models/ATLAS9/ck04models/")):
+            raise RuntimeError(
+                f"The specified directory path `{path}` does not contain the stellar_model directory." + "Please modify the path variable. "
+            )
+        grid_dir = os.path.join(path,"stellar_models/ATLAS9/ck04models/")
+        teff_grid = np.array([3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 
+                              6000, 6250, 6500, 6750, 7000, 7250, 7500, 7750, 8000, 8250, 
+                              8500, 8750, 9000, 9250, 9500, 9750, 10000, 10250, 10500, 10750, 
+                              11000, 11250, 11500, 11750, 12000, 12250, 12500, 12750, 13000, 14000, 
+                              15000, 16000, 17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000, 
+                              25000, 26000, 27000, 28000, 29000, 30000, 31000, 32000, 33000, 34000, 
+                              35000, 36000, 37000, 38000, 39000, 40000, 41000, 42000, 43000, 44000, 
+                              45000, 46000, 47000, 48000, 49000, 50000])
+        mh_grid = np.array([-0.25, -0.20, -0.15, -0.10, -0.05, 0.0, 0.02, 0.05])
+        logg_grid = np.array([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
+
+        mi = [ np.argmin( np.abs(teff_grid - temperature) ),
+               np.argmin( np.abs(mh_grid - metallicity) ),
+               np.argmin( np.abs(logg_grid - logg) ) ]
+
+        teff_str = '{:.0f}'.format( teff_grid[mi[0]] )
+        if mh_grid[mi[1]] < 0:
+            mh_str = 'm{:0>2d}'.format( int(np.abs( mh_grid[mi[1]] ) * 100) )
+        else:
+            mh_str = 'p{:0>2d}'.format( int(np.abs( mh_grid[mi[1]] ) * 100) )
+        logg_str = 'g{:0>2d}'.format( int( logg_grid[mi[2]] * 10) )
+
+        specfile = grid_dir + 'ck' + mh_str + '/' + 'ck' + mh_str + '_' + teff_str + '.fits'
+        if os.path.isfile(specfile):
+            havespectrum = True
+            hdul = fits.open(specfile)
+            data = hdul[1].data #the first extension has table
+            wv = data['WAVELENGTH'] * u.AA
+            flux = data[logg_str] # [erg/s/cm^2/A]
+        else:
+            havespectrum = False
+            print('Spectrum not found: ',specfile)
+
+    return wv, flux
+
+def interp_EEM_table(Teff=[], Gmag=[], Bpmag=[], Rpmag=[]):
+    """
+    Interpolate EEM_table using input Teff
+
+    Parameters
+      ----------
+          Teff :: array of floats
+            Effective temperature of the identified sources
+
+          Gmag :: array of floats
+            Gaia G magnitude of the identified sources
+
+          Bpmag :: array of floats
+            Gaia BP magnitude of the identifies sources
+
+          Rpmag :: array of floats
+            Gaia RP magnitude of the idenitifies sources
+      
+      Return
+      ------
+          interp_output
+            Interpolation result
+    
+    """
+
+    table_fname = join(DATAPATH,"transit_data","EEM_dwarf_UBVIJHK_colors_Teff.txt")
+
+    _logg_sun = 4.438
+
+    # Read in EEM table
+    eem = {'Teff':[], 'radius':[], 'mass':[], 'logg':[], 'Gmag_abs':[],
+           'B-V':[], 'G-V':[], 'Bp-Rp':[], 'G-Rp':[], 'U-B':[], 'V-I':[]}
+    eem_hdr = []
+    with open(table_fname,'r') as file:
+        data_block = False
+        for line in file:
+            # Only read in between lines starting with '$SpT'
+            if line.startswith('#SpT'):
+                if (data_block == False):
+                    data_block = True
+                else:
+                    break
+            if data_block:
+                _line = line.rstrip().split()
+
+                if len(eem_hdr) == 0:
+                    eem_hdr = np.array(_line.copy())
+                else:
+                    ci = np.where(eem_hdr == 'Teff')[0][0]
+                    eem['Teff'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'R_Rsun')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['radius'].append( np.nan )
+                    else:
+                        eem['radius'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'Msun')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['mass'].append( np.nan )
+                    else:
+                        eem['mass'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'M_G')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['Gmag_abs'].append( np.nan )
+                    elif _line[ci].endswith(':'):
+                        eem['Gmag_abs'].append( float(_line[ci][:-1]) )
+                    else:
+                        eem['Gmag_abs'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'B-V')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['B-V'].append( np.nan )
+                    else:
+                        eem['B-V'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'G-V')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['G-V'].append( np.nan )
+                    else:
+                        eem['G-V'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'Bp-Rp')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['Bp-Rp'].append( np.nan )
+                    else:
+                        eem['Bp-Rp'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'G-Rp')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['G-Rp'].append( np.nan )
+                    else:
+                        eem['G-Rp'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'U-B')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['U-B'].append( np.nan )
+                    else:
+                        eem['U-B'].append( float(_line[ci]) )
+
+                    ci = np.where(eem_hdr == 'V-Ic')[0][0]
+                    if _line[ci].startswith('...'):
+                        eem['V-I'].append( np.nan )
+                    else:
+                        eem['V-I'].append( float(_line[ci]) )
+    for _lbl in eem.keys():
+        eem[_lbl] = np.array(eem[_lbl])
+
+    # Calculate logg
+    eem['logg'] = _logg_sun + np.log10( eem['mass'] )  - 2. * np.log10( eem['radius']**2 )
+
+    # Sort by Teff
+    si = np.argsort(eem['Teff'])
+    for _lbl in eem.keys():
+        eem[_lbl] = eem[_lbl][si]
+
+    # If Teff not specified, use Bpmag, Rpmag to get Teff
+    if len(Teff) == 0:
+        si = np.argsort(eem['Bp-Rp'])
+        Teff = np.interp(Bpmag - Rpmag, eem['Bp-Rp'][si], eem['Teff'][si])
+
+    # Interpolate table using input Teff
+    # Use grid edges for missing values
+    interp_output = {'Teff':Teff}
+    for _lbl in eem.keys():
+        if _lbl != 'Teff':
+            vi = np.isfinite(eem[_lbl])
+            interp_output[_lbl] = np.interp(np.log10(Teff), 
+                                        np.log10(eem['Teff'][vi]), eem[_lbl][vi])
+
+    # Calculate U, I and add to table (if Gmag provided)
+    if len(Gmag) > 0:
+        interp_output['Rpmag'] = Gmag - interp_output['G-Rp']
+        interp_output['Bpmag'] = interp_output['Bp-Rp'] + interp_output['Rpmag']
+
+        interp_output['Umag'] = interp_output['U-B'] + interp_output['B-V'] - \
+                                    interp_output['G-V'] + Gmag
+        interp_output['Imag'] = Gmag - ( interp_output['G-V'] + interp_output['V-I'] )
+
+    return interp_output
 
 
 def redshift_wavelengths(wavelengths, redshift):
@@ -384,7 +649,7 @@ class SpectrumMixin:
         # Planck's radiation law
         lightspeed = const.LIGHTSPEED.value  # cm/s
         prefactor = (2 * const.PLANCK_H.value * lightspeed * lightspeed) / (
-            wavelengths**5
+            wavelengths ** 5
         )
         denom = np.expm1(
             (const.PLANCK_H.value * lightspeed) / (wavelengths * const.K_B.value * T)
@@ -1222,12 +1487,12 @@ class SpectrumMixin:
         try:
             if file_ext == "fit" or file_ext == "fits":
                 data = fits.getdata(filepath)
-                self.wavelengths = (data.field(0) * wavelength_unit).to(u.AA)
-                self.spectrum = data.field(1)
+                self.wavelengths = (data.field(0)[0] * wavelength_unit).to(u.AA)
+                self.spectrum = data.field(1)[0] # index 0 to access the corresponding arrays; data variable contains embedded arrays
             else:
                 data = pd.read_csv(
                     filepath,
-                    sep=" +",
+                    sep="\s+",
                     header=None,
                     comment="#",
                     engine="python",
@@ -1294,6 +1559,411 @@ class SpectrumMixin:
         )  # sep=" +" is Python regex to match a variable number of spaces
         self.wavelengths = (data[0].values * u.nm).to(u.AA)
         self.spectrum = data[1].values
+
+    def _calc_xy(self):
+        """
+        Intenal function that converts (ra,dec) of the identified Gaia sources to pixel positions on the CCD. 
+
+        Attributes
+        ----------
+          gaia :: dict of arrays
+            Dictionary containing the interpolated parameters of the queried Gaia sources.
+
+        Return
+        ------
+            None
+        """
+
+        # Get projected CCD coordinates (centered on target)
+        wcs_input_dict = {
+            'CTYPE1': 'RA---TAN', 
+            'CUNIT1': 'deg', 
+            'CDELT1': self.fov.value/self.ccd_dim[0], 
+            'CRPIX1': int(self.ccd_dim[0]/2), 
+            'CRVAL1': self.gaia['ra'][0], 
+            'NAXIS1': self.ccd_dim[0],
+            'CTYPE2': 'DEC--TAN', 
+            'CUNIT2': 'deg', 
+            'CDELT2': self.fov.value/self.ccd_dim[1], 
+            'CRPIX2': int(self.ccd_dim[1]/2), 
+            'CRVAL2': self.gaia['dec'][0], 
+            'NAXIS2': self.ccd_dim[1],
+            'CROTA2': self.fov_pa.value,
+        }
+
+        wcs = WCS(wcs_input_dict)
+
+        # Convert Gaia source ra,dec -> x,y
+        g_coord = SkyCoord(ra=self.gaia['ra'], dec=self.gaia['dec'], 
+                            unit=(u.degree, u.degree), frame='icrs')
+        _x, _y = wcs.world_to_pixel(g_coord)
+
+        self.gaia['x'], self.gaia['y'] = _x, _y
+        self.gaia['wcs'] = wcs
+
+    def _search_gaia(self):
+        """
+        Internal Function. Search Gaia catalog for target and background stars.
+
+        Parameters
+        ----------
+            TelescopeObj :: `castor_etc.Telescope` instance
+              The `Telescope` object passed down to the _calc_xy function.
+
+        Attributes
+        ----------
+          gaia :: dict of arrays
+            Dictionary containing the interpolated parameters of the queried Gaia sources.
+
+        Returns
+        -------
+          None
+
+        """
+        try: 
+            srch_str = "SELECT *, DISTANCE(POINT({:.6f},{:.6f}), POINT(ra,dec))".format(self.ra.value,self.dec.value) + "AS ang_sep FROM gaiadr2.gaia_source " + "WHERE 1 = CONTAINS( POINT({:.6f},{:.6f}), ".format(self.ra.value,self.dec.value) + "CIRCLE(ra,dec,{:.2f}))".format(self.srch_rad.value) + "AND phot_g_mean_mag <={:.2f}".format(self.srch_Gmax) + "AND parallax IS NOT NULL ORDER BY ang_sep ASC"
+
+            job = Gaia.launch_job(srch_str)
+            results = job.get_results()
+
+            ra, dec, Gmag, Bpmag, Rpmag = np.array(results['ra']), np.array(results['dec']), np.array(results['phot_g_mean_mag']), np.array(results['phot_bp_mean_mag']), np.array(results['phot_rp_mean_mag'])
+
+            print('{:.0f} Gaia source(s) found'.format(len(ra)))
+
+            # Identify target within Gaia search (brightest target within sep_max)
+            sep_max = (8.0 / 3600.) #* u.deg
+            c_coord = SkyCoord(ra=self.ra.value, dec=self.dec.value, unit=(u.degree,u.degree), frame='icrs')
+            g_coord = SkyCoord(ra=ra,dec=dec,unit=(u.degree,u.degree), frame='icrs')
+            sep = g_coord.separation(c_coord).degree
+            ti = np.where(sep < sep_max)[0]
+
+            if len(ti) > 0:
+                ti = ti[ np.argmin(Gmag[ti]) ]
+            else:
+                ti = np.argmin(sep)
+                print('No Gaia soueces found within {:.2f} arcsec of specified RA and DEC'.format(sep_max*3600.))
+            
+            gi = np.delete(np.arange(len(ra)),ti)
+
+            # Place target at top of list, sort remaining sources by brightness.
+            si = np.argsort(Gmag[gi])
+            scalars = [ra,dec,Gmag,Bpmag,Rpmag,sep]
+            for scalar in scalars:
+                scalar = np.hstack([ scalar[ti], scalar[gi[si]] ])
+
+            nmax = self.srch_nmax # I believe this way is more efficient than using self.srch_nmax multiple time <Need to check>.
+
+            if len(ra) > nmax:
+                ra = ra[:nmax]
+                dec = dec[:nmax]
+                Gmag = Gmag[:nmax]
+                Bpmag = Bpmag[:nmax]
+                Rpmag = Rpmag[:nmax]
+                sep = sep[:nmax]
+
+            self.gaia = {'ra': ra, 'dec': dec, 'x': np.zeros_like(ra), 'y': np.zeros_like(ra), 'Gmag': Gmag, 'Bpmag': Bpmag, 'Rpmag': Rpmag, 'results': None, 'wcs': None}
+
+            self._calc_xy()
+
+        except Exception:
+            raise RuntimeError('Gaia search failed. Please revise the input target parameters.')
+
+    def _specify_target_parameters(self,run_gaia_search = True):
+        """
+        Internal function. Used to specify target Gaia parameters and populate the gaia attribute of the PointSource. If temperature, Teff, and Gaia G magnitude, Gmag, of the target are specified, then Gaia catalog query will not run. 
+
+        Parameters
+        ----------
+          run_gaia_search :: bool
+            If Teff and Gmag of the target are specified, then this attributes is set to False and gaia query run is called off.
+        
+        Attributes
+        ----------
+          gaia :: dict of arrays
+            Dictionary containing the interpolated parameters of the queried Gaia sources.
+
+        Returns
+        -------
+          None
+
+        """
+
+        xout = self.ccd_dim[0]
+        yout = self.ccd_dim[1]
+
+        if (self.Gmag != None) & (self.Teff != None):
+            run_gaia_search = False
+
+        if run_gaia_search:
+            self._search_gaia()
+        else:
+            self.gaia = {
+                'ra': np.array([self.ra.value]), 
+                'dec': np.array([self.dec.value]),
+                'x': np.zeros(1) + xout/2,
+                'y': np.zeros(1) + yout/2, 
+                'Gmag': np.array([np.nan]),
+                'Bpmag': np.array([np.nan]), 
+                'Rpmag': np.array([np.nan]), 
+                'Gmag_abs': np.array([np.nan]),
+                'logg': np.array([np.nan]),
+                'radius': np.array([np.nan]),
+                'metallicity': np.array([np.nan]),
+                'Teff': np.array([np.nan]), 
+                'results': None, # Full results from Gaia query
+                'wcs': None # wcs.world_to_pixel object used for projection transformation    
+            }
+
+            self._calc_xy()
+        
+
+        # Replace target parameters with user-specified values
+        scalars = [self.Teff, self.Gmag, self.logg, self.radius, self.metallicity, self.Bpmag, self.Rpmag]
+        scalars_str = ["Teff", "Gmag", "logg", "radius", "metallicity","Bpmag","Rpmag"]
+        for scalar, scalar_str in zip(scalars, scalars_str):
+            if scalar != None:    
+              self.gaia[scalar_str][0] = scalar
+
+        # Interpolate EEM_table using Teff or (Bpmag, Rpmag)
+        if 'Teff' in self.gaia.keys():
+            interp_eem = interp_EEM_table(Teff=self.gaia['Teff'], Gmag=self.gaia['Gmag'])
+        else:
+            interp_eem = interp_EEM_table(Gmag=self.gaia['Gmag'], Bpmag=self.gaia['Bpmag'], Rpmag=self.gaia['Rpmag'])
+            
+        if run_gaia_search:   
+          self.gaia['Teff'] = interp_eem['Teff']
+          self.gaia['logg'] = interp_eem['logg']
+          self.gaia['radius'] = interp_eem['radius']
+          self.gaia['metallicity'] = np.zeros_like(self.gaia['Teff'])
+          self.gaia['Gmag_abs'] = interp_eem['Gmag_abs']
+
+        # If certain values are missing, replace with interpolated EEM_table values
+        for _lbl in ['Bpmag','Rpmag','logg','radius','Gmag_abs']:
+            ti  = np.isnan(self.gaia[_lbl])
+            self.gaia[_lbl][ti] = interp_eem[_lbl][ti]
+
+        # Replace missing metallicities with solar value
+        ti = np.isnan(self.gaia['metallicity'])
+        self.gaia['metallicity'][ti] = 0.
+
+    def use_gaia_spectrum(self, TelescopeObj, ra = None, dec = None, srch_Gmax=21., srch_nmax = 100, srch_rad = None, Teff = None, Gmag = None, logg = None, radius = None, metallicity = None, Bpmag = None, Rpmag = None, stellar_model_grid = 'ATLAS9', bkg_sources = True, fov = None, fov_pa = 0 * u.deg, overwrite=False, quiet=False):
+        """
+        Use a spectrum from either the ATLAS9 catalog <Ask James for the link> or the Bt-Sett1 catalog <Ask James for the link> containing flux spectra for numerous stellar model atmospheres. 
+
+        Parameters
+        ----------
+          TelescopeObj :: `castor_etc.Telescope` instance
+            'The `Telescope` object containing the field of view (FoV) value required to calculate the search radius for querying the Gaia database.
+
+          ra :: `astropy.Quantity` int or float
+            Right ascension of the target in degree
+
+          dec  :: `astropy.Quantity` int or float
+            Declination of the target in degree
+
+          srch_Gmax :: int or float
+            Maximum Gaia G magnitude for Gaia catalog query (applies to both the target and the guide stars)
+
+          srch_nmax :: int
+            Maximum Gaia sources to include.
+
+          srch_rad :: `astropy.Quantity`
+            Search radius, in degree, for Gaia catalog query (applies to both the target and the guide stars)
+
+          Teff :: int or float 
+            Effective temperature of the target in Kelvin
+
+          Gmag :: int or float
+            Gaia G magnitude of the target used to query the Gaia catalog 
+
+          logg :: int or float
+            log(g) value of the target
+
+          radius :: int or float
+            radius of the target <ask james about units>
+
+          metallicity :: int or float
+            metallicity of the target
+
+          Bpmag :: int or float
+            Gaia BP magnitude of the target
+
+          Rpmag :: int or float
+            Gaia RP magnitude of the target
+
+          stellar_model_grid :: str
+            Stellar model grid, 'ATLAS9' or 'BTSettl', for selecting spectrum of the source according to the interpolated stellar atmosphere model.
+          
+          bkg_sources :: bool
+            If True, then background Gaia sources are included during the transit simulation calculation. If False, nmax is set to 1.
+
+          fov :: int or float
+            Full width FoV in degree
+
+          fov_pa :: `astropy.Quantity`
+            Field of view position angle
+
+          overwrite :: bool
+            If True, overwrite any existing wavelengths/spectrum. If False, raise an error
+            if wavelengths or spectrum is not None.
+
+          quiet :: bool
+            If True, do not print a message when overwriting an existing spectrum.
+
+        Attributes
+        ----------
+          wavelengths :: `astropy.Quantity` array
+            The wavelengths of the spectrum, in angstroms,
+
+          spectrum :: array of floats
+            Stellar spectrum in flam units
+
+          ra :: `astropy.Quantity` angle
+            Right ascension of the target in degree
+
+          dec  :: `astropy.Quantity` angle
+            Declination of the target in degree
+
+          srch_Gmax :: int or float
+            Maximum Gaia G magnitude for Gaia catalog query (applies to both the target and the guide stars)
+
+          srch_nmax :: int
+            Maximum Gaia sources to include.
+
+          srch_rad :: `astropy.Quantity`
+            Search radius, in degree, for Gaia catalog query (applies to both the target and the guide stars)
+
+          Teff :: int or float 
+            Effective temperature of the target in Kelvin
+
+          Gmag :: int or float
+            Gaia G magnitude of the target used to query the Gaia catalog 
+
+          logg :: int or float
+            log(g) value of the target
+
+          radius :: int or float
+            radius of the target <ask james about units>
+
+          metallicity :: int or float
+            metallicity of the target
+
+          Bpmag :: int or float
+            Gaia BP magnitude of the target
+
+          Rpmag :: int or float
+            Gaia RP magnitude of the target
+
+          stellar_model_grid :: str
+            Stellar model grid, 'ATLAS9' or 'BTSettl', for selecting spectrum of the source according to the interpolated stellar atmosphere model.
+          
+          bkg_sources :: bool
+            If True, then background Gaia sources are included during the transit simulation calculation. If False, nmax is set to 1.
+
+          fov :: int or float
+            Full width FoV in degree
+
+          fov_pa :: `astropy.Quantity`
+            Field of view position angle
+
+          ccd_dim :: int list
+            CCD dimesions adopted from TelescopeObj 
+
+          Returns
+          -------
+            None
+
+        """
+
+        if not isinstance(stellar_model_grid, str):
+            raise TypeError(
+                "stellar_model_grid should be a string"
+                + "(e.g., 'ATLAS9' or 'BTSettl')"
+                )
+        
+        if not isinstance(bkg_sources, bool):
+            raise TypeError(
+                "bkg_sources should be either True or False"
+                )
+        
+        if not isinstance(srch_nmax, int):
+            raise TypeError("srch_nmax must an integer number.")
+            
+        scalars = [ra,dec,fov,fov_pa,srch_rad]
+        scalars_str = ["ra","dec","fov","fov_pa","srch_rad"]
+        for scalar,scalar_str in zip(scalars,scalars_str):
+            if scalar != None:
+                if not isinstance(scalar, u.Quantity):
+                      raise TypeError(
+                          f"{scalar_str} must `astropy.Quantity` angles" + "(e.g., u.arcsec, u.deg)"
+                      )
+
+        scalars = [srch_Gmax, Teff, Gmag, logg, radius, metallicity, Bpmag, Rpmag]
+        scalars_str = ["srch_Gmax","Teff", "Gmag", "logg", "radius", "metallicity","Bpmag","Rpmag"]
+        for scalar, scalar_str in zip(scalars, scalars_str):
+            if scalar != None:    
+              if not isinstance(scalar, Number):
+                  raise TypeError(f"{scalar_str} must be an int or float")
+              
+        if fov == None:
+          fov = TelescopeObj.fov.to(u.deg) 
+        
+        if srch_rad == None:
+            srch_rad = (fov / 2.) * np.sqrt(2.)
+
+        if bkg_sources == False:
+            srch_nmax = 1 # Only the target Gaia source.
+
+        # Intializing PointSource attributes after checking the inputs
+        self.ra = ra.to(u.deg)
+        self.dec = dec.to(u.deg)
+        self.srch_Gmax = srch_Gmax
+        self.srch_nmax = srch_nmax
+        self.srch_rad = srch_rad.to(u.deg)
+        self.Teff = Teff
+        self.Gmag = Gmag
+        self.logg = logg
+        self.radius = radius
+        self.metallicity = metallicity
+        self.Bpmag = Bpmag
+        self.Rpmag = Rpmag
+        self.stellar_model_grid = stellar_model_grid
+        self.bkg_sources = bkg_sources
+        self.fov = fov.to(u.deg)
+        self.fov_pa = fov_pa.to(u.deg)
+        self.ccd_dim = TelescopeObj.ccd_dim
+
+  
+        # Performs a gaia query and interpolates potential sources' parameters, i.e., Teff, radius...
+        self._specify_target_parameters()
+
+        self._check_existing_spectrum(overwrite,quiet=quiet)
+
+        try:
+          # Zero index because we are only concerned with the target here. 
+          wavelengths, spectrum = getStarData(
+              temperature = self.gaia['Teff'][0],
+              metallicity = self.gaia['metallicity'][0],
+              logg = self.gaia['logg'][0],
+              model_grid = stellar_model_grid
+              )
+
+          # Estimate distance using Gmag and estimated Gabs
+          dpc = 10**( (self.gaia['Gmag'][0] - self.gaia['Gmag_abs'][0])/5. + 1 )
+
+          # Scale surface flux to observed flux using esimated dpc and radius
+          spectrum *= ( ( self.gaia['radius'][0] * R_sun ) / ( dpc * pc ) )**2 
+
+          # CASTOR wavelength range.
+          _range = np.where ( (wavelengths.to(u.AA).value <= 11000)  )
+
+          self.wavelengths = wavelengths[_range]
+          self.spectrum = spectrum[_range]
+
+        except Exception:
+            raise RuntimeError(
+                f"Could not load the {stellar_model_grid} data for some reason. Please contact the developer with a minimal" + "working example."
+            )
 
     def use_pickles_spectrum(self, spectral_class, overwrite=False, quiet=False):
         """
@@ -1952,7 +2622,7 @@ class SpectrumMixin:
         source_wavelengths_AA = self.wavelengths.to(u.AA).value
         source_photon_s_A = (  # photon/s/A
             self.spectrum  # erg/s/cm^2/A
-            * TelescopeObj.mirror_area.to(u.cm**2).value  # cm^2
+            * TelescopeObj.mirror_area.to(u.cm ** 2).value  # cm^2
             / calc_photon_energy(wavelength=source_wavelengths_AA)[0]  # photon/erg
         )
         source_interp = interp1d(
@@ -2245,56 +2915,34 @@ class NormMixin:
                     "`TelescopeObj` must be a `castor_etc.telescope.Telescope` object."
                 )
             ab_mags = dict.fromkeys(TelescopeObj.passbands)
+            spectrum_interp = interp1d(
+                x=wavelengths_AA,
+                y=self.spectrum,
+                kind="linear",
+                bounds_error=False,
+                fill_value=np.nan,
+            )
             for band in TelescopeObj.passbands:
-                # Interpolate passband to spectrum resolution
                 passband_wavelengths = (
                     TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
                 )
-                passband_interp = interp1d(
-                    x=passband_wavelengths,
-                    # y=passband_response,
-                    y=TelescopeObj.full_passband_curves[band]["response"],
-                    kind="linear",
-                    bounds_error=False,
-                    fill_value=np.nan,
-                )
-                passband_response = passband_interp(wavelengths_AA)
-                # Do not integrate NaNs
-                isgood_passband = np.isfinite(passband_response)
-                isgood_spectrum = np.isfinite(self.spectrum)
+                passband_spectrum = spectrum_interp(passband_wavelengths)
+                isgood_passband = np.isfinite(passband_spectrum)  # do not integrate NaNs
                 if np.any(~isgood_passband):
                     if np.all(~isgood_passband):
                         raise RuntimeError(
-                            f"{band}-band response could not be estimated "
-                            + "at any source spectrum wavelength"
+                            "Source spectrum could not be estimated "
+                            + f"at any {band}-band wavelength"
                         )
-                    elif np.any(
-                        ~isgood_passband[
-                            (wavelengths_AA >= passband_wavelengths.min())
-                            & (wavelengths_AA <= passband_wavelengths.max())
-                        ]
-                    ):  # only warn if there are NaNs/infs in the passband range
+                    else:
                         warnings.warn(
-                            f"{band}-band response could not be estimated "
-                            + "at some source spectrum wavelengths",
-                            RuntimeWarning,
-                        )
-                if np.any(~isgood_spectrum):
-                    if np.all(~isgood_spectrum):
-                        raise RuntimeError("Source spectrum values are all non-finite!")
-                    elif np.any(
-                        ~isgood_spectrum[
-                            (wavelengths_AA >= passband_wavelengths.min())
-                            & (wavelengths_AA <= passband_wavelengths.max())
-                        ]
-                    ):  # only warn if there are NaNs/infs in the passband range
-                        warnings.warn(
-                            "Source spectrum values are not finite at some wavelengths",
+                            "Source spectrum could not be estimated "
+                            + f"at some {band}-band wavelengths",
                             RuntimeWarning,
                         )
                 ab_mags[band] = flam_to_AB_mag(
-                    wavelengths_AA[isgood_passband & isgood_spectrum],
-                    self.spectrum[isgood_passband & isgood_spectrum],
-                    passband_response[isgood_passband & isgood_spectrum],
+                    passband_wavelengths[isgood_passband],
+                    passband_spectrum[isgood_passband],
+                    TelescopeObj.full_passband_curves[band]["response"][isgood_passband],
                 )
             return ab_mags

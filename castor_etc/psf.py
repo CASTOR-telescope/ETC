@@ -1,5 +1,5 @@
 """
-Contains parameters for CASTOR imaging chain.
+CASTOR psf.
 
 ---
 
@@ -64,92 +64,75 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
-from math import pi
-from os.path import join
+import numpy as np
 
-import astropy.units as u
+def addflux2pix(px,py,pixels,fmod):
+    """Usage: pixels=addflux2pix(px,py,pixels,fmod)
 
-from .filepaths import DATAPATH
+    Drizel Flux onto Pixels using a square PSF of pixel size unity
+    px,py are the pixel position (integers)
+    fmod is the flux calculated for (px,py) pixel
+        and it has the same length as px and py
+    pixels is the image.
+    """
 
-# -------------------------------- TELESCOPE PARAMETERS -------------------------------- #
+    xmax = pixels.shape[0] #Size of pixel array
+    ymax = pixels.shape[1]
 
-# The telescope filter (i.e., passband) names
-PASSBANDS = ["uv", "u", "g"]
+    pxmh = px-0.5 #location of reference corner of PSF square
+    pymh = py-0.5
 
-# The passband wavelength limits for the different filters
-PASSBAND_LIMITS = {
-    "uv": [0.150, 0.300] << u.um,
-    "u": [0.300, 0.400] << u.um,
-    "g": [0.400, 0.550] << u.um,
-}  # microns
+    dx = np.floor(px+0.5)-pxmh
+    dy = np.floor(py+0.5)-pymh
 
-# Resolution of the passband response curves
-PASSBAND_RESOLUTION = 1 << u.nm  # nanometres
+    # Supposing right-left as x axis and up-down as y axis:
+    # Lower left pixel
+    npx = int(pxmh) #Numpy arrays start at zero
+    npy = int(pymh)
 
-# Filepaths to the passband response curves
-PASSBAND_FILEPATHS = {
-    band: join(DATAPATH, "passbands", f"passband_castor.{band}") for band in PASSBANDS
-}
+    #print('n',npx,npy)
+    
+    #if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+    #    pixels[npx,npy]=pixels[npx,npy]+fmod
+    
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*dx*dy
 
-# Wavelength units in the passband response curve files
-PASSBAND_FILEUNITS = {"uv": u.um, "u": u.um, "g": u.um}
+    #Same operations are done for the 3 pixels other neighbouring pixels
 
-# Filepaths to the passband point spread functions (PSFs)
-PSF_FILEPATHS = {
-    band: join(DATAPATH, "psfs", f"{band}_psf_20x_supersampled.fits")
-    for band in PASSBANDS
-}
+    # Lower right pixel
+    npx = int(pxmh)+1 #Numpy arrays start at zero
+    npy = int(pymh)
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*(1.0-dx)*dy
 
-# The PSF oversampling factor. Each square pixel in the PSF file has a side length of
-# PX_SCALE / PSF_SUPERSAMPLE_FACTOR (e.g., 0.1 arcsec / 20 = 0.005 arcsec)
-PSF_SUPERSAMPLE_FACTOR = 20
+    # Upper left pixel
+    npx = int(pxmh) #Numpy arrays start at zero
+    npy = int(pymh)+1
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*dx*(1.0-dy)
 
-# The PSF full-width at half-maximum
-FWHM = 0.15 << u.arcsec  # arcsec
+    # Upper right pixel
+    npx = int(pxmh)+1 #Numpy arrays start at zero
+    npy = int(pymh)+1
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*(1.0-dx)*(1.0-dy)
+    
+    return pixels
 
-# The angular dimension covered by each pixel
-PX_SCALE = 0.1 << u.arcsec  # arcsec (or arcsec/pixel)
+def gen_unconv_image(pars,starmodel_flux,xcoo,ycoo):
 
-# The angular area of each pixel
-PX_AREA = PX_SCALE * PX_SCALE  # arcsec^2
+    xpad=pars.xpad*pars.noversample
+    ypad=pars.ypad*pars.noversample
+    #array to hold synthetic image
+    xmax=pars.xout*pars.noversample+xpad*2
+    ymax=pars.yout*pars.noversample+ypad*2
 
-# Instantaneous field of view
-IFOV_DIMEN = [0.44, 0.56] << u.deg  # degrees. Angular dimensions
-IFOV_AREA = IFOV_DIMEN[0] * IFOV_DIMEN[1]  # degrees^2
-
-# Field of view of Poet
-FOV = 204.5 << u.arcsec 
-
-# Number of pixels in CCD (x 1 million)
-MP = 960  # megapixels
-
-# CCD dimensions of Poet
-CCD_DIMENSIONS = [2048,2048]
-
-# Aperture diameter
-MIRROR_DIAMETER = 100 << u.cm  # cm
-
-# Aperture area
-MIRROR_AREA = pi * (0.5 * MIRROR_DIAMETER) * (0.5 * MIRROR_DIAMETER)  # cm^2
-
-# (Teledyne e2v CMOS detector)
-# Dark current is 0.01 electrons/s/pixel at -50°C and halves for every reduction of 5-6°C.
-# CASTOR operates at 180 K, implying:
-# dark current = 0.5^((223.15K - 180K) / 6) * 0.01 ~ 1e-4 electrons/s/pixel (negligible)
-DARK_CURRENT = 1e-4  # electrons/s/pixel
-
-BIAS = 100  # electron
-
-READ_NOISE = 2.0  # electron/pixel (high-gain). Read noise is 30 electrons for low-gain
-
-GAIN = 2.0  # electron/ADU
-
-# Wavelength threshold for red leak. Flux longward of this is considered to be red leak
-REDLEAK_THRESHOLDS = {"uv": 3010 << u.AA, "u": 4160 << u.AA, "g": 5600 << u.AA}
-
-# Extinction coefficients (i.e., R := A/E(B-V)) for the different telescope passbands
-# Estimates taken from Yuan+2013, column 3 of Table 2, rows: NUV, (SDSS) u, (SDSS) g
-# <https://ui.adsabs.harvard.edu/abs/2013MNRAS.430.2188Y/abstract>
-EXTINCTION_COEFFS = {"uv": 7.06, "u": 4.35, "g": 3.31}
-
-# -------------------------------------------------------------------------------------- #
+    pixels=np.zeros((xmax,ymax))
+    
+    i = ( xcoo + (pars.xout - pars.ccd_dim[0])/2 ) * pars.noversample
+    j = ( ycoo + (pars.yout - pars.ccd_dim[1])/2 ) * pars.noversample
+    
+    pixels=addflux2pix(i,j,pixels,starmodel_flux)
+    
+    return pixels

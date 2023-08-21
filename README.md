@@ -147,3 +147,10 @@ Finally, you can also reach out to Dr. Tyrone Woods, the Science Planning Tools 
 CASTOR.
 # CASTOR
 # CASTOR
+([isaac.cheng.ca@gmail.com](mailto:isaac.cheng.ca@gmail.com)) or the [discussions
+page](https://github.com/CASTOR-telescope/ETC/discussions). You can also ping me on Slack
+or even set up an online video/audio call! Larger issues or feature requests can be posted
+and tracked via the [issues page](https://github.com/CASTOR-telescope/ETC/issues).
+Finally, you can also reach out to Dr. Tyrone Woods, the Science Planning Tools Lead for
+CASTOR.
+# CASTOR
