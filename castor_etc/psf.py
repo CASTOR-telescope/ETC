@@ -1,19 +1,5 @@
 """
-CASTOR Exposure Time Calculator (ETC)
-=====================================
-
-A modular, user-friendly Python package for easy estimation and analysis of CASTOR imaging
-performance. See the [`ETC_frontend`](https://github.com/CASTOR-telescope/ETC_frontend)
-GitHub repository for a graphical user interface to complement this package.
-
-Includes:
-  1. Astronomical source generation and background noise estimation
-  2. Telescope imaging chain simulation, featuring a pixel-based photometry approach
-  3. Convenience functions for converting between useful quantities (e.g., flux to
-     electron/s to AB magnitude)
-
-Author: Isaac Cheng
-Contact: isaac.cheng.ca@gmail.com
+CASTOR psf.
 
 ---
 
@@ -78,44 +64,75 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
-from setuptools import setup
+import numpy as np
 
-long_description = __doc__.strip()  # Remove leading and trailing newlines
+def addflux2pix(px,py,pixels,fmod):
+    """Usage: pixels=addflux2pix(px,py,pixels,fmod)
 
-setup(
-    name="castor_etc",
-    version="1.2.0",  # see semantic versioning (<https://semver.org/spec/v2.0.0.html>)
-    description="CASTOR Exposure Time Calculator (ETC)",
-    long_description=long_description,
-    url="https://github.com/CASTOR-telescope/ETC",
-    author="FORECASTOR Team",
-    # author_email="isaac.cheng.ca@gmail.com",
-    # maintainer="Isaac Cheng",
-    # maintainer_email="isaac.cheng.ca@gmail.com"
-    packages=[
-        "castor_etc",
-        "castor_etc.data",
-        "castor_etc.data.UVMOS_data",
-        "castor_etc.data.galaxy_spectra",
-        "castor_etc.data.passbands",
-        "castor_etc.data.pickles_spectra",
-        "castor_etc.data.psfs",
-        "castor_etc.data.sky_background",
-        "castor_etc.data.transit_data",
-        "castor_etc.data.grism_data"
-    ],
-    package_data={
-        "castor_etc.data.UVMOS_data": ["*.dat", "*.txt"],
-        "castor_etc.data.galaxy_spectra": ["*.txt"],
-        "castor_etc.data.passbands": ["*.uv", "*.u", "*.g"],
-        "castor_etc.data.pickles_spectra": ["dat/*.dat"],  # must use forward slash
-        "castor_etc.data.psfs": ["*.fits"],
-        "castor_etc.data.sky_background": ["*.fits", "*.txt"],
-        "castor_etc.data.transit_data":["*.txt","*.csv","dat/*.dat"],
-        "castor_etc.data.grism_data":["*_profile_uv.txt", "*_dispersion_uv.txt", "*_dispersion_u.txt", "*_efficiency_.uv.txt", "*_efficiency_.u.txt"]
-    },
-    install_requires=["numpy", "scipy", "matplotlib", "astropy", "pandas", "photutils","tqdm","scikit-image","astroquery","pytransit","arviz","celerite","emcee","corner","spectres"], # Packages listed after the 'pytransit' package and before the 'spectres' package are pre-requisites to run the 'pytransit' package.
-    license="GPLv3",
-    python_requires=">=3.9",
-    platforms=["Linux"],  # only tested on Ubuntu. MacOS and Windows likely okay.
-)
+    Drizel Flux onto Pixels using a square PSF of pixel size unity
+    px,py are the pixel position (integers)
+    fmod is the flux calculated for (px,py) pixel
+        and it has the same length as px and py
+    pixels is the image.
+    """
+
+    xmax = pixels.shape[0] #Size of pixel array
+    ymax = pixels.shape[1]
+
+    pxmh = px-0.5 #location of reference corner of PSF square
+    pymh = py-0.5
+
+    dx = np.floor(px+0.5)-pxmh
+    dy = np.floor(py+0.5)-pymh
+
+    # Supposing right-left as x axis and up-down as y axis:
+    # Lower left pixel
+    npx = int(pxmh) #Numpy arrays start at zero
+    npy = int(pymh)
+
+    #print('n',npx,npy)
+    
+    #if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+    #    pixels[npx,npy]=pixels[npx,npy]+fmod
+    
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*dx*dy
+
+    #Same operations are done for the 3 pixels other neighbouring pixels
+
+    # Lower right pixel
+    npx = int(pxmh)+1 #Numpy arrays start at zero
+    npy = int(pymh)
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*(1.0-dx)*dy
+
+    # Upper left pixel
+    npx = int(pxmh) #Numpy arrays start at zero
+    npy = int(pymh)+1
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*dx*(1.0-dy)
+
+    # Upper right pixel
+    npx = int(pxmh)+1 #Numpy arrays start at zero
+    npy = int(pymh)+1
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*(1.0-dx)*(1.0-dy)
+    
+    return pixels
+
+def gen_unconv_image(pars,starmodel_flux,xcoo,ycoo):
+
+    xpad=pars.xpad*pars.noversample
+    ypad=pars.ypad*pars.noversample
+    #array to hold synthetic image
+    xmax=pars.xout*pars.noversample+xpad*2
+    ymax=pars.yout*pars.noversample+ypad*2
+
+    pixels=np.zeros((xmax,ymax))
+    
+    i = ( xcoo + (pars.xout - pars.ccd_dim[0])/2 ) * pars.noversample
+    j = ( ycoo + (pars.yout - pars.ccd_dim[1])/2 ) * pars.noversample
+    
+    pixels=addflux2pix(i,j,pixels,starmodel_flux)
+    
+    return pixels

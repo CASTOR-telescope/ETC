@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+# Invisible file in macOS
+**/.DS_Store
+**/._.DS_Store
+.DS_Store
+._.DS_Store
+
 # Distribution / packaging
 .Python
 build/
