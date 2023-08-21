@@ -529,6 +529,7 @@ def convert_electron_flux_mag(
     var1,
     var1_type,
     var2_type,
+    TelescopeObj=None,
     var1_err=0.0,
     passband=None,
     phot_zpt=None,
@@ -549,6 +550,9 @@ def convert_electron_flux_mag(
 
       var1_type, var2_type :: "electron", "fnu", "flam", or "mag"
         The type of the first and second variable.
+
+      TelescopeObj :: `castor_etc.Telescope` instance
+        The `Telescope` object.
 
       var1_err :: scalar or array
         The uncertainty in var1.
@@ -595,8 +599,12 @@ def convert_electron_flux_mag(
                 )
             elif (not isinstance(passband, str)) or (passband not in params.PASSBANDS):
                 raise ValueError("passband must be 'uv', 'u', or 'g'")
+            elif TelescopeObj is None:
+                raise ValueError(
+                    "TelescopeObj must be provided if var1_type or var2_type is 'electron' and phot_zpt is None"
+                )
             else:
-                phot_zpt = params.PHOT_ZPTS[passband]
+                phot_zpt = TelescopeObj.phot_zpts[passband]
         elif phot_zpt is not None and passband is not None:
             print(
                 "INFO: Using provided phot_zpt and ignoring default passband zero-point."

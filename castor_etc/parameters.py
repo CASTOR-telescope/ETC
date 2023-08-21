@@ -107,8 +107,14 @@ PX_AREA = PX_SCALE * PX_SCALE  # arcsec^2
 IFOV_DIMEN = [0.44, 0.56] << u.deg  # degrees. Angular dimensions
 IFOV_AREA = IFOV_DIMEN[0] * IFOV_DIMEN[1]  # degrees^2
 
+# Field of view of Poet
+FOV = 204.5 << u.arcsec 
+
 # Number of pixels in CCD (x 1 million)
 MP = 960  # megapixels
+
+# CCD dimensions of Poet
+CCD_DIMENSIONS = [2048,2048]
 
 # Aperture diameter
 MIRROR_DIAMETER = 100 << u.cm  # cm

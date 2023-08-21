@@ -77,7 +77,6 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
-import warnings
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from numbers import Number
@@ -542,6 +541,61 @@ class PointSource(Source):
             The passband of the custom surface brightness profile. This is set to None
             since this source is not a `CustomSource`.
 
+          ra :: `astropy.Quantity` angle
+            Right ascension of the target in degree
+
+          dec  :: `astropy.Quantity` angle
+            Declination of the target in degree
+
+          srch_Gmax :: int or float
+            Maximum Gaia G magnitude for Gaia catalog query (applies to both the target and the guide stars)
+
+          srch_nmax :: int
+            Maximum Gaia sources to include.
+
+          srch_rad :: `astropy.Quantity`
+            Search radius, in degree, for Gaia catalog query (applies to both the target and the guide stars)
+
+          Teff :: int or float 
+            Effective temperature of the target in Kelvin
+
+          Gmag :: int or float
+            Gaia G magnitude of the target used to query the Gaia catalog 
+
+          logg :: int or float
+            log(g) value of the target
+
+          radius :: int or float
+            radius of the target <ask james about units>
+
+          metallicity :: int or float
+            metallicity of the target
+
+          Bpmag :: int or float
+            Gaia BP magnitude of the target
+
+          Rpmag :: int or float
+            Gaia RP magnitude of the target
+
+          stellar_model_grid :: str
+            Stellar model grid, 'ATLAS9' or 'BTSettl', for selecting spectrum of the source according to the interpolated stellar atmosphere model.
+          
+          bkg_sources :: bool
+            If True, then background Gaia sources are included during the transit simulation calculation. If False, nmax is set to 1.
+
+          fov :: int or float
+            Full width FoV in degree
+
+          fov_pa :: `astropy.Quantity`
+            Field of view position angle
+
+          ccd_dim :: int list
+            CCD dimesions adopted from TelescopeObj 
+
+          gaia :: dict of array
+            Contains queried gaia sources' parameters
+
+
         Returns
         -------
           `PointSource` instance
@@ -591,6 +645,28 @@ class PointSource(Source):
         self.angle_a = self.angle_b = 1e-12 * u.arcsec
         self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = 0.0
+
+        #
+        # Initialize some potential future gaia attributes
+        #
+        self.ra = None
+        self.dec = None
+        self.srch_Gmax = None
+        self.srch_nmax = None
+        self.srch_rad = None
+        self.Teff = None
+        self.Gmag = None
+        self.logg = None
+        self.radius = None
+        self.metallicity = None
+        self.Bpmag = None
+        self.Rpmag = None
+        self.stellar_model_grid = None
+        self.bkg_sources = None
+        self.fov = None
+        self.fov_pa = None
+        self.ccd_dim = None
+        self.gaia = None
 
 
 class ExtendedSource(Source):
@@ -906,6 +982,7 @@ class GalaxySource(Source):
         self.angle_b = np.sqrt(r_eff_sq * axial_ratio) * u.arcsec
         self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = np.deg2rad(rotation)
+        self.sersic_index = n
 
 
 class CustomSource(Source):
