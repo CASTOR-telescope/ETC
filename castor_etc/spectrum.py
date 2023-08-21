@@ -9,6 +9,7 @@ Includes:
   - generic spiral and elliptical galaxy spectra
   - stellar spectra from the Pickles catalog
   - stellar spectra from the 'ATLAS9' and 'BTSettl' catalogs
+  - stellar spectra from the 'ATLAS9' and 'BTSettl' catalogs
   - normalization functions:
     - normalize a blackbody spectrum to a star of given radius and distance
     - normalize a spectrum to some average value or AB magnitude, either within a passband
@@ -83,6 +84,7 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 import warnings
 from numbers import Number
 from os.path import join
+import os
 import os
 
 import astropy.units as u
