@@ -94,6 +94,16 @@ PASSBAND_FILEPATHS = {
 # Wavelength units in the passband response curve files
 PASSBAND_FILEUNITS = {"uv": u.um, "u": u.um, "g": u.um}
 
+# Filepaths to the passband point spread functions (PSFs)
+PSF_FILEPATHS = {
+    band: join(DATAPATH, "psfs", f"{band}_psf_20x_supersampled.fits")
+    for band in PASSBANDS
+}
+
+# The PSF oversampling factor. Each square pixel in the PSF file has a side length of
+# PX_SCALE / PSF_SUPERSAMPLE_FACTOR (e.g., 0.1 arcsec / 20 = 0.005 arcsec)
+PSF_SUPERSAMPLE_FACTOR = 20
+
 # The PSF full-width at half-maximum
 FWHM = 0.15 << u.arcsec  # arcsec
 
