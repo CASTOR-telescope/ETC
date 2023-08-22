@@ -70,9 +70,13 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
-__all__ = ["sky_background", "passbands", "pickles_spectra", "galaxy_spectra"]
+__all__ = [
+    "UVMOS_data",
+    "galaxy_spectra",
+    "passbands",
+    "pickles_spectra",
+    "psfs",
+    "sky_background",
+]
 
-from . import sky_background
-from . import passbands
-from . import pickles_spectra
-from . import galaxy_spectra
+from . import UVMOS_data, galaxy_spectra, passbands, pickles_spectra, psfs, sky_background

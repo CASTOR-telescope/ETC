@@ -77,7 +77,6 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
-import warnings
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from numbers import Number
