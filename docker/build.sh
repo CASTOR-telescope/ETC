@@ -9,8 +9,8 @@ VERSION=$(date +%y.%m.%d.%H%M)
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # (following line from <https://stackoverflow.com/a/8426110>)
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-#
-LOCAL_STELLAR_MODEL_DIR = "/Users/dhananjhaybansal/Applications/POET/stellar_models"
+# This is local target, need to change this according to CANFAR server.
+LOCAL_STELLAR_MODEL_DIR="/Users/dhananjhaybansal/Applications/POET/stellar_models"
 #
 # Load custom parameters
 #
@@ -43,6 +43,8 @@ echo "Now running castor_etc_v${VERSION}..."
 #
 # Run the project
 #
+
+# The second mount binds stellar_models directory in the transit_data locally.
 docker run --interactive \
         --ip 0.0.0.0 \
         --rm \
