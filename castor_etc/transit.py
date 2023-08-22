@@ -1134,7 +1134,7 @@ class Observation:
         if return_scene:
             return pixels_final.T, pixels_err.T
 
-    def plot_fov(self,plot_grid=True,
+    def plot_fov(self,
                     plot_guide_stars=True,
                     vmin=None,vmax=None,add_scene_sim=True):
         """
@@ -1227,6 +1227,8 @@ class Observation:
         ax.tick_params(axis='x',which='both',top=True,direction='in')
         ax.tick_params(axis='y',which='both',direction='inout')
         ax.tick_params(axis='y',which='both',right=True,direction='in')
+
+        ax.grid(False)
 
         plt.ion()
         plt.show()

@@ -498,6 +498,7 @@ class Grism(object):
         
         """
 
+        plt.grid(False)
         plt.imshow(self.integrated_grism_box_count/self.grism_noise_total, aspect="auto",interpolation="none")
         plt.colorbar(label='SNR')
         plt.xlabel('Pixels (Dispersion direction)')
@@ -1053,6 +1054,8 @@ class Grism(object):
         quad_error_1d = np.sqrt(np.sum(self.grism_noise_total[box_center-half_source_size:box_center+half_source_size+1,:]**2, 
                                     axis=0))
         snr_1d = sum_signal_1d / quad_error_1d
+
+        plt.grid(False)
         plt.plot(grism_1d_x, snr_1d, '-k')
         plt.ylabel('SNR 1D ')
         plt.xlabel('Pixels (Dispersion direction)')
