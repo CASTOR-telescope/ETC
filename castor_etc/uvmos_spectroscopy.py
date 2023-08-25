@@ -1,73 +1,9 @@
-"""
-UVMOS Spectroscopy calculations.
-
----
-
-        GNU General Public License v3 (GNU GPLv3)
-
-(c) 2022.                            (c) 2022.
-Government of Canada                 Gouvernement du Canada
-National Research Council            Conseil national de recherches
-Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
-All rights reserved                  Tous droits réservés
-
-NRC disclaims any warranties,        Le CNRC dénie toute garantie
-expressed, implied, or               énoncée, implicite ou légale,
-statutory, of any kind with          de quelque nature que ce
-respect to the software,             soit, concernant le logiciel,
-including without limitation         y compris sans restriction
-any warranty of merchantability      toute garantie de valeur
-or fitness for a particular          marchande ou de pertinence
-purpose. NRC shall not be            pour un usage particulier.
-liable in any event for any          Le CNRC ne pourra en aucun cas
-damages, whether direct or           être tenu responsable de tout
-indirect, special or general,        dommage, direct ou indirect,
-consequential or incidental,         particulier ou général,
-arising from the use of the          accessoire ou fortuit, résultant
-software. Neither the name           de l'utilisation du logiciel. Ni
-of the National Research             le nom du Conseil National de
-Council of Canada nor the            Recherches du Canada ni les noms
-names of its contributors may        de ses  participants ne peuvent
-be used to endorse or promote        être utilisés pour approuver ou
-products derived from this           promouvoir les produits dérivés
-software without specific prior      de ce logiciel sans autorisation
-written permission.                  préalable et particulière
-                                     par écrit.
-
-This file is part of the             Ce fichier fait partie du projet
-FORECASTOR ETC project.              FORECASTOR ETC.
-
-FORECASTOR ETC is free software:     FORECASTOR ETC est un logiciel
-you can redistribute it and/or       libre ; vous pouvez le redistribuer
-modify it under the terms of         ou le modifier suivant les termes de
-the GNU General Public               la "GNU General Public
-License as published by the          License" telle que publiée
-Free Software Foundation,            par la Free Software Foundation :
-either version 3 of the              soit la version 3 de cette
-License, or (at your option)         licence, soit (à votre gré)
-any later version.                   toute version ultérieure.
-
-FORECASTOR ETC is distributed        FORECASTOR ETC est distribué
-in the hope that it will be          dans l'espoir qu'il vous
-useful, but WITHOUT ANY WARRANTY;    sera utile, mais SANS AUCUNE
-without even the implied warranty    GARANTIE : sans même la garantie
-of MERCHANTABILITY or FITNESS FOR    implicite de COMMERCIALISABILITÉ
-A PARTICULAR PURPOSE. See the        ni d'ADÉQUATION À UN OBJECTIF
-GNU General Public License for       PARTICULIER. Consultez la Licence
-more details.                        Générale Publique GNU pour plus
-                                     de détails.
-
-You should have received             Vous devriez avoir reçu une
-a copy of the GNU General            copie de la Licence Générale
-Public License along with            Publique GNU avec FORECASTOR ETC ;
-FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
-<http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
-"""
-
 import astropy.units as u
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy import constants as const
+from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy.interpolate import RectBivariateSpline
 import scipy
@@ -76,7 +12,8 @@ import math
 from os.path import join
 
 from castor_etc.background import Background
-from castor_etc.sources import PointSource
+from castor_etc.photometry import Photometry
+from castor_etc.sources import ExtendedSource, GalaxySource, PointSource, Source
 from castor_etc.telescope import Telescope
 
 from .filepaths import DATAPATH
@@ -91,43 +28,9 @@ def Gaussian2D(x, y, sigma, a=1, x0=0, y0=0):
 
 class UVMOS_Spectroscopy:
     """
-    UVMOS_Spectroscopy class.
+    Spectroscopy class.
     """
-
     def __init__(self, TelescopeObj, SourceObj, BackgroundObj):
-        """
-        Initialize class for UVMOS Spectroscopy calculations.
-
-        Note that the `Source` object (i.e., the `SourceObj` parameter) should be a point source.
-
-        Parameters
-        ----------
-            TelescopeObj :: `castor_etc.Telescope` object
-            The `castor_etc.Telescope` object containing the telescope parameters.
-
-            SourceObj :: `castor_etc.Source` object
-            The `castor_etc.Source` object contaning the target source parameters.
-
-            BackgroundObj :: `castor_etc.Background` object
-            The `castor_etc.Background` object containing the background parameters.
-            Dictionary keys must match the TelescopeObj.passbands keys.
-
-        Attributes
-        ----------
-            TelescopeObj :: `castor_etc.Telescope` object
-            The `castor_etc.Telescope` object containing the telescope parameters.
-
-            SourceObj :: `castor_etc.Source` object
-            The `castor_etc.Source` object contaning the target source parameters.
-
-            BackgroundObj :: `castor_etc.Background` object
-            The `castor_etc.Background` object containing the background parameters.
-
-
-        Returns
-        -------
-            `UVMOS_Spectroscopy` instance.
-        """
         #
         # Check inputs
         #
@@ -345,63 +248,6 @@ class UVMOS_Spectroscopy:
         cbar = plt.colorbar( )
         cbar.set_label('Normalized Intensity')
         ax.set_aspect('equal')
-
-    def show_slit_image(self, wave):
-        y = self.SourceObj.spectrum
-        x = self.SourceObj.wavelengths.value
-
-        # ----- Extract only the wavelengths in the spectral region
-        ind = np.where( (x >= self.min_wave.value) & (x <= self.max_wave.value) )
-        xx = x[ind]
-        yy = y[ind]
-
-        # ------- Determine the fractional slit transmission
-        fractional_slit_transmission = self._calc_slit_transmission()
-
-        # --------- Find detected flux
-        fact = 1/(const.h*const.c).to('erg angstrom')
-        T = self._getTransmission(xx)
-        yy_phot = yy*(xx*(fact.value))*self.TelescopeObj.mirror_area.value*T*fractional_slit_transmission*self.gain # Detected flux in counts / s / angstrom
-
-        interp_source_spectrum = interp1d( xx, yy_phot, kind='cubic' )
-    
-        # --------- Determine the source pixel weights
-        pix_dist = self.calc_source_pix_weights()
-
-        # --------- If the inputted wavelength is near the extremes, i.e., (1500,2995) nm of the spectrum, then in order to calculate the bands, we have to shift the range while creating detector heat map.
-        wave = (wave * u.nm).to(u.AA).value
-        if (wave - self.slit_width_pix < min(xx)):
-            wave = wave + self.slit_width_pix + self.dispersion.to(u.AA).value
-        
-        if (wave + self.slit_width_pix > max(xx)):
-            wave = wave - self.slit_width_pix - self.dispersion.to(u.AA).value
-        
-        # -------- Create the detector heat map
-        bands = np.arange(wave - self.slit_width_pix,wave + self.slit_width_pix,self.dispersion.to('angstrom').value)
-        tot_xpixels = len(bands) + self.slit_width_pix
-
-        detector = np.zeros((self.slit_height_pix,tot_xpixels))
-        # ------------------
-
-        for i in range(0,len(bands)-1):
-
-            if (bands[i] < wave < bands[i+1]):
-                center_pix = i
-
-            x = np.linspace(bands[i], bands[i+1], 500 )
-            y = interp_source_spectrum(x)
-
-            # Flux in photons per second
-            phot_in_band = np.array(scipy.integrate.cumtrapz(y, x )[-1])
-
-            # Create the pixel map for this band
-            pix_map = pix_dist * phot_in_band
-
-            # Update the detctor heat map
-            for j in range(self.slit_width_pix):
-                detector[:,i+j] = detector[:,i+j] + pix_map[:,j]  
-
-        return detector,center_pix
         
     def _extraction(self, detector, pix_waves, extraction_width, extraction_lowerlim, extraction_upperlim):
         
@@ -641,7 +487,7 @@ class UVMOS_Spectroscopy:
         interp_background_spectrum = scipy.interpolate.interp1d( xx, y_phot,  kind='cubic'  )
         
         # ------ Determine the source pixel weights (evenly illuminated slit)
-        pix_dist = np.full( (self.slit_height_pix ,self.slit_width_pix), 1/(self.slit_width_pix*self.slit_height_pix) )
+        pix_dist = pix_dist = np.full( (self.slit_height_pix ,self.slit_width_pix), 1/(self.slit_width_pix*self.slit_height_pix) )
         
         # ------ Create the detector heat map   
         tot_xpixels = math.ceil(( (self.max_wave - self.min_wave ) / self.dispersion ).si.value) + self.slit_width_pix
@@ -684,23 +530,15 @@ class UVMOS_Spectroscopy:
         
         read_npix = self.source_extracted_numpixs 
         
-        signal = np.array(self.source_CASTORSpectrum)
-        signal_t = signal * t
+        signal_t = np.array(self.source_CASTORSpectrum)*t
         
         noise = signal_t + t*read_npix*(np.array(self.background_CASTORSpectrum)+self.TelescopeObj.dark_current) + read_npix*self.TelescopeObj.read_noise**2*nread 
         
         S_N = np.divide(signal_t, np.sqrt(noise)  , where=np.sqrt(noise) > 0 )
         
         interp_SN = scipy.interpolate.interp1d(self.waves_CASTORSpectrum, S_N, kind='cubic')
-
-        result = interp_SN(wave)
-
-        if np.isnan(result):
-            result = np.array(['NaN'])
-        else:
-            result = abs(result)
-
-        return result
+        
+        return interp_SN(wave)
     
     def calc_t_from_snr(self, snr, wave, nread=1):
         
@@ -709,7 +547,7 @@ class UVMOS_Spectroscopy:
         snr_sq = snr * snr
 
         signal = np.array(self.source_CASTORSpectrum)
-        signal_sq =  signal * signal
+        signal_sq =  signal* signal
 
         poisson_noise = signal + np.array(self.background_CASTORSpectrum)*read_npix + self.TelescopeObj.dark_current*read_npix
 
@@ -717,13 +555,10 @@ class UVMOS_Spectroscopy:
         numer2 = snr_sq * snr_sq * poisson_noise * poisson_noise
         numer3 = 4 * snr_sq * signal_sq * (read_npix * self.TelescopeObj.read_noise**2 * nread)
 
+
         t =  np.divide( numer1 + np.sqrt(numer2 + numer3) , 2 * signal_sq  , where=signal_sq > 0 )
 
+
         interp_t = scipy.interpolate.interp1d(self.waves_CASTORSpectrum, t , kind='cubic')
-
-        result = interp_t(wave)
-
-        if np.isnan(result):
-            result = np.array(['NaN'])
-
-        return result
+    
+        return interp_t(wave)

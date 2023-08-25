@@ -101,8 +101,6 @@ setup(
         "castor_etc.data.pickles_spectra",
         "castor_etc.data.psfs",
         "castor_etc.data.sky_background",
-        "castor_etc.data.transit_data",
-        "castor_etc.data.grism_data"
     ],
     package_data={
         "castor_etc.data.UVMOS_data": ["*.dat", "*.txt"],
@@ -111,10 +109,8 @@ setup(
         "castor_etc.data.pickles_spectra": ["dat/*.dat"],  # must use forward slash
         "castor_etc.data.psfs": ["*.fits"],
         "castor_etc.data.sky_background": ["*.fits", "*.txt"],
-        "castor_etc.data.transit_data":["*.txt","*.csv","dat/*.dat"],
-        "castor_etc.data.grism_data":["*_profile_uv.txt", "*_dispersion_uv.txt", "*_dispersion_u.txt", "*_efficiency_.uv.txt", "*_efficiency_.u.txt"]
     },
-    install_requires=["numpy", "scipy", "matplotlib", "astropy", "pandas", "photutils","tqdm","scikit-image","astroquery","pytransit","arviz","celerite","emcee","corner","spectres"], # Packages listed after the 'pytransit' package and before the 'spectres' package are pre-requisites to run the 'pytransit' package.
+    install_requires=["numpy", "scipy", "matplotlib", "astropy", "pandas", "photutils"],
     license="GPLv3",
     python_requires=">=3.9",
     platforms=["Linux"],  # only tested on Ubuntu. MacOS and Windows likely okay.
