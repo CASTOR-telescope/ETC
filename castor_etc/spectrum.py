@@ -105,12 +105,10 @@ from astropy.coordinates import SkyCoord
 from astropy.constants import R_sun, pc
 from astropy.wcs import WCS
 
-# Change the path variable according to the build instructions.
-path = '/Users/dhananjhaybansal/Applications/POET/stellar_models/'
-#path = '/opt/mypackage/castor_etc/data/transit_data/stellar_models/'
+path = '/Users/dhananjhaybansal/Applications/POET/'
 
 def getStarData(temperature, metallicity, logg, 
-                    model_grid='ATLAS9',
+                    model_grid='ATLAS9', # 'ATLAS9', 'BTSettl'
                     ):
     """
     Reads in star data from atlas directory, according to temperature, metallicity, and log(G) values.
@@ -138,12 +136,12 @@ def getStarData(temperature, metallicity, logg,
     # Default to ATLAS9 model
     #     If Teff < 3500 K (i.e., min Teff in ATLAS9 grid, switch to BTSettl grid)
     if ( (model_grid == 'BTSettl') | (temperature < 3500) ):
-        if not os.path.exists(os.path.join(path,"BTSettl_CIFIST/")):
+        if not os.path.exists(os.path.join(path,"stellar_models/BTSettl_CIFIST/")):
             raise RuntimeError(
-                f"The specified directory path `{path}` does not contain the stellar_models directory." + "Please check the path variable."
+                f"The specified directory path `{path}` does not contain the stellar_model directory." + "Please modify the path variable."
             )
         else:
-          grid_dir = os.path.join(path,"BTSettl_CIFIST/")
+            grid_dir = os.path.join(path, "stellar_models/BTSettl_CIFIST/")
 
         # Scan directory to inventory model grid
         # Assumes all files starting with 'lte' are model files
@@ -186,13 +184,11 @@ def getStarData(temperature, metallicity, logg,
         flux = d[:,1] # [erg/s/cm2/angstrom]
 
     elif model_grid == 'ATLAS9':
-        if not os.path.exists(os.path.join(path, "ATLAS9/ck04models/")):
+        if not os.path.exists(os.path.join(path, "stellar_models/ATLAS9/ck04models/")):
             raise RuntimeError(
                 f"The specified directory path `{path}` does not contain the stellar_model directory." + "Please modify the path variable. "
             )
-        else:
-            grid_dir = os.path.join(path, "ATLAS9/ck04models/")
-
+        grid_dir = os.path.join(path,"stellar_models/ATLAS9/ck04models/")
         teff_grid = np.array([3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 
                               6000, 6250, 6500, 6750, 7000, 7250, 7500, 7750, 8000, 8250, 
                               8500, 8750, 9000, 9250, 9500, 9750, 10000, 10250, 10500, 10750, 
@@ -217,11 +213,13 @@ def getStarData(temperature, metallicity, logg,
 
         specfile = grid_dir + 'ck' + mh_str + '/' + 'ck' + mh_str + '_' + teff_str + '.fits'
         if os.path.isfile(specfile):
+            havespectrum = True
             hdul = fits.open(specfile)
             data = hdul[1].data #the first extension has table
             wv = data['WAVELENGTH'] * u.AA
             flux = data[logg_str] # [erg/s/cm^2/A]
         else:
+            havespectrum = False
             print('Spectrum not found: ',specfile)
 
     return wv, flux
