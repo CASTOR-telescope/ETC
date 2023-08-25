@@ -31,10 +31,7 @@ RUN ./apt-install.sh sssd acl
 COPY docker/bash.bashrc /opt/image-build
 RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
 
-RUN pip install photutils 
-
-#<https://github.com/NVIDIA/NeMo/issues/841> similarly, it is a dependency to pytransit
-RUN pip install llvmlite --ignore-installed
+RUN pip install photutils
 
 # Start notebook in user's home directory
 RUN mkdir /usr/local/bin/start-notebook.d && chmod 777 /usr/local/bin/start-notebook.d
