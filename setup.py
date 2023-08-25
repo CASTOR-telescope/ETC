@@ -84,12 +84,12 @@ long_description = __doc__.strip()  # Remove leading and trailing newlines
 
 setup(
     name="castor_etc",
-    version="1.1.1",  # see semantic versioning (<https://semver.org/spec/v2.0.0.html>)
+    version="1.2.0",  # see semantic versioning (<https://semver.org/spec/v2.0.0.html>)
     description="CASTOR Exposure Time Calculator (ETC)",
     long_description=long_description,
     url="https://github.com/CASTOR-telescope/ETC",
-    author="Isaac Cheng",
-    author_email="isaac.cheng.ca@gmail.com",
+    author="FORECASTOR Team",
+    # author_email="isaac.cheng.ca@gmail.com",
     # maintainer="Isaac Cheng",
     # maintainer_email="isaac.cheng.ca@gmail.com"
     packages=[
