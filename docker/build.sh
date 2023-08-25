@@ -9,7 +9,8 @@ VERSION=$(date +%y.%m.%d.%H%M)
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # (following line from <https://stackoverflow.com/a/8426110>)
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-DOCKER_STELLAR_MODEL_DIR="/opt/conda/lib/python3.9/site-packages/castor_etc/data/transit_data/stellar_models"
+# This is local target, need to change this according to CANFAR server.
+LOCAL_STELLAR_MODEL_DIR="/Users/dhananjhaybansal/Applications/POET/stellar_models"
 #
 # Load custom parameters
 #
@@ -51,7 +52,7 @@ docker run --interactive \
         --env DISPLAY=host.docker.internal:0 \
         -p 8888:8888 \
         -v ${REPO_DIR}:${NOTEBOOK_DIR} \
-        -v ${STELLAR_MODEL_DIR}:${DOCKER_STELLAR_MODEL_DIR} \
+        -v ${LOCAL_STELLAR_MODEL_DIR}:${STELLAR_MODEL_DIR} \
         --env JUPYTER_ENABLE_LAB=${JUPYTER_ENABLE_LAB} \
         --env JUPYTER_TOKEN=${JUPYTER_TOKEN} \
         --env NB_USER=${NB_USER} \
