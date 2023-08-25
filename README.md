@@ -1,6 +1,6 @@
 # CASTOR Exposure Time Calculator (ETC)
 
-Isaac Cheng - 2022
+FORECASTOR Team - 2022-2023
 
 **This package is under active development. It should be stable but please let me know if
 there are any bugs or unusual behaviour!**
@@ -8,8 +8,8 @@ there are any bugs or unusual behaviour!**
 This Python package is an exposure time calculator for
 [CASTOR](https://www.castormission.org/). Since CASTOR is currently in Phase 0, this tool
 contains tunable parameters that are not normally exposed in most other exposure time
-calculators; the user is highly encouraged to read the docstrings and view the [example
-notebooks](https://github.com/CASTOR-telescope/ETC_notebooks) prior to using this
+calculators; the user is highly encouraged to read the docstrings and view the
+[example notebooks](https://github.com/CASTOR-telescope/ETC_notebooks) prior to using this
 software. Likewise, there may be frequent updates to this package as the mission matures
 (see the [changelog](CHANGELOG.md) for more details).
 
@@ -18,8 +18,7 @@ software. Likewise, there may be frequent updates to this package as the mission
 1. [Launching on CANFAR](#launching-on-canfar)
 2. [Installation](#installation)
 3. [Building the Docker image for CANFAR/local machine](docker/README.md)
-4. [Viewing CANFAR Jupyter notebook session logs and Other Terminal
-   Commands](docker/how_to_view_session_logs.md)
+4. [Viewing CANFAR Jupyter notebook session logs and Other Terminal Commands](docker/how_to_view_session_logs.md)
 5. Getting started and specific use-case examples: See the
    [ETC_notebooks](https://github.com/CASTOR-telescope/ETC_notebooks) repository
    containing examples in Jupyter notebooks.
@@ -31,13 +30,13 @@ software. Likewise, there may be frequent updates to this package as the mission
 
 ## Launching on CANFAR
 
-1. Ensure you have a Canadian Astronomy Data Centre account (or [request
-   one](https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html) if you do not
-   have one yet).
-2. Go to [CANFAR](https://www.canfar.net/en/) and sign in to the [Science
-   Portal](https://www.canfar.net/science-portal/). If you cannot access this, then you
-   must send an email to [support@canfar.net](mailto:support@canfar.net) requesting access
-   to the Science Portal.
+1. Ensure you have a Canadian Astronomy Data Centre account (or
+   [request one](https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/request.html) if you
+   do not have one yet).
+2. Go to [CANFAR](https://www.canfar.net/en/) and sign in to the
+   [Science Portal](https://www.canfar.net/science-portal/). If you cannot access this,
+   then you must send an email to [support@canfar.net](mailto:support@canfar.net)
+   requesting access to the Science Portal.
 3. Inside the [Science Portal](https://www.canfar.net/science-portal/), click the "`+`"
    icon to launch a new session. Under "`type`", select "`notebook`". If multiple
    `castor_etc` versions are available, you can select the specific version you would like
@@ -94,8 +93,8 @@ or
 python setup.py install
 ```
 
-If you want to install in [develop
-mode](https://pip-python3.readthedocs.io/en/latest/reference/pip_install.html#install-editable),
+If you want to install in
+[develop mode](https://pip-python3.readthedocs.io/en/latest/reference/pip_install.html#install-editable),
 use:
 
 ```bash
@@ -140,9 +139,9 @@ would like the ETC to have. This tool is meant to be used by the community, afte
 
 Please reach out if you have any questions, suggestions, or other feedback related to this
 software—either through email
-([isaac.cheng.ca@gmail.com](mailto:isaac.cheng.ca@gmail.com)) or the [discussions
-page](https://github.com/CASTOR-telescope/ETC/discussions). You can also ping me on Slack
-or even set up an online video/audio call! Larger issues or feature requests can be posted
-and tracked via the [issues page](https://github.com/CASTOR-telescope/ETC/issues).
-Finally, you can also reach out to Dr. Tyrone Woods, the Science Planning Tools Lead for
-CASTOR.
+([isaac.cheng.ca@gmail.com](mailto:isaac.cheng.ca@gmail.com)) or the
+[discussions page](https://github.com/CASTOR-telescope/ETC/discussions). You can also ping
+me on Slack or even set up an online video/audio call! Larger issues or feature requests
+can be posted and tracked via the
+[issues page](https://github.com/CASTOR-telescope/ETC/issues). Finally, you can also reach
+out to Dr. Tyrone Woods, the Science Planning Tools Lead for CASTOR.
