@@ -199,9 +199,7 @@ class Telescope:
         psf_supersample_factor=params.PSF_SUPERSAMPLE_FACTOR,
         fwhm=params.FWHM,
         px_scale=params.PX_SCALE,
-        transit_fov = params.transit_FOV, # used to calculate search radius during gaia query
         ifov_dimen=params.IFOV_DIMEN,  # not currently used for any calculations
-        transit_ccd_dim = params.transit_CCD_DIMENSIONS, # used to convert (ra,dec) of identified Gaia sources to (x_pix, y_pix)
         mp=params.MP,  # not currently used for any calculations
         mirror_diameter=params.MIRROR_DIAMETER,
         dark_current=params.DARK_CURRENT,
@@ -304,9 +302,6 @@ class Telescope:
             arcsec). This will be used to calculate the solid angle subtended by each
             square pixel in the detector (e.g., 0.01 arcsec).
 
-          transit_fov :: `astropy.Quantity` angle
-            Full width FoV in degree
-
           ifov_dimen :: 2-element `astropy.Quantity` angle array
             The angular dimensions of the telescope's instantaneous field of view (IFOV).
             This will be used to calculate the area covered by the telescope's IFOV. Note
@@ -318,9 +313,6 @@ class Telescope:
           mp :: int or float
             The telescope detector's number of megapixels (million pixels).
             Not currently used for any calculations.
-
-          transit_ccd_dim :: 2-element int list
-            Dimensions of the CCD used for plotting gaia source and converts their ra,dec coordinates to (x,y) positions on the CCD
 
           mirror_diameter :: `astropy.Quantity` length
             The diameter of the telescope's primary circular mirror (e.g., 100 cm). This
@@ -440,9 +432,6 @@ class Telescope:
             The solid angle (i.e., angular area) subtended by each square pixel in the
             detector.
 
-          transit_fov :: `astropy.Quantity` angle
-            Full width FoV in degree.
-
           ifov_dimen :: 2-element `astropy.Quantity` angle array
             The angular dimensions of the telescope's instantaneous field of view.
             Not currently used for any calculations.
@@ -454,9 +443,6 @@ class Telescope:
           mp :: int or float
             The telescope detector's number of megapixels.
             Not currently used for any calculations.
-
-          transit_ccd_dim :: 2-element int list
-            Dimensions of the CCD used for plotting gaia source and converts their ra,dec coordinates to (x,y) positions on the CCD
 
           mirror_diameter :: `astropy.Quantity` length
             The diameter of the telescope's primary circular mirror.
@@ -627,10 +613,6 @@ class Telescope:
                     f"{angle_str} must be an `astropy.Quantity` angle (e.g., u.arcsec)"
                 )
         try:
-            _ = transit_fov.to(u.arcsec)
-        except Exception:
-            raise TypeError("transit_fov must be an `astropy.Quantity` angle, i.e., u.arcsec or u.deg")
-        try:
             if ifov_dimen.shape != (2,):
                 raise ValueError(
                     "ifov_dimen must be a 2-element `astropy.Quantity` angle array "
@@ -641,11 +623,6 @@ class Telescope:
             raise TypeError(
                 "ifov_dimen must be a 2-element `astropy.Quantity` angle array "
                 + "(e.g., [0.44, 0.56] * u.deg)"
-            )
-        if len(transit_ccd_dim) != 2:
-            raise TypeError(
-                f"transit_ccd_dim must be a 2-element integer list"
-                + "(e.g., [2048,2048])"
             )
         try:
             _ = mirror_diameter.to(u.cm)
@@ -722,13 +699,9 @@ class Telescope:
 
         self.ifov_dimen = ifov_dimen
         self.ifov_area = ifov_dimen[0] * ifov_dimen[1]
-        self.transit_fov = transit_fov
 
         self.fwhm = fwhm
-
         self.mp = mp
-        self.transit_ccd_dim = transit_ccd_dim
-
         self.dark_current = dark_current
         self.bias = bias
         self.read_noise = read_noise

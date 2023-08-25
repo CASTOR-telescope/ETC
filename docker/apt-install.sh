@@ -17,7 +17,6 @@ set -eu
 
 apt-get update --yes -qq
 apt-get update --yes --fix-missing
-apt-get -y install gcc
 DEBIAN_FRONTEND=noninteractive apt-get install --yes ${packages}
 apt-get autoremove --purge -y
 apt-get clean --yes

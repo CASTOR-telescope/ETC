@@ -1,9 +1,7 @@
 NB_USER=IsaacCheng
 NOTEBOOK_DIR=/arc/home/IsaacCheng/CASTOR/ETC
 
-STELLAR_MODEL_DIR =  NOTEBOOK_DIR/castor_etc/data/transit_data/stellar_models
-
-CUSTOMIZE_ENV=yes
+CUSTOMIZE_ENV=no
 
 JUPYTER_ENABLE_LAB=yes
 JUPYTER_TOKEN=""
