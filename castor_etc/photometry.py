@@ -1444,12 +1444,6 @@ class Photometry:
                 oaconvolve(source_weights, self.TelescopeObj.psfs[band], mode="same")
                 / sum_tot_source_weights[band]
             )
-        # Check for potential small normalization errors. Ensure sum of source_weights is
-        # <= 1
-        for band in self.source_weights:
-            _nansum_source_weights = np.nansum(self.source_weights[band])
-            if _nansum_source_weights > 1.0:
-                self.source_weights[band] /= _nansum_source_weights
         #
         # Create aperture
         #
@@ -1469,6 +1463,12 @@ class Photometry:
         for band in self.source_weights:
             self.source_weights[band] *= aper_mask
         self._bin_arrs_remove_nans(center)
+        # Check for potential small normalization errors.
+        # (Ensure sum of source_weights is <= 1)
+        for band in self.source_weights:
+            _nansum_source_weights = np.nansum(self.source_weights[band])
+            if _nansum_source_weights > 1.0:
+                self.source_weights[band] /= _nansum_source_weights
         #
         # Final sanity checks
         #
