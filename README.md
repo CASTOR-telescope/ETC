@@ -106,6 +106,8 @@ In develop mode, the installation of the package simply links back to the
 [`castor_etc`](castor_etc/) folder itself, meaning any changes made to this package will
 be reflected in your environment.
 
+After installing the python package, you need to download the [stellar models directory](https://kona.ubishops.ca/jsikora/poet_stellar_models.tar.gz) and link its destination in the spectrum.py file in the [`castor_etc`](castor_etc/) folder. 
+
 ## Known Issues
 
 - Rectangular aperture sometimes produces the incorrect number of pixels in the photometry
