@@ -3,11 +3,6 @@
 See [semantic versioning](https://semver.org/spec/v2.0.0.html) for the rationale behind
 the version numbers.
 
-## [1.2.1](https://github.com/CASTOR-telescope/ETC/tree/v1.2.1) (2023-08-25)
-
-- Moved check for making sure the enclosed flux fraction is <= 100% for rectangular
-  apertures to after the aperture mask is applied.
-
 ## [1.2.0](https://github.com/CASTOR-telescope/ETC/tree/v1.2.0) (2023-08-25)
 
 - Changed AB magnitude calculation to interpolate the passband to the spectrum resolution
