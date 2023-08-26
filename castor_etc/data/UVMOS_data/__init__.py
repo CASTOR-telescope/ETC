@@ -1,19 +1,5 @@
 """
-CASTOR Exposure Time Calculator (ETC)
-=====================================
-
-A modular, user-friendly Python package for easy estimation and analysis of CASTOR imaging
-performance. See the [`ETC_frontend`](https://github.com/CASTOR-telescope/ETC_frontend)
-GitHub repository for a graphical user interface to complement this package.
-
-Includes:
-  1. Astronomical source generation and background noise estimation
-  2. Telescope imaging chain simulation, featuring a pixel-based photometry approach
-  3. Convenience functions for converting between useful quantities (e.g., flux to
-     electron/s to AB magnitude)
-
-Author: Isaac Cheng
-Contact: isaac.cheng.ca@gmail.com
+Data files for CASTOR UVMOS.
 
 ---
 
@@ -77,31 +63,3 @@ Public License along with            Publique GNU avec FORECASTOR ETC ;
 FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
-
-__all__ = [
-    "background",
-    "constants",
-    "conversions",
-    "data",
-    "filepaths",
-    "parameters",
-    "photometry",
-    "sources",
-    "spectrum",
-    "telescope",
-    "uvmos_spectroscopy",
-]
-
-from . import (
-    background,
-    constants,
-    conversions,
-    data,
-    filepaths,
-    parameters,
-    photometry,
-    sources,
-    spectrum,
-    telescope,
-    uvmos_spectroscopy,
-)
