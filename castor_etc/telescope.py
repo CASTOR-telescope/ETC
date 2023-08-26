@@ -70,26 +70,15 @@ from copy import deepcopy
 from numbers import Number
 
 import astropy.units as u
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from astropy.io import fits
-from matplotlib.colors import LinearSegmentedColormap
 from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
 from . import parameters as params
 from .conversions import fnu_to_photlam, mag_to_flux
 
-# Make our own matplotlib colormap to mimic the "heat" map in DS9, because we're extra
-# Based on: <https://gist.github.com/adonath/c9a97d2f2d964ae7b9eb>
-
-_ds9heat = {
-    "red": lambda v: np.interp(v, [0, 0.34, 1], [0, 1, 1]),
-    "green": lambda v: np.interp(v, [0, 1], [0, 1]),
-    "blue": lambda v: np.interp(v, [0, 0.65, 0.98, 1], [0, 0, 1, 1]),
-}
-_ds9heat_cmap = LinearSegmentedColormap("ds9heat", _ds9heat)
+# TODO: add PSF (Moffat and Gaussian? Need to get data file first)
 
 
 def secant_method(f, x0, x1, tol=1e-6, max_iter=100):
@@ -195,8 +184,6 @@ class Telescope:
             "tol": 2e-4,
             "max_iter": 100,
         },
-        psf_filepaths=params.PSF_FILEPATHS,
-        psf_supersample_factor=params.PSF_SUPERSAMPLE_FACTOR,
         fwhm=params.FWHM,
         px_scale=params.PX_SCALE,
         fov = params.FOV, # used to calculate search radius during gaia query
@@ -276,24 +263,6 @@ class Telescope:
             - max_iter :: int
                 The maximum number of iterations to use for finding each photometric zero
                 point.
-
-          psf_filepaths :: dict of str
-            The absolute paths to the FITS files containing the point spread functions
-            (PSFs) for each of the telescope's passbands. The FITS files should be 2D
-            images at the same resolution as the telescope's detectors (also see the
-            `px_scale` parameter below). The value of a particular pixel should represent
-            the flux contained within that pixel relative to the total flux. For example,
-            a pixel value of 0.1 means that 10% of the flux from the source is contained
-            within that pixel. The extent of the PSF images should be sufficiently large
-            as to contain roughly 100% of the flux from a point source (i.e., pixel values
-            should sum to 1).
-            The default files are averaged 2D PSFs that are, strictly speaking, only valid
-            for the center field of view.
-
-          psf_supersample_factor :: int
-            The PSF oversampling factor, meaning each square pixel in the PSF file has a
-            side length of `px_scale / psf_supersample_factor` (e.g., 0.1 arcsec / 20 =
-            0.005 arcsec).
 
           fwhm :: `astropy.Quantity` angle
             The angular full-width at half-maximum of the telescope's PSF (e.g., 0.15
@@ -377,18 +346,6 @@ class Telescope:
             Dictionary containing the photometric zero-point of each passband. The
             photometric zero-point of a passband is defined as the AB magnitude which
             produces 1 electron/s in the passband.
-
-          psfs :: dict of 2D `numpy.ndarray`
-            The point spread functions (PSFs) for each of the telescope's passbands. The
-            value of a particular pixel (i.e., entry in the 2D array) represents the flux
-            contained within that pixel relative to the total flux. For example, a pixel
-            value of 0.1 means that 10% of the flux from the source is contained within
-            that pixel.
-
-          psf_supersample_factor :: int
-            The PSF oversampling factor, meaning each square pixel in the PSF file has a
-            side length of `px_scale / psf_supersample_factor` (e.g., 0.1 arcsec / 20 =
-            0.005 arcsec).
 
           passband_curves :: dict of dicts
             ! This has since been deprecated and is not used anymore !
@@ -573,7 +530,7 @@ class Telescope:
             passband_response_filepaths,
             "`passband_response_filepaths`",
             str,
-            "absolute filepath strings",
+            "absolute file path strings",
         )
         passband_response_fileunits = _check_dict(
             passband_response_fileunits,
@@ -592,11 +549,6 @@ class Telescope:
                 "INFO: `passband_pivots` and passband response files both provided. Will "
                 + "use user-supplied `passband_pivots` rather than calculating pivots."
             )
-        psf_filepaths = _check_dict(
-            psf_filepaths, "`psf_filepaths`", str, "absolute filepath strings"
-        )
-        if not isinstance(psf_supersample_factor, (int, np.integer)):
-            raise TypeError("`psf_supersample_factor` must be an int")
         redleak_thresholds = _check_dict(
             redleak_thresholds,
             "`redleak_thresholds`",
@@ -604,7 +556,10 @@ class Telescope:
             "`astropy.Quantity` lengths (e.g., u.AA)",
         )
         extinction_coeffs = _check_dict(
-            extinction_coeffs, "`extinction_coeffs`", Number, "int or float"
+            extinction_coeffs,
+            "`extinction_coeffs`",
+            Number,
+            "int or float",
         )
         if phot_zpts is not None:
             phot_zpts = _check_dict(
@@ -633,13 +588,13 @@ class Telescope:
         try:
             if ifov_dimen.shape != (2,):
                 raise ValueError(
-                    "ifov_dimen must be a 2-element `astropy.Quantity` angle array "
+                    f"ifov_dimen must be a 2-element `astropy.Quantity` angle array "
                     + "(e.g., [0.44, 0.56] * u.deg)"
                 )
             _ = ifov_dimen.to(u.arcsec)
         except Exception:
             raise TypeError(
-                "ifov_dimen must be a 2-element `astropy.Quantity` angle array "
+                f"ifov_dimen must be a 2-element `astropy.Quantity` angle array "
                 + "(e.g., [0.44, 0.56] * u.deg)"
             )
         if len(ccd_dim) != 2:
@@ -693,16 +648,10 @@ class Telescope:
         if phot_zpts is None:
             phot_zpts = Telescope.calc_phot_zpts(
                 self.full_passband_curves,
-                mirror_area=self.mirror_area.to(u.cm**2).value,
+                mirror_area=self.mirror_area.to(u.cm ** 2).value,
                 **phot_zpts_kwargs,
             )
         self.phot_zpts = phot_zpts
-
-        psfs = dict.fromkeys(passbands)
-        for band in passbands:
-            psfs[band] = fits.getdata(psf_filepaths[band])
-        self.psfs = psfs
-        self.psf_supersample_factor = psf_supersample_factor
 
         if passband_pivots is None:
             passband_pivots = dict.fromkeys(passbands)
@@ -750,65 +699,6 @@ class Telescope:
             The deep copy of the `Telescope` object.
         """
         return deepcopy(self)
-
-    def show_psf(self, passband, plot=True):
-        """
-        Visualize the point spread function (PSF) of a given passband. The visualization
-        assumes (0, 0) is at the center of the image (this assumption does not affect
-        calculations, and is purely for visualization purposes).
-
-        Parameters
-        ----------
-          passband :: str
-            The passband corresponding to the PSF.
-
-          plot :: bool
-            If True, plot the PSF and return None. If False, return the figure, axis,
-            image, and colorbar instance associated with the plot.
-
-        Returns
-        -------
-        If plot is True:
-          None
-
-        If plot is False:
-          fig, ax :: `matplotlib.figure.Figure` and `matplotlib.axes.Axes` objects
-            The figure and axis instance associated with the plot.
-
-          img :: `matplotlib.image.AxesImage` object
-            The image instance returned by `ax.imshow`.
-
-          cbar :: `matplotlib.colorbar.Colorbar` object
-            The colorbar instance associated with the plot.
-        """
-        try:
-            psf = self.psfs[passband]
-        except KeyError:
-            raise KeyError(f"{passband} is not a valid passband")
-        psf_px_scale = (self.px_scale / self.psf_supersample_factor).to(u.arcsec).value
-        extent_y = 0.5 * psf_px_scale * psf.shape[0]
-        extent_x = 0.5 * psf_px_scale * psf.shape[1]
-        #
-        rc = {"axes.grid": False}
-        with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
-            fig, ax = plt.subplots()
-            img = ax.imshow(
-                psf,
-                origin="lower",
-                interpolation=None,
-                extent=[-extent_x, extent_x, -extent_y, extent_y],
-                cmap=_ds9heat_cmap,
-            )  # no need to transpose PSF. Same result as visualizing with DS9
-            ax.tick_params(color="w", which="both")
-            cbar = fig.colorbar(img)
-            cbar.set_label("Fraction of Flux Contained Within Pixel")
-            ax.set_xlabel("$x$ [arcsec]")
-            ax.set_ylabel("$y$ [arcsec]")
-            ax.set_title(f"{passband}-band PSF")
-            if plot:
-                plt.show()
-            else:
-                return fig, ax, img, cbar
 
     @staticmethod
     def calc_pivot_wavelength(wavelengths, response, response_func="EE"):

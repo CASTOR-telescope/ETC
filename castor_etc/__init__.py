@@ -79,29 +79,25 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 """
 
 __all__ = [
-    "background",
     "constants",
-    "conversions",
-    "data",
     "filepaths",
     "parameters",
-    "photometry",
-    "sources",
+    "conversions",
     "spectrum",
+    "sources",
+    "data",
     "telescope",
-    "uvmos_spectroscopy",
+    "background",
+    "photometry",
 ]
 
-from . import (
-    background,
-    constants,
-    conversions,
-    data,
-    filepaths,
-    parameters,
-    photometry,
-    sources,
-    spectrum,
-    telescope,
-    uvmos_spectroscopy,
-)
+from . import constants
+from . import filepaths
+from . import parameters
+from . import conversions
+from . import spectrum
+from . import sources
+from . import data
+from . import telescope
+from . import background
+from . import photometry

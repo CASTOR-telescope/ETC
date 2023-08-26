@@ -152,7 +152,7 @@ def convert_freq_wavelength(data, to="wavelength", output_unit=u.AA):
     elif to == "frequency":
         unit = u.AA  # data are wavelengths
     else:
-        raise ValueError("to must be 'wavelength' or 'frequency'")
+        raise ValueError(f"to must be 'wavelength' or 'frequency'")
     #
     if isinstance(data, u.Quantity):
         data = data.to(unit)
@@ -348,7 +348,7 @@ def convert_rel_abs_mag(mag, dist, mag_err=0.0, dist_err=0.0, to="abs"):
         new_mag = mag + 5 * (np.log10(dist) - 1)
     else:
         raise ValueError("to must be either 'abs' or 'rel'")
-    new_mag_err = np.sqrt(mag_err**2 + (5 / np.log(10) * dist_err / dist) ** 2)
+    new_mag_err = np.sqrt(mag_err ** 2 + (5 / np.log(10) * dist_err / dist) ** 2)
     #
     return new_mag, new_mag_err
 

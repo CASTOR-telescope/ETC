@@ -1,13 +1,14 @@
 # Dockerfile for the CASTOR exposure time calculator.
 # Please build from the repository directory
 
-FROM jupyter/scipy-notebook:hub-2.0.1
+# --platform=linux/amd64 ensures that the docker image CPU architecture matches with the CANFAR server CPU architecture.
+FROM --platform=linux/amd64 jupyter/scipy-notebook:hub-2.0.1
 LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
 
 USER ${NB_UID}
 
 # Install required Python packages
-RUN pip install astropy photutils \
+RUN pip install astropy \
     ipyevents pylint black[jupyter] jupyterlab-git
 RUN jupyter nbextension enable --py --sys-prefix ipyevents
 
@@ -23,6 +24,11 @@ RUN ./apt-install.sh sssd acl
 
 COPY docker/bash.bashrc /opt/image-build
 RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
+
+RUN pip install photutils 
+
+#<https://github.com/NVIDIA/NeMo/issues/841> similarly, it is a dependency to pytransit
+RUN pip install llvmlite --ignore-installed
 
 # Start notebook in user's home directory
 RUN mkdir /usr/local/bin/start-notebook.d && chmod 777 /usr/local/bin/start-notebook.d
