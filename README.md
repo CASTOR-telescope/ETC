@@ -146,4 +146,3 @@ or even set up an online video/audio call! Larger issues or feature requests can
 and tracked via the [issues page](https://github.com/CASTOR-telescope/ETC/issues).
 Finally, you can also reach out to Dr. Tyrone Woods, the Science Planning Tools Lead for
 CASTOR.
-# CASTOR
