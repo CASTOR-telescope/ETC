@@ -173,7 +173,7 @@ class Observation:
         self.tstart = 0.0 * u.d # light curve start time [days]
         self.tend = 6.0/24. * u.d # light curve end time [days]
 
-        self.ccd_dim = [self.TelescopeObj.ccd_dim[0],self.TelescopeObj.ccd_dim[1]] # [pxl,pxl] used for plotting (including converting ra,dec -> x_pxl, y_pxl)
+        self.ccd_dim = [self.TelescopeObj.transit_ccd_dim[0],self.TelescopeObj.transit_ccd_dim[1]] # [pxl,pxl] used for plotting (including converting ra,dec -> x_pxl, y_pxl)
 
         self.noise_sources = ['illum','shot','read','dark','jitter', 'sky_background'] # List of noise sources to include
         

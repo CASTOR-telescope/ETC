@@ -1913,7 +1913,7 @@ class SpectrumMixin:
                   raise TypeError(f"{scalar_str} must be an int or float")
               
         if fov == None:
-          fov = TelescopeObj.fov.to(u.deg) 
+          fov = TelescopeObj.transit_fov.to(u.deg) 
         
         if srch_rad == None:
             srch_rad = (fov / 2.) * np.sqrt(2.)
@@ -1938,7 +1938,7 @@ class SpectrumMixin:
         self.bkg_sources = bkg_sources
         self.fov = fov.to(u.deg)
         self.fov_pa = fov_pa.to(u.deg)
-        self.ccd_dim = TelescopeObj.ccd_dim
+        self.ccd_dim = TelescopeObj.transit_ccd_dim
 
   
         # Performs a gaia query and interpolates potential sources' parameters, i.e., Teff, radius...
