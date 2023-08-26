@@ -1926,16 +1926,13 @@ class Photometry:
                 # Convert extinction-corrected AB mag to electron/s using Eq. (2) of
                 # <https://hst-docs.stsci.edu/acsihb/chapter-9-exposure-time-calculations/9-2-determining-count-rates-from-sensitivities#id-9.2DeterminingCountRatesfromSensitivities-9.2.1>
                 # and the passband's photometric zero point
-                erate_per_px = (
+                source_erate[band] = (
                     mag_to_flux(
                         source_passband_mag,
                         zpt=self.TelescopeObj.phot_zpts[band],
                     )[0]
-                    / self._eff_npix
+                    * self.source_weights[band]
                 )  # electron/s/pixel
-                source_erate[band] = (
-                    erate_per_px * self._aper_mask * encircled_energy
-                )  # array containing the source-produced electron/s for each pixel
         #
         # Calculate desired results (either integration time given SNR or SNR given time)
         #
