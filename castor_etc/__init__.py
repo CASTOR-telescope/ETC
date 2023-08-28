@@ -90,6 +90,9 @@ __all__ = [
     "spectrum",
     "telescope",
     "uvmos_spectroscopy",
+    "psf",
+    "transit",
+    "grism"
 ]
 
 from . import (
@@ -104,4 +107,7 @@ from . import (
     spectrum,
     telescope,
     uvmos_spectroscopy,
+    psf,
+    transit,
+    grism
 )
