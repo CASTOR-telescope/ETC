@@ -97,20 +97,12 @@ from . import constants as const
 from .conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
 from .filepaths import DATAPATH
 from .telescope import Telescope
+from . import parameters as params
 
 from astroquery.gaia import Gaia
 from astropy.coordinates import SkyCoord
 from astropy.constants import R_sun, pc
 from astropy.wcs import WCS
-
-# Use local_path when working with castor_etc on your local machine.
-# local_path = <path to local stellar_models directory> 
-
-# Use local_docker_path when building docker container locally.
-# local_docker_path = join(DATAPATH,"transit_data/stellar_models")
-
-# Use canfar_docker_path when building castor_etc package ready to be deployed on the canfar server.
-canfar_docker_path = "/arc/projects/CASTOR/stellar_models"
 
 def getStarData(temperature, metallicity, logg, 
                     model_grid='ATLAS9',
@@ -141,12 +133,12 @@ def getStarData(temperature, metallicity, logg,
     # Default to ATLAS9 model
     #     If Teff < 3500 K (i.e., min Teff in ATLAS9 grid, switch to BTSettl grid)
     if ( (model_grid == 'BTSettl') | (temperature < 3500) ):
-        if not os.path.exists(os.path.join(canfar_docker_path,"BTSettl_CIFIST/")):
+        if not os.path.exists(os.path.join(params.STELLAR_MODELS_DIR_PATH,"BTSettl_CIFIST/")):
             raise RuntimeError(
-                f"The specified directory path `{canfar_docker_path}` does not contain the stellar_models directory." + "Please check the path variable."
+                f"The specified directory path `{params.STELLAR_MODELS_DIR_PATH}` does not contain the stellar_models directory." + "Please check the path variable."
             )
         else:
-          grid_dir = os.path.join(canfar_docker_path,"BTSettl_CIFIST/")
+          grid_dir = os.path.join(params.STELLAR_MODELS_DIR_PATH,"BTSettl_CIFIST/")
 
         # Scan directory to inventory model grid
         # Assumes all files starting with 'lte' are model files
@@ -189,12 +181,12 @@ def getStarData(temperature, metallicity, logg,
         flux = d[:,1] # [erg/s/cm2/angstrom]
 
     elif model_grid == 'ATLAS9':
-        if not os.path.exists(os.path.join(canfar_docker_path, "ATLAS9/ck04models/")):
+        if not os.path.exists(os.path.join(params.STELLAR_MODELS_DIR_PATH, "ATLAS9/ck04models/")):
             raise RuntimeError(
-                f"The specified directory path `{canfar_docker_path}` does not contain the stellar_model directory." + "Please modify the path variable. "
+                f"The specified directory path `{params.STELLAR_MODELS_DIR_PATH}` does not contain the stellar_model directory." + "Please modify the path variable. "
             )
         else:
-            grid_dir = os.path.join(canfar_docker_path, "ATLAS9/ck04models/")
+            grid_dir = os.path.join(params.STELLAR_MODELS_DIR_PATH, "ATLAS9/ck04models/")
 
         teff_grid = np.array([3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 
                               6000, 6250, 6500, 6750, 7000, 7250, 7500, 7750, 8000, 8250, 
@@ -2933,7 +2925,7 @@ class NormMixin:
                 passband_wavelengths = (
                     TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
                 )
-                passband_spectrum = spectrum_interp(passband_wavelengths)
+                passband_spectrum = spectrum_interp(passband_wavelengths) # interpolating passband to spectrum resolution.
                 isgood_passband = np.isfinite(passband_spectrum)  # do not integrate NaNs
                 if np.any(~isgood_passband):
                     if np.all(~isgood_passband):
