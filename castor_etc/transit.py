@@ -85,8 +85,6 @@ from astropy.constants import R_sun, pc
 
 
 from os.path import join
-
-from . import psf
 from astroquery.gaia import Gaia
 
 
@@ -101,6 +99,79 @@ from photutils.aperture import EllipticalAperture, aperture_photometry
 
 # The optimal aperture for a point source is a circular aperture with a radius equal to the factor below times half the telescope's FWHM
 _OPTIMAL_APER_FACTOR = 1.4
+
+import numpy as np
+
+def addflux2pix(px,py,pixels,fmod):
+    """Usage: pixels=addflux2pix(px,py,pixels,fmod)
+
+    Drizel Flux onto Pixels using a square PSF of pixel size unity
+    px,py are the pixel position (integers)
+    fmod is the flux calculated for (px,py) pixel
+        and it has the same length as px and py
+    pixels is the image.
+    """
+
+    xmax = pixels.shape[0] #Size of pixel array
+    ymax = pixels.shape[1]
+
+    pxmh = px-0.5 #location of reference corner of PSF square
+    pymh = py-0.5
+
+    dx = np.floor(px+0.5)-pxmh
+    dy = np.floor(py+0.5)-pymh
+
+    # Supposing right-left as x axis and up-down as y axis:
+    # Lower left pixel
+    npx = int(pxmh) #Numpy arrays start at zero
+    npy = int(pymh)
+
+    #print('n',npx,npy)
+    
+    #if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+    #    pixels[npx,npy]=pixels[npx,npy]+fmod
+    
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*dx*dy
+
+    #Same operations are done for the 3 pixels other neighbouring pixels
+
+    # Lower right pixel
+    npx = int(pxmh)+1 #Numpy arrays start at zero
+    npy = int(pymh)
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*(1.0-dx)*dy
+
+    # Upper left pixel
+    npx = int(pxmh) #Numpy arrays start at zero
+    npy = int(pymh)+1
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*dx*(1.0-dy)
+
+    # Upper right pixel
+    npx = int(pxmh)+1 #Numpy arrays start at zero
+    npy = int(pymh)+1
+    if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
+        pixels[npx,npy]=pixels[npx,npy]+fmod*(1.0-dx)*(1.0-dy)
+    
+    return pixels
+
+def gen_unconv_image(pars,starmodel_flux,xcoo,ycoo):
+
+    xpad=pars.xpad*pars.noversample
+    ypad=pars.ypad*pars.noversample
+    #array to hold synthetic image
+    xmax=pars.xout*pars.noversample+xpad*2
+    ymax=pars.yout*pars.noversample+ypad*2
+
+    pixels=np.zeros((xmax,ymax))
+    
+    i = ( xcoo + (pars.xout - pars.ccd_dim[0])/2 ) * pars.noversample
+    j = ( ycoo + (pars.yout - pars.ccd_dim[1])/2 ) * pars.noversample
+    
+    pixels=addflux2pix(i,j,pixels,starmodel_flux)
+    
+    return pixels
 
 class Observation:
     """
@@ -376,51 +447,34 @@ class Observation:
         # Rendition of get_AB_mag method in spectrum.py; calculates the AB magnitude of the source through the telescope's passband.
         passband_wavelength = self.TelescopeObj.full_passband_curves[self.passband_name]['wavelength'].to(u.AA).value
 
-        passband_response = self.TelescopeObj.full_passband_curves[self.passband_name]['response']
-
-        passband_interp = interp1d(
-            x=passband_wavelength,
-            y=passband_response,
+        spectrum_interp = interp1d(
+            x=wavelength_AA,
+            y=fl,
             kind='linear',
             bounds_error=False,
             fill_value=np.nan,
         )
 
-        passband_response = passband_interp(wavelength_AA)
+        passband_spectrum = spectrum_interp(passband_wavelength) #interpolating passband to spectrum resolution.
         # Do not integrate NaNs
-        isgood_passband = np.isfinite(passband_response)
-        isgood_spectrum = np.isfinite(fl)
+        isgood_passband = np.isfinite(passband_spectrum)
         if np.any(~isgood_passband):
             if np.all(~isgood_passband):
                 raise RuntimeError(
                     "Source spectrum could not be estimated"
                     + f"at any {self.passband_name}-band wavelength"
                 )
-            elif np.any(
-                ~isgood_passband[(wavelength_AA >= passband_wavelength.min()) & (wavelength_AA <= passband_wavelength.max())]
-            ):
-                warnings.warn(
-                    f"{self.passband_name}-band response could not be estimated" + "at some source spectrum wavelengths",
-                    RuntimeWarning,
-                )
-
-            if np.any(~isgood_spectrum):
-                if np.all(~isgood_spectrum):
-                    raise RuntimeError("Source spectrum values are all non-finite")
-                elif np.any(
-                    ~isgood_spectrum[
-                        (wavelength_AA >= passband_wavelength.min()) & (wavelength_AA <= passband_wavelength.max())
-                    ]
-                ): # only warn if there are NaNs/infs in the passband range
+            else:
                     warnings.warn(
-                        f"Source spectrum values are not finite at some wavelengths",
+                        "Source spectrum could not be estimated "
+                        + f"at some {self.passband_name}-band wavelengths",
                         RuntimeError,
                     )
                     
         ab_mag = flam_to_AB_mag(
-            wavelengths=wavelength_AA[isgood_passband & isgood_spectrum],
-            flam=fl[isgood_passband & isgood_spectrum],
-            response=passband_response[isgood_passband & isgood_spectrum]
+            passband_wavelength[isgood_passband],
+            passband_spectrum[isgood_passband],
+            self.TelescopeObj.full_passband_curves[self.passband_name]["response"][isgood_passband],
         ) 
 
         #response depends on the bandpass id chosen.
@@ -1015,7 +1069,7 @@ class Observation:
                     # Get (x,y) coordinates with jitter
                     xcoo = self.SourceObj.gaia['x'][isource] + xjit + xpad/2
                     ycoo = self.SourceObj.gaia['y'][isource] + yjit + ypad/2
-                    pixels1 = psf.gen_unconv_image(self,starmodel_flux[isource],xcoo,ycoo)
+                    pixels1 = gen_unconv_image(self,starmodel_flux[isource],xcoo,ycoo)
                     if (isource == 0):
                         pixels = np.copy(pixels1)
                     else:
