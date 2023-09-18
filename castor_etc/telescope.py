@@ -677,7 +677,7 @@ class Telescope:
 
         psfs = dict.fromkeys(passbands)
         for band in passbands:
-            psfs[band] = fits.getdata(psf_filepaths[band]).T  # transpose to match x/y
+            psfs[band] = fits.getdata(psf_filepaths[band])
         self.psfs = psfs
         self.psf_supersample_factor = psf_supersample_factor
 
@@ -778,7 +778,7 @@ class Telescope:
                 extent=[-extent_x, extent_x, -extent_y, extent_y],
                 cmap=_ds9heat_cmap,
                 norm=norm,
-            )  # no need to transpose PSF because already transposed when loading data
+            )  # no need to transpose. Same result as DS9
             ax.tick_params(color="w", which="both")
             cbar = fig.colorbar(img)
             cbar.set_label("Fraction of Flux Contained Within Pixel")
