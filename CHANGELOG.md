@@ -3,6 +3,12 @@
 See [semantic versioning](https://semver.org/spec/v2.0.0.html) for the rationale behind
 the version numbers.
 
+## Current Version
+
+- Change `MP` and `READ_NOISE` parameters in parameters.py to 930 and 3.0, respectively.
+  Also add some comments about parameters
+  ([#22](https://github.com/CASTOR-telescope/ETC/pull/22))
+
 ## [1.2.1](https://github.com/CASTOR-telescope/ETC/tree/v1.2.1) (2023-09-18)
 
 - Add ability to control the colour bar normalization when visualizing PSFs
