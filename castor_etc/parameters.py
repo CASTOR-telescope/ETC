@@ -118,7 +118,7 @@ IFOV_DIMEN = [0.44, 0.56] << u.deg  # degrees. Angular dimensions
 IFOV_AREA = IFOV_DIMEN[0] * IFOV_DIMEN[1]  # degrees^2
 
 # Number of pixels in CCD (x 1 million)
-MP = 960  # megapixels
+MP = 930  # megapixels
 
 # Aperture diameter
 MIRROR_DIAMETER = 100 << u.cm  # cm
@@ -131,10 +131,12 @@ MIRROR_AREA = pi * (0.5 * MIRROR_DIAMETER) * (0.5 * MIRROR_DIAMETER)  # cm^2
 # CASTOR operates at 180 K, implying:
 # dark current = 0.5^((223.15K - 180K) / 6) * 0.01 ~ 1e-4 electrons/s/pixel (negligible)
 DARK_CURRENT = 1e-4  # electrons/s/pixel
+# Dark current will increase linearly over time to 0.01 electrons/s/pixel by the end of 5
+# years
 
 BIAS = 100  # electron
 
-READ_NOISE = 2.0  # electron/pixel (high-gain). Read noise is 30 electrons for low-gain
+READ_NOISE = 3.0  # electron/pixel (high-gain). Read noise is 30 electrons for low-gain
 
 GAIN = 2.0  # electron/ADU
 
