@@ -201,7 +201,7 @@ class Telescope:
         px_scale=params.PX_SCALE,
         ifov_dimen=params.IFOV_DIMEN,  # not currently used for any calculations
         mp=params.MP,  # not currently used for any calculations
-        mirror_diameter=params.MIRROR_DIAMETER,
+        mirror_diameter=params.MIRROR_DIAMETER,  # not currently used for any calculations
         dark_current=params.DARK_CURRENT,
         bias=params.BIAS,  # not currently used for any calculations
         read_noise=params.READ_NOISE,
