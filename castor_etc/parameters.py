@@ -100,12 +100,6 @@ PSF_FILEPATHS = {
     for band in PASSBANDS
 }
 
-# Path to stellar model directory. There are three variations contingent on the working environment.
-# Variation 1: stellar_models_dir_path = "/arc/projects/CASTOR/stellar_models" --> Default path (Working in the CANFAR server).
-# Variation 2: stellar_models_dir_path = <path to local stellar models directory>
-# Variation 3: stellar_models_dir_path = join(DATAPATH,"transit_data/stellar_models") --> This path should be used when building docker container locally.
-STELLAR_MODELS_DIR_PATH = "/arc/projects/CASTOR/stellar_models"
-
 # The PSF oversampling factor. Each square pixel in the PSF file has a side length of
 # PX_SCALE / PSF_SUPERSAMPLE_FACTOR (e.g., 0.1 arcsec / 20 = 0.005 arcsec)
 PSF_SUPERSAMPLE_FACTOR = 20
