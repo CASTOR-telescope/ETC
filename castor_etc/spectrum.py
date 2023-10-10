@@ -97,14 +97,13 @@ from . import constants as const
 from .conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
 from .filepaths import DATAPATH
 from .telescope import Telescope
-from . import parameters as params
 
 from astroquery.gaia import Gaia
 from astropy.coordinates import SkyCoord
 from astropy.constants import R_sun, pc
 from astropy.wcs import WCS
 
-def getStarData(temperature, metallicity, logg, 
+def getStarData(temperature, metallicity, logg,  stellar_model_dir,
                     model_grid='ATLAS9',
                     ):
     """
@@ -120,6 +119,12 @@ def getStarData(temperature, metallicity, logg,
 
         logg :: g00,g05,g10,g15,g20,g25,g30,g35,g40,g45,g50
             log(G) value for the reference star.
+
+        stellar_model_dir :: str
+          Path to the stellar models directory. There are three variations contingent on the working environment.
+          Variation 1: stellar_model_dir = "/arc/projects/CASTOR/stellar_models" --> Default path (Working in the CANFAR server).
+          Variation 2: stellar_model_dir = <path to local stellar models directory>
+          Variation 3: stellar_model_dir = join(DATAPATH,"transit_data/stellar_models") --> This path should be used when building docker container locally.
     
     Returns
     -------- 
@@ -133,12 +138,12 @@ def getStarData(temperature, metallicity, logg,
     # Default to ATLAS9 model
     #     If Teff < 3500 K (i.e., min Teff in ATLAS9 grid, switch to BTSettl grid)
     if ( (model_grid == 'BTSettl') | (temperature < 3500) ):
-        if not os.path.exists(os.path.join(params.STELLAR_MODELS_DIR_PATH,"BTSettl_CIFIST/")):
+        if not os.path.exists(os.path.join(stellar_model_dir,"BTSettl_CIFIST/")):
             raise RuntimeError(
-                f"The specified directory path `{params.STELLAR_MODELS_DIR_PATH}` does not contain the stellar_models directory." + "Please check the path variable."
+                f"The specified directory path `{stellar_model_dir}` does not contain the stellar_models directory." + "Please make sure the path variable points to the correct directory."
             )
         else:
-          grid_dir = os.path.join(params.STELLAR_MODELS_DIR_PATH,"BTSettl_CIFIST/")
+          grid_dir = os.path.join(stellar_model_dir,"BTSettl_CIFIST/")
 
         # Scan directory to inventory model grid
         # Assumes all files starting with 'lte' are model files
@@ -181,12 +186,12 @@ def getStarData(temperature, metallicity, logg,
         flux = d[:,1] # [erg/s/cm2/angstrom]
 
     elif model_grid == 'ATLAS9':
-        if not os.path.exists(os.path.join(params.STELLAR_MODELS_DIR_PATH, "ATLAS9/ck04models/")):
+        if not os.path.exists(os.path.join(stellar_model_dir, "ATLAS9/ck04models/")):
             raise RuntimeError(
-                f"The specified directory path `{params.STELLAR_MODELS_DIR_PATH}` does not contain the stellar_model directory." + "Please modify the path variable. "
+                f"The specified directory path `{stellar_model_dir}` does not contain the stellar_model directory." + "Please modify the path variable. "
             )
         else:
-            grid_dir = os.path.join(params.STELLAR_MODELS_DIR_PATH, "ATLAS9/ck04models/")
+            grid_dir = os.path.join(stellar_model_dir, "ATLAS9/ck04models/")
 
         teff_grid = np.array([3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 
                               6000, 6250, 6500, 6750, 7000, 7250, 7500, 7750, 8000, 8250, 
@@ -1745,9 +1750,9 @@ class SpectrumMixin:
         ti = np.isnan(self.gaia['metallicity'])
         self.gaia['metallicity'][ti] = 0.
 
-    def use_gaia_spectrum(self, TelescopeObj, ra = None, dec = None, srch_Gmax=21., srch_nmax = 100, srch_rad = None, Teff = None, Gmag = None, logg = None, radius = None, metallicity = None, Bpmag = None, Rpmag = None, stellar_model_grid = 'ATLAS9', bkg_sources = True, fov = None, fov_pa = 0 * u.deg, overwrite=False, quiet=False):
+    def use_gaia_spectrum(self, TelescopeObj, ra = None, dec = None, srch_Gmax=21., srch_nmax = 100, srch_rad = None, Teff = None, Gmag = None, logg = None, radius = None, metallicity = None, Bpmag = None, Rpmag = None, stellar_model_grid = 'ATLAS9', stellar_model_dir = None, bkg_sources = True, fov = None, fov_pa = 0 * u.deg, overwrite=False, quiet=False):
         """
-        Use a spectrum from either the ATLAS9 catalog <Ask James for the link> or the Bt-Sett1 catalog <Ask James for the link> containing flux spectra for numerous stellar model atmospheres. 
+        Use a spectrum from either the ATLAS9 catalog or the Bt-Sett1 catalog containing flux spectra for numerous stellar model atmospheres. 
 
         Parameters
         ----------
@@ -1792,6 +1797,9 @@ class SpectrumMixin:
 
           stellar_model_grid :: str
             Stellar model grid, 'ATLAS9' or 'BTSettl', for selecting spectrum of the source according to the interpolated stellar atmosphere model.
+
+          stellar_model_dir :: str
+            Path to the stellar models directory used by the `getStarData` function to calculate spectrum of stars.
           
           bkg_sources :: bool
             If True, then background Gaia sources are included during the transit simulation calculation. If False, nmax is set to 1.
@@ -1855,6 +1863,9 @@ class SpectrumMixin:
 
           stellar_model_grid :: str
             Stellar model grid, 'ATLAS9' or 'BTSettl', for selecting spectrum of the source according to the interpolated stellar atmosphere model.
+
+          stellar_model_dir :: str
+            Path to the stellar models directory used by the `getStarData` function to calculate spectrum of stars.
           
           bkg_sources :: bool
             If True, then background Gaia sources are included during the transit simulation calculation. If False, nmax is set to 1.
@@ -1873,6 +1884,11 @@ class SpectrumMixin:
             None
 
         """
+
+        if not isinstance(stellar_model_dir, str):
+            raise TypeError(
+                "Please specify the path to the stellar models directory" + "(e.g., ../../stellar_models)"
+            )
 
         if not isinstance(stellar_model_grid, str):
             raise TypeError(
@@ -1944,7 +1960,8 @@ class SpectrumMixin:
               temperature = self.gaia['Teff'][0],
               metallicity = self.gaia['metallicity'][0],
               logg = self.gaia['logg'][0],
-              model_grid = stellar_model_grid
+              model_grid = stellar_model_grid,
+              stellar_model_dir=stellar_model_dir
               )
 
           # Estimate distance using Gmag and estimated Gabs
@@ -2914,34 +2931,56 @@ class NormMixin:
                     "`TelescopeObj` must be a `castor_etc.telescope.Telescope` object."
                 )
             ab_mags = dict.fromkeys(TelescopeObj.passbands)
-            spectrum_interp = interp1d(
-                x=wavelengths_AA,
-                y=self.spectrum,
-                kind="linear",
-                bounds_error=False,
-                fill_value=np.nan,
-            )
             for band in TelescopeObj.passbands:
+                # Interpolate passband to spectrum resolution
                 passband_wavelengths = (
                     TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
                 )
-                passband_spectrum = spectrum_interp(passband_wavelengths) # interpolating passband to spectrum resolution.
-                isgood_passband = np.isfinite(passband_spectrum)  # do not integrate NaNs
+                passband_interp = interp1d(
+                    x=passband_wavelengths,
+                    # y=passband_response,
+                    y=TelescopeObj.full_passband_curves[band]["response"],
+                    kind="linear",
+                    bounds_error=False,
+                    fill_value=np.nan,
+                )
+                passband_response = passband_interp(wavelengths_AA)
+                # Do not integrate NaNs
+                isgood_passband = np.isfinite(passband_response)
+                isgood_spectrum = np.isfinite(self.spectrum)
                 if np.any(~isgood_passband):
                     if np.all(~isgood_passband):
                         raise RuntimeError(
-                            "Source spectrum could not be estimated "
-                            + f"at any {band}-band wavelength"
+                            f"{band}-band response could not be estimated "
+                            + "at any source spectrum wavelength"
                         )
-                    else:
+                    elif np.any(
+                        ~isgood_passband[
+                            (wavelengths_AA >= passband_wavelengths.min())
+                            & (wavelengths_AA <= passband_wavelengths.max())
+                        ]
+                    ):  # only warn if there are NaNs/infs in the passband range
                         warnings.warn(
-                            "Source spectrum could not be estimated "
-                            + f"at some {band}-band wavelengths",
+                            f"{band}-band response could not be estimated "
+                            + "at some source spectrum wavelengths",
+                            RuntimeWarning,
+                        )
+                if np.any(~isgood_spectrum):
+                    if np.all(~isgood_spectrum):
+                        raise RuntimeError("Source spectrum values are all non-finite!")
+                    elif np.any(
+                        ~isgood_spectrum[
+                            (wavelengths_AA >= passband_wavelengths.min())
+                            & (wavelengths_AA <= passband_wavelengths.max())
+                        ]
+                    ):  # only warn if there are NaNs/infs in the passband range
+                        warnings.warn(
+                            "Source spectrum values are not finite at some wavelengths",
                             RuntimeWarning,
                         )
                 ab_mags[band] = flam_to_AB_mag(
-                    passband_wavelengths[isgood_passband],
-                    passband_spectrum[isgood_passband],
-                    TelescopeObj.full_passband_curves[band]["response"][isgood_passband],
+                    wavelengths_AA[isgood_passband & isgood_spectrum],
+                    self.spectrum[isgood_passband & isgood_spectrum],
+                    passband_response[isgood_passband & isgood_spectrum],
                 )
             return ab_mags
