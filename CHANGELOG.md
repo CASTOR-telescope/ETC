@@ -3,6 +3,18 @@
 See [semantic versioning](https://semver.org/spec/v2.0.0.html) for the rationale behind
 the version numbers.
 
+## Current Version
+
+- Change `MP` and `READ_NOISE` parameters in parameters.py to 930 and 3.0, respectively.
+  Also add some comments about parameters
+  ([#22](https://github.com/CASTOR-telescope/ETC/pull/22))
+
+## [1.2.1](https://github.com/CASTOR-telescope/ETC/tree/v1.2.1) (2023-09-18)
+
+- Add ability to control the colour bar normalization when visualizing PSFs
+  ([#16](https://github.com/CASTOR-telescope/ETC/pull/16))
+- Update the bundled CASTOR PSFs ([#17](https://github.com/CASTOR-telescope/ETC/pull/17))
+
 ## [1.2.0](https://github.com/CASTOR-telescope/ETC/tree/v1.2.0) (2023-08-25)
 
 - Changed AB magnitude calculation to interpolate the passband to the spectrum resolution

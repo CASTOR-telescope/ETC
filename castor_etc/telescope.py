@@ -203,7 +203,7 @@ class Telescope:
         ifov_dimen=params.IFOV_DIMEN,  # not currently used for any calculations
         transit_ccd_dim = params.TRANSIT_CCD_DIMENSIONS, # used to convert (ra,dec) of identified Gaia sources to (x_pix, y_pix)
         mp=params.MP,  # not currently used for any calculations
-        mirror_diameter=params.MIRROR_DIAMETER,
+        mirror_diameter=params.MIRROR_DIAMETER,  # not currently used for any calculations
         dark_current=params.DARK_CURRENT,
         bias=params.BIAS,  # not currently used for any calculations
         read_noise=params.READ_NOISE,
@@ -751,16 +751,21 @@ class Telescope:
         """
         return deepcopy(self)
 
-    def show_psf(self, passband, plot=True):
+    def show_psf(self, passband, norm=None, plot=True):
         """
         Visualize the point spread function (PSF) of a given passband. The visualization
         assumes (0, 0) is at the center of the image (this assumption does not affect
-        calculations, and is purely for visualization purposes).
+        calculations, and is purely for visualization purposes). Non-finite values will be
+        shown as black pixels in the plot.
 
         Parameters
         ----------
           passband :: str
             The passband corresponding to the PSF.
+
+          norm :: `matplotlib.colors.Normalize` object or None
+            The normalization to use for the PSF plot. If None, use the default (linear)
+            scaling.
 
           plot :: bool
             If True, plot the PSF and return None. If False, return the figure, axis,
@@ -790,6 +795,7 @@ class Telescope:
         extent_x = 0.5 * psf_px_scale * psf.shape[1]
         #
         rc = {"axes.grid": False}
+        _ds9heat_cmap.set_bad("k")  # set NaNs and infs to black
         with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
             fig, ax = plt.subplots()
             img = ax.imshow(
@@ -798,7 +804,8 @@ class Telescope:
                 interpolation=None,
                 extent=[-extent_x, extent_x, -extent_y, extent_y],
                 cmap=_ds9heat_cmap,
-            )  # no need to transpose PSF. Same result as visualizing with DS9
+                norm=norm,
+            )  # no need to transpose. Same result as DS9
             ax.tick_params(color="w", which="both")
             cbar = fig.colorbar(img)
             cbar.set_label("Fraction of Flux Contained Within Pixel")
