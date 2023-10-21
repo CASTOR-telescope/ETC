@@ -549,9 +549,6 @@ def convert_electron_flux_mag(
       var1_type, var2_type :: "electron", "fnu", "flam", or "mag"
         The type of the first and second variable.
 
-      TelescopeObj :: `castor_etc.Telescope` instance
-        The `Telescope` object.
-
       var1_err :: scalar or array
         The uncertainty in var1.
 
