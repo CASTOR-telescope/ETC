@@ -20,7 +20,7 @@ RUN mkdir /opt/image-build && chmod 777 /opt/image-build
 ADD docker/nsswitch.conf /etc/
 COPY docker/apt-install.sh /opt/image-build
 WORKDIR /opt/image-build
-RUN ./apt-install.sh sssd acl
+RUN ./apt-install.sh sssd acl gcc g++
 
 COPY docker/bash.bashrc /opt/image-build
 RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
