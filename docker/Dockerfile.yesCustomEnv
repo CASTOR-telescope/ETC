@@ -9,7 +9,7 @@ ARG NOTEBOOK_DIR
 USER ${NB_UID}
 
 # Install required Python packages
-RUN pip install astropy photutils \
+RUN pip install astropy \
     ipyevents pylint black[jupyter] jupyterlab-git
 RUN jupyter nbextension enable --py --sys-prefix ipyevents
 
@@ -30,6 +30,11 @@ RUN ./apt-install.sh sssd acl
 
 COPY docker/bash.bashrc /opt/image-build
 RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
+
+RUN pip install photutils 
+
+#<https://github.com/NVIDIA/NeMo/issues/841> similarly, it is a dependency to pytransit
+RUN pip install llvmlite --ignore-installed
 
 # Start notebook in user's home directory
 RUN mkdir /usr/local/bin/start-notebook.d && chmod 777 /usr/local/bin/start-notebook.d

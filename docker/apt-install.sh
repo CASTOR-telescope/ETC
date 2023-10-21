@@ -17,6 +17,8 @@ set -eu
 
 apt-get update --yes -qq
 apt-get update --yes --fix-missing
+# gcc and g++ compilers are needed to install photutils and celerite python packages.
+apt-get -y install gcc g++
 DEBIAN_FRONTEND=noninteractive apt-get install --yes ${packages}
 apt-get autoremove --purge -y
 apt-get clean --yes

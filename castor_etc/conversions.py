@@ -530,7 +530,6 @@ def convert_electron_flux_mag(
     var1_type,
     var2_type,
     var1_err=0.0,
-    passband=None,
     phot_zpt=None,
     wavelengths=None,
     wavelengths_err=0.0,
@@ -549,6 +548,9 @@ def convert_electron_flux_mag(
 
       var1_type, var2_type :: "electron", "fnu", "flam", or "mag"
         The type of the first and second variable.
+
+      TelescopeObj :: `castor_etc.Telescope` instance
+        The `Telescope` object.
 
       var1_err :: scalar or array
         The uncertainty in var1.
@@ -589,27 +591,15 @@ def convert_electron_flux_mag(
         raise ValueError("var1_type and var2_type must be different")
     if var1_type == "electron" or var2_type == "electron":
         if phot_zpt is None:
-            if passband is None:
-                raise ValueError(
-                    "passband must be provided if var1_type or var2_type is 'electron'"
-                )
-            elif (not isinstance(passband, str)) or (passband not in params.PASSBANDS):
-                raise ValueError("passband must be 'uv', 'u', or 'g'")
-            else:
-                phot_zpt = params.PHOT_ZPTS[passband]
-        elif phot_zpt is not None and passband is not None:
-            print(
-                "INFO: Using provided phot_zpt and ignoring default passband zero-point."
-            )
+              raise ValueError(
+                  "phot_zpts must be provided if var1_type or var2_type is 'electron'"
+              )
     if var1_type == "flam" or var2_type == "flam":
         if wavelengths is None:
-            if passband is not None:
-                wavelengths = params.PASSBAND_PIVOTS[passband]
-            else:
-                raise ValueError(
-                    "wavelengths or passband must be provided if "
-                    + "var1_type or var2_type is 'flam'"
-                )
+              raise ValueError(
+                  "wavelengths must be provided if "
+                  + "var1_type or var2_type is 'flam'"
+              )
     if np.any(var1_err < 0):
         raise ValueError("var1_err must be non-negative")
     #

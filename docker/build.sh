@@ -9,6 +9,7 @@ VERSION=$(date +%y.%m.%d.%H%M)
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # (following line from <https://stackoverflow.com/a/8426110>)
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
+DOCKER_STELLAR_MODEL_DIR="/opt/conda/lib/python3.9/site-packages/castor_etc/data/transit_data/stellar_models"
 #
 # Load custom parameters
 #
@@ -41,6 +42,8 @@ echo "Now running castor_etc_v${VERSION}..."
 #
 # Run the project
 #
+
+# The second mount binds stellar_models directory in the transit_data locally.
 docker run --interactive \
         --ip 0.0.0.0 \
         --rm \
@@ -48,6 +51,7 @@ docker run --interactive \
         --env DISPLAY=host.docker.internal:0 \
         -p 8888:8888 \
         -v ${REPO_DIR}:${NOTEBOOK_DIR} \
+        -v ${STELLAR_MODEL_DIR}:${DOCKER_STELLAR_MODEL_DIR} \
         --env JUPYTER_ENABLE_LAB=${JUPYTER_ENABLE_LAB} \
         --env JUPYTER_TOKEN=${JUPYTER_TOKEN} \
         --env NB_USER=${NB_USER} \
