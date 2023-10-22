@@ -105,7 +105,12 @@ In develop mode, the installation of the package simply links back to the
 [`castor_etc`](castor_etc/) folder itself, meaning any changes made to this package will
 be reflected in your environment.
 
-After installing the python package, you need to download the [stellar models directory](https://kona.ubishops.ca/jsikora/poet_stellar_models.tar.gz) and target its path destination in the spectrum.py file in the [`castor_etc`](castor_etc/) folder. 
+If you are doing transit simulations, then after installing the Python package, you will need to
+download these [stellar models](https://kona.ubishops.ca/jsikora/poet_stellar_models.tar.gz) into a
+directory. When you are using `getStarData()` or `use_gaia_spectrum()` in
+[spectrum.py](castor_etc/spectrum.py) and when you are using the `Observation` class in
+[transit.py](castor_etc/transit.py), you will need to set the `stellar_model_dir` parameter in
+these functions/class to the directory containing the stellar models on your local machine.
 
 ## Known Issues
 
