@@ -124,7 +124,7 @@ TRANSIT_FOV = 204.5 << u.arcsec
 MP = 930  # megapixels
 
 # CCD dimensions of Poet
-TRANSIT_CCD_DIMENSIONS = [2048,2048]
+TRANSIT_CCD_DIMENSIONS = [2048,2048]  # pixels
 
 # Aperture diameter
 MIRROR_DIAMETER = 100 << u.cm  # cm
