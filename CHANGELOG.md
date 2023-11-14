@@ -4,17 +4,14 @@ See [semantic versioning](https://semver.org/spec/v2.0.0.html) for the rationale
 the version numbers.
 
 ## [1.3.0](https://github.com/CASTOR-telescope/ETC/tree/v1.3.0) (2023-11-13)
-- Introduced a new feature of Grism spectroscopy. This is very much still in development and currently only supports Sersic galaxy sources. Available results are: 2D dispersed spectrum and 1D SNR dispersed spectrum.
-- Adapted transit numerical simulation from the POET mission. Using CASTOR tools, the light curve simulation calculation has been reduced from ~ 4 minutes to 1 second.
-- Added a new feature that allows users to query GaiaDR2 database on the basis of (ra,dec), and threshold Gaia G magnitude, and select an appropriate normalized spectrum. This is achievable by selecting `Gaia` from the Predefined Spectra drop-down menu for a Point Source. To do transit simulation, one has to choose a Gaia Point Source.
-- Added a new function `show_slit_image` in the uvmos_spectroscopy.py file to display a cropped view of the source on the detector.
-
-
-## Current Version
 
 - Change `MP` and `READ_NOISE` parameters in parameters.py to 930 and 3.0, respectively.
   Also add some comments about parameters
   ([#22](https://github.com/CASTOR-telescope/ETC/pull/22))
+- Introduced a new feature of Grism spectroscopy. This is very much still in development and currently only supports Sersic galaxy sources. Available results are: 2D dispersed spectrum and 1D SNR dispersed spectrum.
+- Adapted transit numerical simulation from the POET mission. Using CASTOR tools, the light curve simulation calculation has been reduced from ~ 4 minutes to 1 second.
+- Added a new feature that allows users to query GaiaDR2 database on the basis of (ra,dec), and threshold Gaia G magnitude, and select an appropriate normalized spectrum. This is achievable by selecting `Gaia` from the Predefined Spectra drop-down menu for a Point Source. To do transit simulation, one has to choose a Gaia Point Source.
+- Added a new function `show_slit_image` in the uvmos_spectroscopy.py file to display a cropped view of the source on the detector.
 
 ## [1.2.1](https://github.com/CASTOR-telescope/ETC/tree/v1.2.1) (2023-09-18)
 
