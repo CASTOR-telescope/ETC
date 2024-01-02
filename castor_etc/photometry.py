@@ -171,6 +171,8 @@ class Photometry:
         self._ydim = None  # the number of pixels along the y-direction of the aperture
         # Default optimal aperture dimensions for a point source. For error-checking
         self._optimal_aperture_radius = _OPTIMAL_APER_FACTOR * 0.5 * TelescopeObj.fwhm
+        # The aperture's encircled energy in each passband
+        self._encircled_energies = dict.fromkeys(TelescopeObj.passbands, None)
 
     def copy(self):
         """
@@ -1914,6 +1916,7 @@ class Photometry:
             # calculate the signal in each passband
             for band in source_erate:
                 encircled_energy = np.nansum(self.source_weights[band])
+                self._encircled_energies[band] = encircled_energy
                 if not quiet:
                     print(
                         f"INFO: Fraction of flux within aperture in {band}-band = "
