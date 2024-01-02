@@ -6,7 +6,7 @@ the version numbers.
 ## [1.3.1](https://github.com/CASTOR-telescope/ETC/tree/v1.3.0) (2024-01-02)
 
 - Added an `_encircled_energies` attribute to the `Photometry` object. This is needed for
-  the v1.1.1 of the [ETC frontend](https://github.com/CASTOR-telescope/ETC_frontend)
+  v1.1.1 of the [ETC frontend](https://github.com/CASTOR-telescope/ETC_frontend)
   ([#26](https://github.com/CASTOR-telescope/ETC/pull/26)).
 
 ## [1.3.0](https://github.com/CASTOR-telescope/ETC/tree/v1.3.0) (2023-11-13)
