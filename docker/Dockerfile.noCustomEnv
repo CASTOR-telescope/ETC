@@ -2,7 +2,8 @@
 # Please build from the repository directory
 
 # --platform=linux/amd64 ensures that the docker image CPU architecture matches with the CANFAR server CPU architecture.
-FROM --platform=linux/amd64 jupyter/scipy-notebook:hub-2.0.1
+# Docker base image from <https://quay.io/repository/jupyter/scipy-notebook?tab=tags>
+FROM --platform=linux/amd64 quay.io/jupyter/scipy-notebook:hub-5.2.1
 LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
 
 USER ${NB_UID}
