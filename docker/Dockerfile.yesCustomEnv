@@ -11,7 +11,7 @@ USER ${NB_UID}
 
 # Install required Python packages
 RUN pip install astropy \
-    ipyevents pylint black[jupyter] jupyterlab-git
+    ipyevents pylint black[jupyter] jupyterlab-git notebook==6.5.4 scipy==1.13.0
 RUN jupyter nbextension enable --py --sys-prefix ipyevents
 
 # Custom JupyterHub settings
@@ -38,7 +38,7 @@ RUN pip install photutils
 RUN pip install llvmlite --ignore-installed
 
 # Start notebook in user's home directory
-RUN mkdir /usr/local/bin/start-notebook.d && chmod 777 /usr/local/bin/start-notebook.d
+RUN chmod 777 /usr/local/bin/start-notebook.d
 COPY docker/startup-hook.sh /usr/local/bin/start-notebook.d/
 
 # Install castor_etc package (always install newest version via CACHEBUST)
