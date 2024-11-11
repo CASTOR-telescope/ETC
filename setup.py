@@ -84,7 +84,7 @@ long_description = __doc__.strip()  # Remove leading and trailing newlines
 
 setup(
     name="castor_etc",
-    version="1.3.0",  # see semantic versioning (<https://semver.org/spec/v2.0.0.html>)
+    version="1.3.2",  # see semantic versioning (<https://semver.org/spec/v2.0.0.html>)
     description="CASTOR Exposure Time Calculator (ETC)",
     long_description=long_description,
     url="https://github.com/CASTOR-telescope/ETC",
@@ -106,17 +106,43 @@ setup(
         "castor_etc.data.sky_background",
     ],
     package_data={
-        "castor_etc.data.UVMOS_data": ["*.dat", "*.txt"],
         "castor_etc.data.galaxy_spectra": ["*.txt"],
+        "castor_etc.data.grism_data": [
+            "*_dispersion_u.txt",
+            "*_dispersion_uv.txt",
+            "*_efficiency_.u.txt",
+            "*_efficiency_.uv.txt",
+            "*_profile_uv.txt",
+        ],
         "castor_etc.data.passbands": ["*.uv", "*.u", "*.g"],
         "castor_etc.data.pickles_spectra": ["dat/*.dat"],  # must use forward slash
-        "castor_etc.data.UVMOS_data":["*.dat", "*.txt"],
-        "castor_etc.data.transit_data":["*.txt","instrument_data/*.csv","instrument_data/transmission_functions/*.dat","stellar_models/*.txt"],
-        "castor_etc.data.grism_data":["*_profile_uv.txt", "*_dispersion_uv.txt", "*_dispersion_u.txt", "*_efficiency_.uv.txt", "*_efficiency_.u.txt"],
         "castor_etc.data.psfs": ["*.fits"],
         "castor_etc.data.sky_background": ["*.fits", "*.txt"],
+        "castor_etc.data.transit_data": [
+            "*.txt",
+            "instrument_data/*.csv",
+            "instrument_data/transmission_functions/*.dat",
+            "stellar_models/*.txt",
+        ],
+        "castor_etc.data.UVMOS_data": ["*.dat", "*.txt"],
     },
-    install_requires=["numpy", "scipy", "matplotlib", "astropy", "pandas", "photutils","tqdm","scikit-image","astroquery","pytransit","arviz","celerite","emcee","corner","spectres"], # Packages listed after the 'pytransit' package and before the 'spectres' package are pre-requisites to run the 'pytransit' package.
+    install_requires=[
+        "numpy",
+        "scipy",
+        "matplotlib",
+        "astropy",
+        "pandas",
+        "photutils",
+        "tqdm",
+        "scikit-image",
+        "astroquery",
+        "pytransit",
+        "arviz",
+        "celerite",
+        "emcee",
+        "corner",
+        "spectres",
+    ],  # Packages listed after the 'pytransit' package and before the 'spectres' package are pre-requisites to run the 'pytransit' package.
     license="GPLv3",
     python_requires=">=3.9",
     platforms=["Linux"],  # only tested on Ubuntu. MacOS and Windows likely okay.

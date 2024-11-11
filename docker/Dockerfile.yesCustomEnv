@@ -1,7 +1,8 @@
 # Dockerfile for the CASTOR exposure time calculator.
 # Please build from the repository directory
 
-FROM jupyter/scipy-notebook:hub-2.0.1
+# Docker base image from <https://quay.io/repository/jupyter/scipy-notebook?tab=tags>
+FROM --platform=linux/amd64 quay.io/jupyter/scipy-notebook:hub-5.2.1
 LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
 
 ARG NB_USER
@@ -9,9 +10,10 @@ ARG NOTEBOOK_DIR
 USER ${NB_UID}
 
 # Install required Python packages
-RUN pip install astropy \
-    ipyevents pylint black[jupyter] jupyterlab-git
+RUN pip install astropy ipyevents pylint black[jupyter] jupyterlab-git notebook==6.5.7
 RUN jupyter nbextension enable --py --sys-prefix ipyevents
+# `nbextension` does not work with `notebook` v7 and above (see
+# <https://github.com/ipython-contrib/jupyter_contrib_nbextensions/pull/1657>)
 
 # Custom JupyterHub settings
 COPY misc/overrides.json /opt/conda/share/jupyter/lab/settings/
@@ -31,13 +33,13 @@ RUN ./apt-install.sh sssd acl gcc g++
 COPY docker/bash.bashrc /opt/image-build
 RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
 
-RUN pip install photutils 
+RUN pip install photutils
 
 #<https://github.com/NVIDIA/NeMo/issues/841> similarly, it is a dependency to pytransit
 RUN pip install llvmlite --ignore-installed
 
 # Start notebook in user's home directory
-RUN mkdir /usr/local/bin/start-notebook.d && chmod 777 /usr/local/bin/start-notebook.d
+RUN chmod 777 /usr/local/bin/start-notebook.d
 COPY docker/startup-hook.sh /usr/local/bin/start-notebook.d/
 
 # Install castor_etc package (always install newest version via CACHEBUST)

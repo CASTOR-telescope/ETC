@@ -9,6 +9,7 @@ VERSION=$(date +%y.%m.%d.%H%M)
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # (following line from <https://stackoverflow.com/a/8426110>)
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
+# ! NOTE 2024-11-10: You probably need to update `DOCKER_STELLAR_MODEL_DIR` below...
 DOCKER_STELLAR_MODEL_DIR="/opt/conda/lib/python3.9/site-packages/castor_etc/data/transit_data/stellar_models"
 #
 # Load custom parameters
@@ -44,11 +45,12 @@ echo "Now running castor_etc_v${VERSION}..."
 #
 
 # The second mount binds stellar_models directory in the transit_data locally.
+# ! REMOVED --ip 0.0.0.0 because implied already and throws error
 docker run --interactive \
-        --ip 0.0.0.0 \
         --rm \
         --tty \
         --env DISPLAY=host.docker.internal:0 \
+        # (REMOVED --ip 0.0.0.0 because it is implied already & this arg throws an error)
         -p 8888:8888 \
         -v ${REPO_DIR}:${NOTEBOOK_DIR} \
         -v ${STELLAR_MODEL_DIR}:${DOCKER_STELLAR_MODEL_DIR} \

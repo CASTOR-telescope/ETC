@@ -64,7 +64,6 @@ FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 """
 
-
 import warnings
 from copy import deepcopy
 from numbers import Number
@@ -199,9 +198,9 @@ class Telescope:
         psf_supersample_factor=params.PSF_SUPERSAMPLE_FACTOR,
         fwhm=params.FWHM,
         px_scale=params.PX_SCALE,
-        transit_fov = params.TRANSIT_FOV, # used to calculate search radius during gaia query
+        transit_fov=params.TRANSIT_FOV,  # used to calculate search radius during gaia query
         ifov_dimen=params.IFOV_DIMEN,  # not currently used for any calculations
-        transit_ccd_dim = params.TRANSIT_CCD_DIMENSIONS, # used to convert (ra,dec) of identified Gaia sources to (x_pix, y_pix)
+        transit_ccd_dim=params.TRANSIT_CCD_DIMENSIONS,  # used to convert (ra,dec) of identified Gaia sources to (x_pix, y_pix)
         mp=params.MP,  # not currently used for any calculations
         mirror_diameter=params.MIRROR_DIAMETER,  # not currently used for any calculations
         dark_current=params.DARK_CURRENT,
@@ -629,7 +628,9 @@ class Telescope:
         try:
             _ = transit_fov.to(u.arcsec)
         except Exception:
-            raise TypeError("transit_fov must be an `astropy.Quantity` angle, i.e., u.arcsec or u.deg")
+            raise TypeError(
+                "transit_fov must be an `astropy.Quantity` angle, i.e., u.arcsec or u.deg"
+            )
         try:
             if ifov_dimen.shape != (2,):
                 raise ValueError(
@@ -644,8 +645,7 @@ class Telescope:
             )
         if len(transit_ccd_dim) != 2:
             raise TypeError(
-                f"transit_ccd_dim must be a 2-element integer list"
-                + "(e.g., [2048,2048])"
+                "transit_ccd_dim must be a 2-element integer list (e.g., [2048,2048])"
             )
         try:
             _ = mirror_diameter.to(u.cm)
@@ -845,13 +845,11 @@ class Telescope:
             wavelengths).
         """
         if response_func == "EE":
-            numer = simpson(y=wavelengths * response, x=wavelengths, even="avg")
-            denom = simpson(y=response / wavelengths, x=wavelengths, even="avg")
+            numer = simpson(y=wavelengths * response, x=wavelengths)
+            denom = simpson(y=response / wavelengths, x=wavelengths)
         elif response_func == "QE":
-            numer = simpson(y=response, x=wavelengths, even="avg")
-            denom = simpson(
-                y=response / (wavelengths * wavelengths), x=wavelengths, even="avg"
-            )
+            numer = simpson(y=response, x=wavelengths)
+            denom = simpson(y=response / (wavelengths * wavelengths), x=wavelengths)
         return np.sqrt(numer / denom)
 
     @staticmethod
@@ -1108,7 +1106,6 @@ class Telescope:
                 erate = simpson(
                     y=photlam * photlam_to_erate_AA,  # electron/s/A
                     x=wavelengths_AA,
-                    even="avg",
                 )  # electron/s
                 return erate - 1.0
 
