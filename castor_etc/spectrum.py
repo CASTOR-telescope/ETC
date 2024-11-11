@@ -2882,14 +2882,11 @@ class SpectrumMixin:
                 )
             try:
                 redleak_per_px = simpson(  # electron/s (per px)
-                    y=redleak_per_A[isgood_redleak],
-                    x=redleak_wavelengths[isgood_redleak],
-                    even="avg",
+                    y=redleak_per_A[isgood_redleak], x=redleak_wavelengths[isgood_redleak]
                 )
                 total_erate_per_px = simpson(  # electron/s (per px)
                     y=total_erate_per_A[isgood_total],
                     x=full_response_curve_wavelengths_AA[isgood_total],
-                    even="avg",
                 )
                 redleak_frac = redleak_per_px / total_erate_per_px
             except Exception:
@@ -3073,9 +3070,7 @@ class NormMixin:
         # Normalize spectrum (originally in erg/s/cm^2/A)
         #
         erg_s_A = 4 * np.pi * dist * dist * self.spectrum  # erg/s/A
-        tot_luminosity = simpson(
-            y=erg_s_A, x=self.wavelengths.to(u.AA).value, even="avg"
-        )  # erg/s
+        tot_luminosity = simpson(y=erg_s_A, x=self.wavelengths.to(u.AA).value)  # erg/s
         norm_factor = luminosity / tot_luminosity  # dimensionless
         self.spectrum *= norm_factor  # erg/s/cm^2/A
 

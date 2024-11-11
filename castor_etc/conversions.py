@@ -75,7 +75,6 @@ import numpy as np
 from scipy.integrate import simpson
 
 from . import constants as const
-from . import parameters as params
 
 
 def calc_photon_energy(
@@ -514,12 +513,8 @@ def flam_to_AB_mag(wavelengths, flam, response):
     #
     # Perform calculation (Eq. (2) of Bessell & Murphy (2012))
     #
-    numer = simpson(y=flam * response * wavelengths, x=wavelengths, even="avg")
-    denom = simpson(
-        y=response / wavelengths,
-        x=wavelengths,
-        even="avg",
-    )
+    numer = simpson(y=flam * response * wavelengths, x=wavelengths)
+    denom = simpson(y=response / wavelengths, x=wavelengths)
     return (
         -2.5 * np.log10(numer / (const.LIGHTSPEED.to(u.AA / u.s).value * denom)) - 48.60
     )  # AB magnitude
@@ -588,15 +583,14 @@ def convert_electron_flux_mag(
         raise ValueError("var1_type and var2_type must be different")
     if var1_type == "electron" or var2_type == "electron":
         if phot_zpt is None:
-              raise ValueError(
-                  "phot_zpts must be provided if var1_type or var2_type is 'electron'"
-              )
+            raise ValueError(
+                "phot_zpts must be provided if var1_type or var2_type is 'electron'"
+            )
     if var1_type == "flam" or var2_type == "flam":
         if wavelengths is None:
-              raise ValueError(
-                  "wavelengths must be provided if "
-                  + "var1_type or var2_type is 'flam'"
-              )
+            raise ValueError(
+                "wavelengths must be provided if var1_type or var2_type is 'flam'"
+            )
     if np.any(var1_err < 0):
         raise ValueError("var1_err must be non-negative")
     #
