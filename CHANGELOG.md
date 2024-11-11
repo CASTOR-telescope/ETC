@@ -3,7 +3,13 @@
 See [semantic versioning](https://semver.org/spec/v2.0.0.html) for the rationale behind
 the version numbers.
 
-## [1.3.1](https://github.com/CASTOR-telescope/ETC/tree/v1.3.0) (2024-01-02)
+## [1.3.2](https://github.com/CASTOR-telescope/ETC/tree/v1.3.2) (2024-11-10)
+
+- Fixed the broken JupyterLab terminal on CANFAR
+- Removed the `even` parameter in all `scipy.integrate.simpson()` calls, since this
+  parameter is removed in the newest versions of scipy.
+
+## [1.3.1](https://github.com/CASTOR-telescope/ETC/tree/v1.3.1) (2024-01-02)
 
 - Added an `_encircled_energies` attribute to the `Photometry` object. This is needed for
   v1.1.1 of the [ETC frontend](https://github.com/CASTOR-telescope/ETC_frontend)
