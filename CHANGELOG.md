@@ -3,7 +3,7 @@
 See [semantic versioning](https://semver.org/spec/v2.0.0.html) for the rationale behind
 the version numbers.
 
-## Current version (as of 2025-02-24)
+## [1.3.3](https://github.com/CASTOR-telescope/ETC/tree/v1.3.3) (2025-02-24)
 
 - Fixed a bug ([#31](https://github.com/CASTOR-telescope/ETC/issues/31)) in the definition
   of `ellipticity`/`eccentricity` for a `GalaxySource`
