@@ -889,8 +889,8 @@ class GalaxySource(Source):
 
     def __init__(self, r_eff, n, axial_ratio, rotation=0.0):
         """
-        Generate a galaxy with a specific effective radius (`sqrt(a * b)`), Sersic index
-        (`n`), and axial ratio (`b/a`).
+        Generate a galaxy with a specific effective radius (here, equal to the semimajor
+        axis `a`), Sersic index (`n`), and axial ratio (`b/a`).
 
         The dimensions of the galaxy (i.e., the semimajor and semiminor axis) will be used
         to calculate its surface brightness when doing photometry calculations and is not
@@ -906,9 +906,13 @@ class GalaxySource(Source):
         Parameters
         ----------
           r_eff :: int or float or `astropy.Quantity` angle
-            Effective (half-light) radius. If a scalar, r_eff is assumed to be in arcsec.
+            Effective (half-light) radius. If a scalar, `r_eff` is assumed to be in arcsec.
             This is also known as the half-light radius, i.e., the radius within which
             half the light of the galaxy is contained.
+
+            Following the `astropy` convention, `r_eff` is equal to the semimajor axis
+            (a); the semiminor axis (b) is calculated as
+            `axial_ratio * r_eff = b/a * a = b`.
 
           n :: int or float
             Sersic index of the galaxy.
@@ -933,6 +937,9 @@ class GalaxySource(Source):
           angle_a, angle_b :: `astropy.Quantity` angles
             The angles subtended by the extended source's semimajor and semiminor axes.
             These attributes were calculated from the given `r_eff` and `axial_ratio`.
+
+            Following the `astropy` convention, `angle_a` is equal to `r_eff`, and
+            `angle_b` is calculated as `axial_ratio * r_eff = b/a * a = b`.
 
           area :: `astropy.Quantity` angle
             The angular area subtended by the extended source.
@@ -972,12 +979,11 @@ class GalaxySource(Source):
         #
         # Assign attributes to source
         #
-        r_eff_sq = r_eff * r_eff
         ellipticity = 1.0 - axial_ratio  # per `astropy`'s definition of ellipticity
         profile = Profiles.sersic(r_eff, n, e=ellipticity, angle=rotation)
         super().__init__(profile, init_dimensions=True)
-        self.angle_a = np.sqrt(r_eff_sq / axial_ratio) * u.arcsec
-        self.angle_b = np.sqrt(r_eff_sq * axial_ratio) * u.arcsec
+        self.angle_a = r_eff * u.arcsec
+        self.angle_b = axial_ratio * r_eff * u.arcsec
         self.area = np.pi * self.angle_a * self.angle_b
         self.rotation = np.deg2rad(rotation)
         self.sersic_index = n
