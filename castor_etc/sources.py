@@ -312,13 +312,14 @@ class Profiles:
         Parameters
         ----------
           r_eff :: scalar or `astropy.Quantity` angle
-            Effective (half-light) radius. If a scalar, r_eff is assumed to be in arsec.
+            Effective (half-light) radius. If a scalar, r_eff is assumed to be in arcsec.
 
           n :: scalar
             Sersic index of the galaxy.
 
           e :: scalar
-            Eccentricity of the galaxy.
+            Ellipticity of the galaxy. N.B. this is defined as (following `astropy`):
+            `1 - b/a`, _not_ `sqrt(1 - b^2/a^2)`, where `b/a` is the axial ratio.
 
           angle :: scalar
             The counter-clockwise rotation angle in degrees. At an angle of 0, the
@@ -548,19 +549,21 @@ class PointSource(Source):
             Declination of the target in degree
 
           srch_Gmax :: int or float
-            Maximum Gaia G magnitude for Gaia catalog query (applies to both the target and the guide stars)
+            Maximum Gaia G magnitude for Gaia catalog query (applies to both the target
+            and the guide stars)
 
           srch_nmax :: int
             Maximum Gaia sources to include.
 
           srch_rad :: `astropy.Quantity`
-            Search radius, in degree, for Gaia catalog query (applies to both the target and the guide stars)
+            Search radius, in degree, for Gaia catalog query (applies to both the target
+            and the guide stars)
 
-          Teff :: int or float 
+          Teff :: int or float
             Effective temperature of the target in Kelvin
 
           Gmag :: int or float
-            Gaia G magnitude of the target used to query the Gaia catalog 
+            Gaia G magnitude of the target used to query the Gaia catalog
 
           logg :: int or float
             log(g) value of the target
@@ -578,10 +581,12 @@ class PointSource(Source):
             Gaia RP magnitude of the target
 
           stellar_model_grid :: str
-            Stellar model grid, 'ATLAS9' or 'BTSettl', for selecting spectrum of the source according to the interpolated stellar atmosphere model.
-          
+            Stellar model grid, 'ATLAS9' or 'BTSettl', for selecting spectrum of the
+            source according to the interpolated stellar atmosphere model.
+
           bkg_sources :: bool
-            If True, then background Gaia sources are included during the transit simulation calculation. If False, nmax is set to 1.
+            If True, then background Gaia sources are included during the transit
+            simulation calculation. If False, nmax is set to 1.
 
           fov :: int or float
             Full width FoV in degree
@@ -590,7 +595,7 @@ class PointSource(Source):
             Field of view position angle
 
           ccd_dim :: int list
-            CCD dimesions adopted from TelescopeObj 
+            CCD dimesions adopted from TelescopeObj
 
           gaia :: dict of array
             Contains queried gaia sources' parameters
@@ -882,13 +887,7 @@ class GalaxySource(Source):
     A galaxy.
     """
 
-    def __init__(
-        self,
-        r_eff,
-        n,
-        axial_ratio,
-        rotation=0.0,
-    ):
+    def __init__(self, r_eff, n, axial_ratio, rotation=0.0):
         """
         Generate a galaxy with a specific effective radius (`sqrt(a * b)`), Sersic index
         (`n`), and axial ratio (`b/a`).
@@ -907,10 +906,9 @@ class GalaxySource(Source):
         Parameters
         ----------
           r_eff :: int or float or `astropy.Quantity` angle
-            Effective (half-light) radius. If a scalar, r_eff is assumed to be in arsec.
-            This is also known as the half-light radius and is conventially equal to the
-            square root of the product of the semimajor axis and the semiminor axis (i.e.,
-            `r_eff = sqrt(a * b)`).
+            Effective (half-light) radius. If a scalar, r_eff is assumed to be in arcsec.
+            This is also known as the half-light radius, i.e., the radius within which
+            half the light of the galaxy is contained.
 
           n :: int or float
             Sersic index of the galaxy.
@@ -975,8 +973,8 @@ class GalaxySource(Source):
         # Assign attributes to source
         #
         r_eff_sq = r_eff * r_eff
-        eccentricity = np.sqrt(1 - (axial_ratio * axial_ratio))
-        profile = Profiles.sersic(r_eff, n, e=eccentricity, angle=rotation)
+        ellipticity = 1.0 - axial_ratio  # per `astropy`'s definition of ellipticity
+        profile = Profiles.sersic(r_eff, n, e=ellipticity, angle=rotation)
         super().__init__(profile, init_dimensions=True)
         self.angle_a = np.sqrt(r_eff_sq / axial_ratio) * u.arcsec
         self.angle_b = np.sqrt(r_eff_sq * axial_ratio) * u.arcsec
