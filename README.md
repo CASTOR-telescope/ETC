@@ -1,6 +1,6 @@
 # CASTOR Exposure Time Calculator (ETC)
 
-FORECASTOR Team - 2022-2023
+FORECASTOR Team - 2022-2025
 
 **This package is under active development. It should be stable but please let me know if
 there are any bugs or unusual behaviour!**
@@ -12,6 +12,31 @@ calculators; the user is highly encouraged to read the docstrings and view the
 [example notebooks](https://github.com/CASTOR-telescope/ETC_notebooks) prior to using this
 software. Likewise, there may be frequent updates to this package as the mission matures
 (see the [changelog](CHANGELOG.md) for more details).
+
+If you use this code in your research, please cite the
+[FORECASTOR I.](https://ui.adsabs.harvard.edu/abs/2024AJ....167..178C/abstract)
+paper. The BibTeX entry is below.
+
+```bibtex
+@ARTICLE{Cheng2024,
+       author = {{Cheng}, Isaac and {Woods}, Tyrone E. and {C{\^o}t{\'e}}, Patrick and {Glover}, Jennifer and {Bansal}, Dhananjhay and {Amenouche}, Melissa and {Marshall}, Madeline A. and {Amen}, Laurie and {Hutchings}, John and {Ferrarese}, Laura and {Venn}, Kim A. and {Balogh}, Michael and {Blouin}, Simon and {Cloutier}, Ryan and {Dickson}, Nolan and {Gallagher}, Sarah and {Hellmich}, Martin and {H{\'e}nault-Brunet}, Vincent and {Khatu}, Viraja and {Lawlor-Forsyth}, Cameron and {Morgan}, Cameron and {Richer}, Harvey and {Sawicki}, Marcin and {Sorba}, Robert},
+        title = "{FORECASTOR. I. Finding Optics Requirements and Exposure Times for the Cosmological Advanced Survey Telescope for Optical and UV Research Mission}",
+      journal = {\aj},
+     keywords = {Galaxies, M stars, Photometry, Proper motions, Ultraviolet telescopes, White dwarf stars, 573, 985, 1234, 1295, 1743, 1799, Astrophysics - Instrumentation and Methods for Astrophysics, Astrophysics - Astrophysics of Galaxies, Astrophysics - Solar and Stellar Astrophysics},
+         year = 2024,
+        month = apr,
+       volume = {167},
+       number = {4},
+          eid = {178},
+        pages = {178},
+          doi = {10.3847/1538-3881/ad2987},
+archivePrefix = {arXiv},
+       eprint = {2402.08137},
+ primaryClass = {astro-ph.IM},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2024AJ....167..178C},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+```
 
 ## Table of Contents
 
@@ -127,10 +152,6 @@ these functions/class to the directory containing the stellar models on your loc
 
 Here are some future plans for the ETC:
 
-- Use a sampled PSF to create a pixel-based kernel to convolve with the simulated images.
-  Additionally, point sources should use the sampled PSF to calculate its encircled energy
-  (we currently assume the point source PSF is a Gaussian).
-- Add slitless grism and multi-object spectroscopic capabilities to the ETC
 - Arbitrary source profiles (i.e., surface brightness profiles) based on a FITS file
   _with_ spectrum? Not sure what I would be asking the user for in this case (e.g., what
   unit should the FITS file data be in?)... Please let me know if you have any ideas!
