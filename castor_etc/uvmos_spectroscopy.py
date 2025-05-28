@@ -392,7 +392,7 @@ class UVMOS_Spectroscopy:
             y = interp_source_spectrum(x)
 
             # Flux in photons per second
-            phot_in_band = np.array(scipy.integrate.cumtrapz(y, x )[-1])
+            phot_in_band = np.array(scipy.integrate.cumulative_trapezoid(y, x )[-1])
 
             # Create the pixel map for this band
             pix_map = pix_dist * phot_in_band
@@ -593,7 +593,7 @@ class UVMOS_Spectroscopy:
             y = interp_source_spectrum(x)
 
             # Flux in photons per second
-            phot_in_band = np.array(scipy.integrate.cumtrapz(y, x )[-1])
+            phot_in_band = np.array(scipy.integrate.cumulative_trapezoid(y, x )[-1])
 
             # Create the pixel map for this band
             pix_map = pix_dist * phot_in_band
@@ -658,7 +658,7 @@ class UVMOS_Spectroscopy:
             y = interp_background_spectrum(x)
 
             # Flux in photons per second
-            phot_in_band = np.array(scipy.integrate.cumtrapz(y, x )[-1])
+            phot_in_band = np.array(scipy.integrate.cumulative_trapezoid(y, x )[-1])
 
             # Create the pixel map for this band
             pix_map = pix_dist * phot_in_band
