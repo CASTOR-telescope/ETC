@@ -89,7 +89,7 @@ from astropy.modeling.models import Sersic2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from photutils.aperture import EllipticalAperture
-from scipy.interpolate import interp2d
+from scipy.interpolate import RectBivariateSpline
 
 from .spectrum import NormMixin, SpectrumMixin
 
@@ -1093,6 +1093,7 @@ class CustomSource(Source):
         )
         ysize, xsize = data.shape
         # xs, ys = np.meshgrid(np.arange(xsize), np.arange(ysize), indexing="xy")
+      #Additional edit, interp2d removed from SciPy changed to RectBivariateSpline
         xs = np.arange(xsize)  # must use 1D array to prevent interp2d overflow errors
         ys = np.arange(ysize)  # must use 1D array to prevent interp2d overflow errors
         xs = (xs - center[0]) * arcsec_per_px[1]
@@ -1102,7 +1103,7 @@ class CustomSource(Source):
         #
         # Create 2D interpolation function
         #
-        profile_interp = interp2d(
+        profile_interp = RectBivariateSpline(
             xs,
             ys,
             data.astype(np.float64),
