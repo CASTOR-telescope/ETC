@@ -136,3 +136,6 @@ dmypy.json
 
 # VS Code stuff
 .vscode/
+
+# Sphinx auto-gen docs
+docs
