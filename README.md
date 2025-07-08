@@ -1,6 +1,6 @@
 # CASTOR Exposure Time Calculator (ETC)
 
-FORECASTOR Team - 2022-2025
+FORECASTOR Team - 2022-2025 
 
 **This package is under active development. It should be stable but please let me know if
 there are any bugs or unusual behaviour!**
