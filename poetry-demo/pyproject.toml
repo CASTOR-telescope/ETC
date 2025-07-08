@@ -1,5 +1,5 @@
 [project]
-name = "poetry-Package"
+name = "poetry-package"
 version = "0.1.0"
 description = ""
 authors = [
