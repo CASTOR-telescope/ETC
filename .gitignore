@@ -74,8 +74,9 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
-docs/_build/
+# Sphinx documentation ignores
+docs/.venv/
+docs/build/
 
 # PyBuilder
 target/
@@ -137,5 +138,3 @@ dmypy.json
 # VS Code stuff
 .vscode/
 
-# Sphinx auto-gen docs
-docs
