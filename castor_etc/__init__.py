@@ -1,11 +1,11 @@
 #         GNU General Public License v3 (GNU GPLv3)
-
+#
 # (c) 2022.                            (c) 2022.
 # Government of Canada                 Gouvernement du Canada
 # National Research Council            Conseil national de recherches
 # Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
 # All rights reserved                  Tous droits réservés
-
+#
 # NRC disclaims any warranties,        Le CNRC dénie toute garantie
 # expressed, implied, or               énoncée, implicite ou légale,
 # statutory, of any kind with          de quelque nature que ce
@@ -28,10 +28,10 @@
 # software without specific prior      de ce logiciel sans autorisation
 # written permission.                  préalable et particulière
 #                                      par écrit.
-
+#
 # This file is part of the             Ce fichier fait partie du projet
 # FORECASTOR ETC project.              FORECASTOR ETC.
-
+#
 # FORECASTOR ETC is free software:     FORECASTOR ETC est un logiciel
 # you can redistribute it and/or       libre ; vous pouvez le redistribuer
 # modify it under the terms of         ou le modifier suivant les termes de
@@ -41,7 +41,7 @@
 # either version 3 of the              soit la version 3 de cette
 # License, or (at your option)         licence, soit (à votre gré)
 # any later version.                   toute version ultérieure.
-
+#
 # FORECASTOR ETC is distributed        FORECASTOR ETC est distribué
 # in the hope that it will be          dans l'espoir qu'il vous
 # useful, but WITHOUT ANY WARRANTY;    sera utile, mais SANS AUCUNE
@@ -51,13 +51,12 @@
 # GNU General Public License for       PARTICULIER. Consultez la Licence
 # more details.                        Générale Publique GNU pour plus
 #                                      de détails.
-
+#
 # You should have received             Vous devriez avoir reçu une
 # a copy of the GNU General            copie de la Licence Générale
 # Public License along with            Publique GNU avec FORECASTOR ETC ;
 # FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
-
 
 """
 CASTOR Exposure Time Calculator (ETC)
