@@ -1,0 +1,3 @@
+[submodule "ETC_notebooks"]
+	path = ETC_notebooks
+	url = git@github.com:CASTOR-telescope/ETC_notebooks.git
