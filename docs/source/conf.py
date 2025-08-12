@@ -12,6 +12,7 @@ author = 'CASTOR Team'
 
 import sys
 from pathlib import Path
+import shutil
 
 sys.path.insert(0, str(Path('..', '').resolve()))
 
@@ -20,6 +21,7 @@ sys.path.insert(0, str(Path('..', '').resolve()))
 
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.napoleon',
+              'sphinx.ext.mathjax',  # Print mathematical expressions
               'myst_parser',
               "autodoc2"
               ]
