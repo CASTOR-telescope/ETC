@@ -13,7 +13,7 @@ Welcome to the CASTOR exposure time calculator documentation! Here you will find
    :maxdepth: 2
    :caption: Contents:
 
-   introduction/index.md
+   introduction/index
    examples/index
    apidocs/index
 
