@@ -6,14 +6,13 @@
 CASTOR ETC documentation
 ========================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+Welcome to the CASTOR exposure time calculator documentation! Here you will find details on the code, the corresponding papers, as well as the API documentation.
 
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+   introduction/index.md
    apidocs/index
 

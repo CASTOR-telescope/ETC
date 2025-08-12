@@ -27,11 +27,15 @@ extensions = ['sphinx.ext.autodoc',
 autodoc2_packages = [
     "../../castor_etc"
 ]
-# source_suffix = {
-#     '.rst': 'restructuredtext',
-#     '.ipynb': 'myst-nb',
-#     '.myst': 'myst-nb',
-# }
+
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.ipynb': 'myst-nb', # we utilize this to embed jupyter notebooks: https://docs.readthedocs.com/platform/latest/guides/jupyter.html
+    '.myst': 'myst-nb',
+    '.md': 'markdown'
+}
+
+
 templates_path = ['_templates']
 exclude_patterns = []
 
