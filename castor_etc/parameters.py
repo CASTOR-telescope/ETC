@@ -120,7 +120,7 @@ IFOV_DIMEN = [0.44, 0.56] << u.deg  # degrees. Angular dimensions
 IFOV_AREA = IFOV_DIMEN[0] * IFOV_DIMEN[1]  # degrees^2
 
 # Field of view of Poet
-TRANSIT_FOV = 204.5 << u.arcsec 
+TRANSIT_FOV = 204.5 << u.arcsec
 
 # Number of pixels in CCD (x 1 million)
 MP = 930  # megapixels

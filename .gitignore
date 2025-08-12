@@ -136,3 +136,6 @@ dmypy.json
 
 # VS Code stuff
 .vscode/
+
+.artifacts
+.ruff_cache

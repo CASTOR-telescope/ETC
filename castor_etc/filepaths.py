@@ -62,7 +62,7 @@
 Contains filepaths for CASTOR. Mostly private constants that should be re-factored elsewhere later.
 """
 
-from os.path import dirname, abspath, join
+from os.path import abspath, dirname, join
 
 # ------------------------- FILEPATHS (N.B. no trailing slash) ------------------------- #
 

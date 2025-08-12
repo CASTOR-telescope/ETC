@@ -98,12 +98,12 @@ from . import (
     conversions,
     data,
     filepaths,
+    grism,
     parameters,
     photometry,
     sources,
     spectrum,
     telescope,
-    uvmos_spectroscopy,
     transit,
-    grism
+    uvmos_spectroscopy,
 )

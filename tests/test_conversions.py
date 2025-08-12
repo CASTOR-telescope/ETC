@@ -66,11 +66,6 @@ Unit tests for the conversions module.
 
 import unittest
 
-import astropy.units as u
-import numpy as np
-
-from .. import conversions as convert
-
 # ALlowed differences for passing tests
 _FLUX_MAG_COUNT = 1e-15  # floating-point tolerance for convert.convert_count_flux_mag()
 

@@ -67,42 +67,32 @@ a transit event such as observations.
 """
 
 import warnings
-
-import numpy as np
-
-import matplotlib.pyplot as plt
-from matplotlib.ticker import AutoMinorLocator
-
-from astropy.coordinates import SkyCoord
-import astropy.units as u
-from matplotlib.colors import LogNorm
-
-from tqdm import tqdm
-
-from scipy.ndimage import interpolation, gaussian_filter
-from skimage.transform import downscale_local_mean
-from .conversions import calc_photon_energy, mag_to_flux,flam_to_AB_mag, convert_electron_flux_mag
-from scipy.interpolate import interp1d
-from astropy.constants import R_sun, pc
-
-
 from os.path import join
-from astroquery.gaia import Gaia
 
+import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.constants import R_sun, pc
+from matplotlib.colors import LogNorm
+from matplotlib.ticker import AutoMinorLocator
+from photutils.aperture import EllipticalAperture, aperture_photometry
+from pytransit import QuadraticModel
+from scipy.interpolate import interp1d
+from scipy.ndimage import gaussian_filter, interpolation
+from skimage.transform import downscale_local_mean
+from tqdm import tqdm
 
 from castor_etc.background import Background
 from castor_etc.sources import PointSource
-from castor_etc.telescope import Telescope
 from castor_etc.spectrum import getStarData
+from castor_etc.telescope import Telescope
 
+from .conversions import calc_photon_energy, convert_electron_flux_mag, flam_to_AB_mag, mag_to_flux
 from .filepaths import DATAPATH
-from pytransit import QuadraticModel
-from photutils.aperture import EllipticalAperture, aperture_photometry
 
 # The optimal aperture for a point source is a circular aperture with a radius equal to the factor below times half the telescope's FWHM
 _OPTIMAL_APER_FACTOR = 1.4
 
-import numpy as np
 
 def addflux2pix(px,py,pixels,fmod):
     """Usage: pixels=addflux2pix(px,py,pixels,fmod)
@@ -129,10 +119,10 @@ def addflux2pix(px,py,pixels,fmod):
     npy = int(pymh)
 
     #print('n',npx,npy)
-    
+
     #if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
     #    pixels[npx,npy]=pixels[npx,npy]+fmod
-    
+
     if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
         pixels[npx,npy]=pixels[npx,npy]+fmod*dx*dy
 
@@ -155,7 +145,7 @@ def addflux2pix(px,py,pixels,fmod):
     npy = int(pymh)+1
     if (npx >= 0) & (npx < xmax) & (npy >= 0) & (npy < ymax) :
         pixels[npx,npy]=pixels[npx,npy]+fmod*(1.0-dx)*(1.0-dy)
-    
+
     return pixels
 
 def gen_unconv_image(pars,starmodel_flux,xcoo,ycoo):
@@ -167,12 +157,12 @@ def gen_unconv_image(pars,starmodel_flux,xcoo,ycoo):
     ymax=pars.yout*pars.noversample+ypad*2
 
     pixels=np.zeros((xmax,ymax))
-    
+
     i = ( xcoo + (pars.xout - pars.ccd_dim[0])/2 ) * pars.noversample
     j = ( ycoo + (pars.yout - pars.ccd_dim[1])/2 ) * pars.noversample
-    
+
     pixels=addflux2pix(i,j,pixels,starmodel_flux)
-    
+
     return pixels
 
 class Observation:
@@ -223,13 +213,13 @@ class Observation:
 
         if not isinstance(TelescopeObj, Telescope):
             raise TypeError("TelescopeObj must be a `castor_etc.Telescope` Object")
-        
+
         if not isinstance(SourceObj, PointSource):
             raise TypeError("SourceObj must be a `castor_etc.PointSource` object. Other sources are not currently supported")
-        
+
         if not isinstance(BackgroundObj, Background):
             raise TypeError("BackgroundObj must be a `castor_etc.Background` object")
-        
+
 
         #
         # Assign attributes
@@ -240,7 +230,7 @@ class Observation:
 
         self.stellar_model_dir = stellar_model_dir
 
-        self.gaia = {} 
+        self.gaia = {}
 
         self.t_id = '' # Target name. Used for plots
 
@@ -254,7 +244,7 @@ class Observation:
         self.ccd_dim = [self.TelescopeObj.transit_ccd_dim[0],self.TelescopeObj.transit_ccd_dim[1]] # [pxl,pxl] used for plotting (including converting ra,dec -> x_pxl, y_pxl)
 
         self.noise_sources = ['illum','shot','read','dark','jitter', 'sky_background'] # List of noise sources to include
-        
+
         self.passband_name = None # 'uv', 'u', 'g'
 
         self.gain = 1 # self.TelescopeObj.gain = 2 but we are overiding this.
@@ -270,7 +260,7 @@ class Observation:
         self.xout = self.ccd_dim[0] # x-axis
         self.yout = self.ccd_dim[1] # y-axis
         self.noversample = 2 # CCD oversampling factor
-        
+
         self.detector_aperture = 1. * u.m
         self.detector_pixscale = 10. * u.um
         self.illumfile = 'illum_pattern.csv' # CCD illumination pattern file, currently a 2D array of one ones
@@ -290,7 +280,7 @@ class Observation:
         self.ccd_aperture = (_OPTIMAL_APER_FACTOR * 0.5 * TelescopeObj.fwhm.to(u.arcsec).value)/TelescopeObj.px_scale.to(u.arcsec).value # radius [pxl] for aperture photometry
 
         self.quiet = False
-  
+
     def calc_sky_background_erate(self):
         """
         Noise associated with the sky background. This calculation is copy and pasted from calc_snr_or_t function in the photometry class.
@@ -396,7 +386,7 @@ class Observation:
                     # emission line is in multiple bands)
         self.sky_background_noise = sky_background_erate
 
-    def _photon_count(self,temp=5780., metallicity=0.0, logg=4.44, 
+    def _photon_count(self,temp=5780., metallicity=0.0, logg=4.44,
                         Gmag=7.0, Gmag_abs=4.635,
                         radius=1.0
     ):
@@ -502,7 +492,7 @@ class Observation:
             wavelength_AA[isgood_passband & isgood_spectrum],
             fl[isgood_passband & isgood_spectrum],
             passband_response[isgood_passband & isgood_spectrum],
-        ) 
+        )
 
         #response depends on the bandpass id chosen.
         e_rate = convert_electron_flux_mag(var1=ab_mag,var1_type="mag",var2_type="electron", phot_zpt=self.TelescopeObj.phot_zpts[self.passband_name])[0]
@@ -572,7 +562,7 @@ class Observation:
 
         if not isinstance(plot_SN, bool):
             raise TypeError("plot_SN must be either True or False")
-        
+
 
         # Generate scene simulation using guide star exposure criteria
         _nstack, _exptime, _quiet = self.nstack, self.exptime.to(u.second), self.quiet # Store previous nstack and exptime
@@ -626,7 +616,7 @@ class Observation:
             self.gaia['gs_SN_pix_max'] = []
 
         if self.quiet == False:
-            print('{:.0f} guide star(s) identified.'.format(len(gs_i)))
+            print(f'{len(gs_i):.0f} guide star(s) identified.')
 
         self.gaia['gs_i'] = gs_i
         self.gaia['gs_SN_pix_max'] = SN_pix_max
@@ -785,7 +775,7 @@ class Observation:
         source_weights = np.exp(
             -((self._aper_xs + center[0])**2 + (self._aper_ys + center[1])**2) / (2 * telescope_standard_dev_sq)
         )
-        
+
         return source_weights
 
     def _create_aper_arrs(self,half_x,half_y,center,overwrite=False):
@@ -955,7 +945,7 @@ class Observation:
                 error associated with the point source simulation 
         """
 
-        scene_phot_count *= target_flux_fraction 
+        scene_phot_count *= target_flux_fraction
 
         encircled_energy = self._encircled_energy
 
@@ -966,7 +956,7 @@ class Observation:
         for istack in range(self.nstack):
 
             source_count = count_per_px * encircled_energy * self._aper_mask
-            
+
             if 'illum' in self.noise_sources:
                 il = np.genfromtxt(fname=join(DATAPATH, "transit_data/instrument_data",self.illumfile), delimiter=',')
                 z = len(source_count) / len(il)
@@ -1039,7 +1029,7 @@ class Observation:
         #
         if (self.passband_name is None):
             raise ValueError("Bandpass must be specified, i.e., ['uv','u','g']")
-        
+
         # Need to check other parameters
 
         telsecope_fwhm_arcsec = self.TelescopeObj.fwhm.to(u.arcsec).value
@@ -1105,7 +1095,7 @@ class Observation:
             else:
                 pixels = np.copy(pixels_unconvolved)
 
-            # Convolve image 
+            # Convolve image
             if ((xjit < 1.e-3) & (yjit < 1.e-3)):
                 if istack == 0:
                     pixels_conv = gaussian_filter(pixels,sigma=sigma)
@@ -1136,18 +1126,18 @@ class Observation:
                 _coord = []
                 for ll in range(len(x0)):
                     _coord.append([x0[ll], y0[ll]])
-            
+
                 aper_radius_px = self.ccd_aperture
-                
+
                 aper = EllipticalAperture(positions=_coord, a=aper_radius_px, b=aper_radius_px, theta=0)
 
-                _ap_phot = aperture_photometry(np.abs(pixels_conv_ras_nav), 
+                _ap_phot = aperture_photometry(np.abs(pixels_conv_ras_nav),
                                     aper, method='center')
                 _fl = _ap_phot['aperture_sum']
                 n_pix = np.floor(aper.area) # Number of pixels in the aperture
                 SN_ap = np.array( _fl / np.sqrt( _fl + np.sqrt(self.nstack) * self.read_noise + \
                                                 (self.dark_noise + self.sky_background_noise[self.passband_name]) * self.nstack * n_pix * self.exptime.to(u.second).value ) )
-            
+
             # Add illumination pattern
             if 'illum' in self.noise_sources:
                 #add illumination pattern
@@ -1314,7 +1304,7 @@ class Observation:
         plt.ion()
         plt.show()
         plt.pause(1.e-6)
-        
+
     def specify_pl_model(self,RpRs, P, t0, b, aRs):
         """
         Model planet for transit simulation
@@ -1343,7 +1333,7 @@ class Observation:
         """
 
         #
-        # Check inputs 
+        # Check inputs
         #
 
         if not isinstance(RpRs, list):
@@ -1399,7 +1389,7 @@ class Observation:
         """
 
         #
-        # Check inputs 
+        # Check inputs
         #
 
         if isinstance(exptime, u.Quantity):
@@ -1422,7 +1412,7 @@ class Observation:
                 self.tend = tend.to(u.d)
             except Exception:
                 raise TypeError("tend must be a `astropy.Quantity` time (e.g., sec,day)")
-        
+
     def calc_pl_model(self,model='pytransit_QuadraticModel',t_grid=[],exp_time=-1):
         """
         Parameters
@@ -1450,7 +1440,7 @@ class Observation:
             n_pl = len(self.pl_model['RpRs'])
 
             if model == 'pytransit_QuadraticModel':
-                
+
                 tm = QuadraticModel()
 
                 if exp_time < 0:
@@ -1538,7 +1528,7 @@ class Observation:
         for n in range(nt):
             obs, err = self._point_source_sim(target_flux_fraction=pl_lc[n], scene_phot_count=scene_phot_count)
             i=0
-            fl[n,i] = np.nansum(obs) 
+            fl[n,i] = np.nansum(obs)
             fl_err[n,i] = np.nansum(err)
 
             if quiet == False:

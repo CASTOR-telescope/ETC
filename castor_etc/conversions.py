@@ -80,8 +80,7 @@ from . import constants as const
 
 
 def calc_photon_energy(
-    wavelength=None, frequency=None, wavelength_err=0.0, frequency_err=0.0
-):
+    wavelength=None, frequency=None, wavelength_err=0.0, frequency_err=0.0):
     """
     Calculates the energy of a photon in ergs given its wavelength or frequency. Useful
     for converting between erg and photon units.
@@ -124,7 +123,7 @@ def calc_photon_energy(
     return energy, energy_err  # erg
 
 
-def convert_freq_wavelength(data, to="wavelength", output_unit=u.AA):
+def convert_freq_wavelength(data, to="wavelength", output_unit = u.AA):
     """
     Converts between frequency and wavelength for light in a vacuum.
 
@@ -193,7 +192,7 @@ def flam_to_photlam(flam, wavelength):
 def fnu_to_photlam(fnu, wavelength):
     """
     Converts from fnu (erg/cm^2/s/Hz) to photlam (photon/cm^2/s/A). See
-    <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf> ("F_\nu" to "f_\lambda").
+    <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf> ("F_\nu" to "f_\\lambda").
 
     Parameters
     ----------
@@ -217,7 +216,7 @@ def fnu_to_photlam(fnu, wavelength):
 def fnu_to_flam(fnu, wavelength, fnu_err=0.0, wavelength_err=0.0):
     """
     Converts from fnu (erg/cm^2/s/Hz) to flam (erg/cm^2/s/A). See
-    <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf> ("F_\nu" to "F_\lambda").
+    <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf> ("F_\nu" to "F_\\lambda").
 
     Parameters
     ----------
@@ -264,7 +263,7 @@ def fnu_to_flam(fnu, wavelength, fnu_err=0.0, wavelength_err=0.0):
 def flam_to_fnu(flam, wavelength, flam_err=0.0, wavelength_err=0.0):
     """
     Converts from flam (erg/cm^2/s/A) to fnu (erg/cm^2/s/Hz). See
-    <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf> ("F_\lambda" to "F_\nu").
+    <https://hea-www.harvard.edu/~pgreen/figs/Conversions.pdf> ("F_\\lambda" to "F_\nu").
 
     Parameters
     ----------
