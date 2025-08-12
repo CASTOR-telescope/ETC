@@ -77,6 +77,8 @@ instance/
 # Sphinx documentation ignores
 docs/.venv/
 docs/build/
+docs/source/examples/notebooks/*.ipynb
+docs/jupyter_execute
 
 # PyBuilder
 target/

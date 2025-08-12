@@ -1,4 +1,15 @@
-# Examples
+.. CASTOR ETC documentation master file, created by
+   sphinx-quickstart on Mon Jun 16 11:17:42 2025.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
 
-The FORECASTOR team has created examples in the form of Jupyter notebooks that can be found in their corresponding pages below, or [cloned directly from Github](https://github.com/CASTOR-telescope/ETC_notebooks.git).
+Examples
+========
 
+
+
+.. toctree::
+    :maxdepth: 1
+    :glob:
+
+    notebooks/*

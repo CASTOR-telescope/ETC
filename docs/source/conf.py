@@ -12,7 +12,6 @@ author = 'CASTOR Team'
 
 import sys
 from pathlib import Path
-import shutil
 
 sys.path.insert(0, str(Path('..', '').resolve()))
 
@@ -21,8 +20,8 @@ sys.path.insert(0, str(Path('..', '').resolve()))
 
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.napoleon',
+              'myst_nb',
               'sphinx.ext.mathjax',  # Print mathematical expressions
-              'myst_parser',
               "autodoc2"
               ]
 
@@ -31,10 +30,7 @@ autodoc2_packages = [
 ]
 
 source_suffix = {
-    '.rst': 'restructuredtext',
-    '.ipynb': 'myst-nb', # we utilize this to embed jupyter notebooks: https://docs.readthedocs.com/platform/latest/guides/jupyter.html
-    '.myst': 'myst-nb',
-    '.md': 'markdown'
+    '.rst': 'restructuredtext'
 }
 
 
