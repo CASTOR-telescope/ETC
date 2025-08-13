@@ -1,0 +1,32 @@
+[project]
+name = "castor-etc"
+version = "1.3.2"
+description = "CASTOR Exposure Time Calculator (ETC): A modular, user-friendly Python package for easy estimation and analysis of CASTOR imaging performance. This Poetry package will help maintain the version of the packages that this ETC depends on so that any updates of packages will not effect the performance of the ETC."
+authors = [
+    {name = "Jocelyn",email = "jgroney1@gmail.com"}
+]
+license = {text = "GPLv3"}
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy (>=2.3.1,<3.0.0)",
+    "scipy (>=1.16.0,<2.0.0)",
+    "matplotlib (>=3.10.3,<4.0.0)",
+    "astropy (>=7.1.0,<8.0.0)",
+    "pandas (>=2.3.1,<3.0.0)",
+    "photutils (>=2.2.0,<3.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "scikit-image (>=0.25.2,<0.26.0)",
+    "astroquery (>=0.4.10,<0.5.0)",
+    "pytransit (>=2.6.14,<3.0.0)",
+    "arviz (>=0.22.0,<0.23.0)",
+    "celerite (>=0.4.3,<0.5.0)",
+    "emcee (>=3.1.6,<4.0.0)",
+    "corner (>=2.2.3,<3.0.0)",
+    "spectres (>=2.2.2,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
