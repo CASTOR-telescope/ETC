@@ -25,9 +25,9 @@ extensions = ['sphinx.ext.autodoc',
               "autodoc2"
               ]
 
-autodoc2_packages = [
-    "../../castor_etc"
-]
+# autodoc2_packages = [
+#     "../../castor_etc"
+# ]
 
 source_suffix = {
     '.rst': 'restructuredtext'

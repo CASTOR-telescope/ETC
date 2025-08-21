@@ -14,6 +14,7 @@ Welcome to the CASTOR exposure time calculator documentation! Here you will find
    :caption: Contents:
 
    introduction/index
+   getting_started/index
    examples/index
    apidocs/index
 
