@@ -74,8 +74,11 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
-docs/_build/
+# Sphinx documentation ignores
+docs/.venv/
+docs/build/
+docs/source/examples/notebooks/*.ipynb
+docs/jupyter_execute
 
 # PyBuilder
 target/
@@ -136,6 +139,8 @@ dmypy.json
 
 # VS Code stuff
 .vscode/
+
+
 
 .artifacts
 .ruff_cache

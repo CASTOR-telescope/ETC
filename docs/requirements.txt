@@ -1,0 +1,7 @@
+sphinx
+myst-nb
+sphinx-book-theme
+sphinxcontrib-napoleon
+sphinx-autodoc2
+sphinx-autobuild
+mathjax
