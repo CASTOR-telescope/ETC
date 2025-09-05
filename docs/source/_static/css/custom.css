@@ -1,0 +1,15 @@
+/* Hide all logos by default */
+.logo-large, .logo-medium, .logo-small { display: none; }
+
+/* Show appropriate logo based on screen size */
+@media screen and (min-width: 1200px) {
+    .logo-large { display: block; max-height: 80px !important; }
+}
+
+@media screen and (min-width: 768px) and (max-width: 1199px) {
+    .logo-medium { display: block; max-height: 60px !important; }
+}
+
+@media screen and (max-width: 767px) {
+    .logo-small { display: block; max-height: 40px !important; }
+}

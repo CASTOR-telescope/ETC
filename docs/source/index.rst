@@ -11,10 +11,19 @@ Welcome to the CASTOR exposure time calculator documentation! Here you will find
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Getting Started:
+   
+   getting-started/index.rst
 
-   introduction/index
-   getting_started/index
-   examples/index
-   apidocs/index
+.. toctree::
+   :maxdepth: 2
+   :caption: User Documentation:
+   
+   user-guide/introduction/index.rst
+   user-guide/examples/index.rst
 
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference:
+   
+   api/index.rst

@@ -140,3 +140,5 @@ dmypy.json
 # VS Code stuff
 .vscode/
 
+# Local GH actions
+.artifacts

@@ -5,3 +5,4 @@ sphinxcontrib-napoleon
 sphinx-autodoc2
 sphinx-autobuild
 mathjax
+sphinx_rtd_theme
