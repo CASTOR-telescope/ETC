@@ -290,12 +290,12 @@ def getStarData(
             np.argmin(np.abs(logg_grid - logg)),
         ]
 
-        teff_str = "{:.0f}".format(teff_grid[mi[0]])
+        teff_str = f"{teff_grid[mi[0]]:.0f}"
         if mh_grid[mi[1]] < 0:
-            mh_str = "m{:0>2d}".format(int(np.abs(mh_grid[mi[1]]) * 100))
+            mh_str = f"m{int(np.abs(mh_grid[mi[1]]) * 100):0>2d}"
         else:
-            mh_str = "p{:0>2d}".format(int(np.abs(mh_grid[mi[1]]) * 100))
-        logg_str = "g{:0>2d}".format(int(logg_grid[mi[2]] * 10))
+            mh_str = f"p{int(np.abs(mh_grid[mi[1]]) * 100):0>2d}"
+        logg_str = f"g{int(logg_grid[mi[2]] * 10):0>2d}"
 
         specfile = (
             grid_dir + "ck" + mh_str + "/" + "ck" + mh_str + "_" + teff_str + ".fits"
@@ -355,7 +355,7 @@ def interp_EEM_table(Teff=[], Gmag=[], Bpmag=[], Rpmag=[]):
         "V-I": [],
     }
     eem_hdr = []
-    with open(table_fname, "r") as file:
+    with open(table_fname) as file:
         data_block = False
         for line in file:
             # Only read in between lines starting with '$SpT'
@@ -428,7 +428,7 @@ def interp_EEM_table(Teff=[], Gmag=[], Bpmag=[], Rpmag=[]):
                         eem["V-I"].append(np.nan)
                     else:
                         eem["V-I"].append(float(_line[ci]))
-    for _lbl in eem.keys():
+    for _lbl in eem:
         eem[_lbl] = np.array(eem[_lbl])
 
     # Calculate logg
@@ -436,7 +436,7 @@ def interp_EEM_table(Teff=[], Gmag=[], Bpmag=[], Rpmag=[]):
 
     # Sort by Teff
     si = np.argsort(eem["Teff"])
-    for _lbl in eem.keys():
+    for _lbl in eem:
         eem[_lbl] = eem[_lbl][si]
 
     # If Teff not specified, use Bpmag, Rpmag to get Teff
@@ -447,7 +447,7 @@ def interp_EEM_table(Teff=[], Gmag=[], Bpmag=[], Rpmag=[]):
     # Interpolate table using input Teff
     # Use grid edges for missing values
     interp_output = {"Teff": Teff}
-    for _lbl in eem.keys():
+    for _lbl in eem:
         if _lbl != "Teff":
             vi = np.isfinite(eem[_lbl])
             interp_output[_lbl] = np.interp(
@@ -970,13 +970,12 @@ class SpectrumMixin:
                 peak -= spectrum_interp(center)
                 if peak < 0:
                     raise ValueError("peak of emission line below continuum.")
-        else:
-            if abs_peak:
-                # Ensure final dip is actually at desired value
-                center_val = spectrum_interp(center)
-                if peak > center_val:
-                    raise ValueError("dip of absorption line above continuum.")
-                peak = center_val - peak
+        elif abs_peak:
+            # Ensure final dip is actually at desired value
+            center_val = spectrum_interp(center)
+            if peak > center_val:
+                raise ValueError("dip of absorption line above continuum.")
+            peak = center_val - peak
         # Ensure Gaussian is well sampled by evaluating at the wavelengths within +/- 5
         # sigma of the center. This also prevents overflow errors caused by calculations
         # at wavelengths too far from the center.
@@ -1151,13 +1150,12 @@ class SpectrumMixin:
                 peak -= spectrum_interp(center)
                 if peak < 0:
                     raise ValueError("peak of emission line below continuum.")
-        else:
-            if abs_peak:
-                # Ensure final dip is actually at desired value
-                center_val = spectrum_interp(center)
-                if peak > center_val:
-                    raise ValueError("dip of absorption line above continuum.")
-                peak = center_val - peak
+        elif abs_peak:
+            # Ensure final dip is actually at desired value
+            center_val = spectrum_interp(center)
+            if peak > center_val:
+                raise ValueError("dip of absorption line above continuum.")
+            peak = center_val - peak
         # Ensure Lorentzian is well sampled by evaluating at the wavelengths within +/- 80
         # units of probable error from the center. This also prevents overflow errors
         # caused by calculations at wavelengths too far from the center.
@@ -1731,15 +1729,11 @@ class SpectrumMixin:
         """
         try:
             srch_str = (
-                "SELECT *, DISTANCE(POINT({:.6f},{:.6f}), POINT(ra,dec))".format(
-                    self.ra.value, self.dec.value
-                )
+                f"SELECT *, DISTANCE(POINT({self.ra.value:.6f},{self.dec.value:.6f}), POINT(ra,dec))"
                 + "AS ang_sep FROM gaiadr2.gaia_source "
-                + "WHERE 1 = CONTAINS( POINT({:.6f},{:.6f}), ".format(
-                    self.ra.value, self.dec.value
-                )
-                + "CIRCLE(ra,dec,{:.2f}))".format(self.srch_rad.value)
-                + "AND phot_g_mean_mag <={:.2f}".format(self.srch_Gmax)
+                + f"WHERE 1 = CONTAINS( POINT({self.ra.value:.6f},{self.dec.value:.6f}), "
+                + f"CIRCLE(ra,dec,{self.srch_rad.value:.2f}))"
+                + f"AND phot_g_mean_mag <={self.srch_Gmax:.2f}"
                 + "AND parallax IS NOT NULL ORDER BY ang_sep ASC"
             )
 
@@ -1754,7 +1748,7 @@ class SpectrumMixin:
                 np.array(results["phot_rp_mean_mag"]),
             )
 
-            print("{:.0f} Gaia source(s) found".format(len(ra)))
+            print(f"{len(ra):.0f} Gaia source(s) found")
 
             # Identify target within Gaia search (brightest target within sep_max)
             sep_max = 8.0 / 3600.0  # * u.deg
@@ -2168,7 +2162,7 @@ class SpectrumMixin:
             spectrum *= ((self.gaia["radius"][0] * R_sun) / (dpc * pc)) ** 2
 
             # CASTOR wavelength range.
-            _range = np.where((wavelengths.to(u.AA).value <= 11000))
+            _range = np.where(wavelengths.to(u.AA).value <= 11000)
 
             self.wavelengths = wavelengths[_range]
             self.spectrum = spectrum[_range]

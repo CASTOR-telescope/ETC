@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "castor-etc"
+dynamic = ["version"]
+description = "CASTOR Exposure Time Calculator (ETC)"
+readme = "README.md"
+license = "GPL-3.0-only"
+requires-python = ">=3.9"
+authors = [
+    { name = "FORECASTOR Team" },
+]
+dependencies = [
+    "arviz",
+    "astropy",
+    "astroquery",
+    "celerite",
+    "corner",
+    "emcee",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "photutils",
+    "pytransit",
+    "scikit-image",
+    "scipy",
+    "spectres",
+    "tqdm",
+]
+
+[project.urls]
+Homepage = "https://github.com/CASTOR-telescope/ETC"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "_version.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/castor_etc",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["/castor_etc"]
+
+[tool.hatch.envs.build]
+dependencies = [
+    "isort"
+]
+
+[tool.hatch.envs.hatch-test]
+dependencies = [
+    "pytest",
+    "pytest-cov"
+]
+installer = "pip"
+
+[tool.hatch.envs.docs]
+python = ["3.11", "3.12"]
+dependencies = [
+    "sphinx"
+]
