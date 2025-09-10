@@ -26,9 +26,16 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx_rtd_theme'
               ]
 
-# autodoc2_packages = [
-#     "../../castor_etc"
-# ]
+# -- Options for Autodoc2 output -------------------------------------------------
+# https://sphinx-autodoc2.readthedocs.io/en/stable/config.html
+## TODO: redo this so that it analyzes each "submodule" on its own
+autodoc2_packages = [
+    "../../castor_etc"
+]
+autodoc2_docstring_parser_regexes = [
+    # this will render all docstrings as Markdown
+    (r".*", "myst"),
+]
 
 source_suffix = {
     '.rst': 'restructuredtext'
@@ -55,10 +62,3 @@ html_css_files = [
 # The full documentation for this is found here: https://sphinx-rtd-theme.readthedocs.io/en/stable/configuring.html
 html_theme_options = {
 }
-
-# Automatically extract typehints when specified and place them in
-# descriptions of the relevant function/method.
-autodoc_typehints = "description"
-
-# Don't show class signature with the class' name.
-autodoc_class_signature = "separated"

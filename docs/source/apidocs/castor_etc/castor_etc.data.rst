@@ -4,6 +4,7 @@
 .. py:module:: castor_etc.data
 
 .. autodoc2-docstring:: castor_etc.data
+   :parser: myst
    :allowtitles:
 
 Subpackages
@@ -33,6 +34,7 @@ Data
 
    * - :py:obj:`__all__ <castor_etc.data.__all__>`
      - .. autodoc2-docstring:: castor_etc.data.__all__
+          :parser: myst
           :summary:
 
 API
@@ -43,3 +45,4 @@ API
    :value: ['UVMOS_data', 'galaxy_spectra', 'passbands', 'pickles_spectra', 'psfs', 'sky_background']
 
    .. autodoc2-docstring:: castor_etc.data.__all__
+      :parser: myst

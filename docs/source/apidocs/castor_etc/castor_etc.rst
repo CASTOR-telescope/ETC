@@ -4,6 +4,7 @@
 .. py:module:: castor_etc
 
 .. autodoc2-docstring:: castor_etc
+   :parser: myst
    :allowtitles:
 
 Subpackages
@@ -14,7 +15,6 @@ Subpackages
    :maxdepth: 3
 
    castor_etc.data
-   castor_etc.tests
 
 Submodules
 ----------
@@ -48,6 +48,7 @@ Data
 
    * - :py:obj:`__all__ <castor_etc.__all__>`
      - .. autodoc2-docstring:: castor_etc.__all__
+          :parser: myst
           :summary:
 
 API
@@ -58,3 +59,4 @@ API
    :value: ['background', 'constants', 'conversions', 'data', 'filepaths', 'parameters', 'photometry', 'sources...
 
    .. autodoc2-docstring:: castor_etc.__all__
+      :parser: myst

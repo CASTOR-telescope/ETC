@@ -4,6 +4,7 @@
 .. py:module:: castor_etc.data.sky_background
 
 .. autodoc2-docstring:: castor_etc.data.sky_background
+   :parser: myst
    :allowtitles:
 
 Submodules

@@ -4,6 +4,7 @@
 .. py:module:: castor_etc.filepaths
 
 .. autodoc2-docstring:: castor_etc.filepaths
+   :parser: myst
    :allowtitles:
 
 Module Contents
@@ -18,9 +19,11 @@ Data
 
    * - :py:obj:`__BASEPATH <castor_etc.filepaths.__BASEPATH>`
      - .. autodoc2-docstring:: castor_etc.filepaths.__BASEPATH
+          :parser: myst
           :summary:
    * - :py:obj:`DATAPATH <castor_etc.filepaths.DATAPATH>`
      - .. autodoc2-docstring:: castor_etc.filepaths.DATAPATH
+          :parser: myst
           :summary:
 
 API
@@ -31,9 +34,11 @@ API
    :value: 'dirname(...)'
 
    .. autodoc2-docstring:: castor_etc.filepaths.__BASEPATH
+      :parser: myst
 
 .. py:data:: DATAPATH
    :canonical: castor_etc.filepaths.DATAPATH
    :value: 'join(...)'
 
    .. autodoc2-docstring:: castor_etc.filepaths.DATAPATH
+      :parser: myst
