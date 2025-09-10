@@ -531,9 +531,8 @@ class Telescope:
                         _ = value.to(u.AA)
                     except Exception:
                         raise TypeError(f"`{d_name}` must be dict of {value_types_str}")
-            else:
-                if any(not isinstance(value, value_types) for value in d.values()):
-                    raise TypeError(f"`{d_name}` must be dict of {value_types_str}")
+            elif any(not isinstance(value, value_types) for value in d.values()):
+                raise TypeError(f"`{d_name}` must be dict of {value_types_str}")
             #
             for band in list(d):
                 if band not in passbands:
@@ -792,7 +791,7 @@ class Telescope:
             psf = self.psfs[passband]
         except KeyError as exc:
             raise KeyError(f"{passband} is not a valid passband") from exc
-        
+
         psf_px_scale = (self.px_scale / self.psf_supersample_factor).to(u.arcsec).value
         extent_y = 0.5 * psf_px_scale * psf.shape[0]
         extent_x = 0.5 * psf_px_scale * psf.shape[1]

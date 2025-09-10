@@ -95,9 +95,9 @@ class Background:
 
     def __init__(
         self,
-        earthshine_file=join(DATAPATH, "sky_background", "earthshine.fits"),
-        zodi_file=join(DATAPATH, "sky_background", "zodi.fits"),
-        mags_per_sq_arcsec=None,
+        earthshine_file: str | None = join(DATAPATH, "sky_background", "earthshine.fits"),
+        zodi_file: str | None = join(DATAPATH, "sky_background", "zodi.fits"),
+        mags_per_sq_arcsec : dict[float] | None = None,
     ):
         """
         Create a `Background` object that characterizes the sky background. Can contain

@@ -59,9 +59,6 @@
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
 """
-CASTOR Exposure Time Calculator (ETC)
-=====================================
-
 A modular, user-friendly Python package for easy estimation and analysis of CASTOR imaging
 performance. See the [`ETC_frontend`](https://github.com/CASTOR-telescope/ETC_frontend)
 GitHub repository for a graphical user interface to complement this package.
@@ -98,12 +95,12 @@ from . import (
     conversions,
     data,
     filepaths,
+    grism,
     parameters,
     photometry,
     sources,
     spectrum,
     telescope,
-    uvmos_spectroscopy,
     transit,
-    grism
+    uvmos_spectroscopy,
 )

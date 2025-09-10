@@ -69,50 +69,43 @@ Classes and methods for grism calculations.
 """
 
 import warnings
-
-import numpy as np
-
-import matplotlib.pyplot as plt
-
-import astropy.units as u
-
-from .conversions import calc_photon_energy, mag_to_flux, flam_to_photlam
-from scipy.interpolate import interp1d
-from astropy.modeling.models import Sersic2D
-
-
 from os.path import join
 
-from .filepaths import DATAPATH
-import numpy as np
-import matplotlib.pyplot as plt
 import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
 import spectres
 from astropy.io import ascii
+from astropy.modeling.models import Sersic2D
+from scipy.interpolate import interp1d
 
 from castor_etc.background import Background
 from castor_etc.sources import GalaxySource
 from castor_etc.telescope import Telescope
 
-class Grism(object):
+from .conversions import calc_photon_energy, flam_to_photlam, mag_to_flux
+from .filepaths import DATAPATH
+
+
+class Grism:
     """
     Grism class.
     """
-    
+
     def __init__(self,TelescopeObj, SourceObj, BackgroundObj):
         """
         Initialize class for Grism calculations.
         """
-        
+
         if not isinstance(TelescopeObj, Telescope):
             raise TypeError("TelescopeObj must be a `castor_etc.Telescope` Object")
-            
+
         if not isinstance(SourceObj, GalaxySource):
             raise TypeError("SourceObj must be a `castor_etc.GalaxySource`")
-            
+
         if not isinstance(BackgroundObj, Background):
             raise TypeError("BackgroundObj must be a `castor_etc.Background`")
-            
+
         # Assign attributes
         self.TelescopeObj = TelescopeObj
         self.SourceObj = SourceObj
@@ -127,10 +120,10 @@ class Grism(object):
         self.integrated_grism_box_count = None
         self.source_image = None
         self.source_seg = None
-        
+
         self.add_bkgrd_noise_count = 0 #add noise per reads e-/pix
         self.exposure_time = None
-        
+
         self.source_spectrum = [self.SourceObj.wavelengths.to(u.AA).value,self.SourceObj.spectrum]
 
     def _create_segmentation_map(self):
@@ -149,7 +142,7 @@ class Grism(object):
 
         if r_eff.to(u.arcsec).value > 1.:
             raise ValueError("Effective radius of Sersic galaxy source should be less than or equal to 1 arcsec to do grism spectroscopy.")
-        
+
         r_eff_pix = r_eff.to(u.arcsec).value / self.TelescopeObj.px_scale.value
         box_size = r_eff_pix * 4
 
@@ -158,7 +151,7 @@ class Grism(object):
         sersic_model = Sersic2D(amplitude=1, r_eff=r_eff_pix,
                                 n=n,x_0=box_size/2,y_0=box_size/2,ellip=e,
                                 theta=angle)
-        
+
         self.source_image = sersic_model(x,y)
 
         self.source_seg = self.source_image / np.max(self.source_image) > 1e-2
@@ -185,7 +178,7 @@ class Grism(object):
 
         """
         self.grism_channel = grism_channel
-        
+
         self._create_segmentation_map()
 
         if self.source_image is None:
@@ -298,7 +291,7 @@ class Grism(object):
         psf_profile_norm = psf_profile / norm
         #Smear spectrum using psf_profile in spatial direction
         spectrum_spatial = np.ones((len(psf_profile_norm),len(wavelength_array))) * flux_resamp * psf_profile_norm[:, None]
-        
+
         #Loop over the pixel and disperse them (scale and add all 2D irradiance spectrum arrays).
         for indice in indices:
 
@@ -342,7 +335,7 @@ class Grism(object):
             plt.xlabel('Pixels (Dispersion direction)')
             plt.ylabel('Pixels (Spatial direction)')
             plt.show()
-            
+
     def expose(self, exposure_time=1000):
         """
         Function to simulate a noiseless grism observation for a given integration time.
@@ -350,7 +343,7 @@ class Grism(object):
         exposure_time
             Exposure time in seconds.
 
-        """ 
+        """
 
         #self.grism_box is in e-/s
         #self.integrated_grism_box_count is then in units of e-
@@ -360,7 +353,7 @@ class Grism(object):
         #NEW METHOD GIVES 'self.grism_box * exposure_time' IN e- (INSTEAD OF ergs/cm2/A BEFORE).
         #NO LONGER NEEDED TO USE THE INVERSE SENSITIVITY FUNCTION.
         #integrated_grism_box_count is in electrons
-    
+
     def _calc_sky_background_erate(self):
         """
         Noise associated with the sky background. This calculation is copy and pasted from calc_snr_or_t function in the photometry class.
@@ -465,7 +458,7 @@ class Grism(object):
                     # (Now don't break out of loop: check other bands in case geocoronal
                     # emission line is in multiple bands)
         self.sky_background_noise = sky_background_erate
-    
+
     def _calculate_tot_unif_noise(self, Nreads=1, Nbin=1):
         """
          
@@ -474,10 +467,10 @@ class Grism(object):
         add_bkgrd_noise: additionnal noise, eg, HST: the background added using the post-flash option in e− pixel-1
         total_unif_noise is per pixel
         """
-        self._calc_sky_background_erate() #Calculates e/sec/pix associated with the sky background 
-        
+        self._calc_sky_background_erate() #Calculates e/sec/pix associated with the sky background
+
         self.total_unif_noise = self.sky_background_noise[self.grism_channel] * self.exposure_time + self.TelescopeObj.dark_current * self.exposure_time + self.TelescopeObj.read_noise**2 * Nreads / Nbin + self.add_bkgrd_noise_count * Nreads
-        
+
     def total_noise(self, Nreads=1, Nbin=1):
         """
         Function to generate the total noise of a grism observation for a given integration time.
@@ -487,7 +480,7 @@ class Grism(object):
         Nbin: the number of detector pixels binned to one read-out pixel when on-chip binning is used (int).
 
         """
-        
+
         self.grism_noise_total = np.zeros_like(self.grism_box)
 
         #compute the uniform background
@@ -496,7 +489,7 @@ class Grism(object):
         #compute total background
         self.grism_noise_total = np.sqrt( self.integrated_grism_box_count + self.total_unif_noise
                                             )
-        
+
     def show_2d_snr_per_resolution(self):
         """
         
@@ -522,9 +515,9 @@ class Grism(object):
 
         plt.figure()
 
-        sum_signal_1d = np.sum(self.integrated_grism_box_count[box_center-half_source_size:box_center+half_source_size+1,:], 
+        sum_signal_1d = np.sum(self.integrated_grism_box_count[box_center-half_source_size:box_center+half_source_size+1,:],
                             axis=0)
-        quad_error_1d = np.sqrt(np.sum(self.grism_noise_total[box_center-half_source_size:box_center+half_source_size+1,:]**2, 
+        quad_error_1d = np.sqrt(np.sum(self.grism_noise_total[box_center-half_source_size:box_center+half_source_size+1,:]**2,
                                     axis=0))
         snr_1d = sum_signal_1d / quad_error_1d
 
