@@ -19,8 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        python-version: ['3.9']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
       - name: Check out repository
@@ -36,13 +36,15 @@ jobs:
         
       - name: Run static code analysis with Hatch and Ruff 
         run: hatch fmt --check
-        continue-on-error: true
-      - name: Upload Ruff annotations
-        if: failure()
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: .ruff.sarif
-    
+      
+      - uses: astral-sh/ruff-action@v3
 
       - name: Run tests and track code coverage
-        run: hatch test --cov --retries 2
+        run: hatch test --cov
+
+      - name: Save coverage report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: .coverage/
