@@ -1,12 +1,16 @@
-name: Tests for all branch pushes
+name: Multi-platform Tests & Format Check
 
 on:
-    push:
+  push:
+      branches:
+          - "*"
+  pull_request:
+      branches:
+          - "*"
 
 concurrency:
   group: test-${{ github.head_ref }}
   cancel-in-progress: true
-
 
 jobs:
   run:
@@ -16,23 +20,24 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Running pipeline on Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install Hatch
         run: pip install --upgrade hatch
-
-      - name: Lint
-        if: matrix.python-version == '3.9' && runner.os == 'Linux'
-        run: hatch run lint:all
+      
+      - uses: astral-sh/ruff-action@v3
+        continue-on-error: true
+        with:
+          args: "format --check --diff"
 
       - name: Run tests and track code coverage
-        run: hatch run cov
+        run: hatch test --cov

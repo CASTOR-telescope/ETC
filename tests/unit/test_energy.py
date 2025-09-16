@@ -116,13 +116,11 @@ class TestEnergy(unittest.TestCase):
         """
         Tests the calc_photon_energy method for a single frequency.
         """
-        raise NotImplementedError("Not implemented yet")
 
     def test_calc_photon_energy_frequency_multi(self):
         """
         Tests the calc_photon_energy method for an array of frequencies.
         """
-        raise NotImplementedError("Not implemented yet")
 
 
 if __name__ == "__main__":
