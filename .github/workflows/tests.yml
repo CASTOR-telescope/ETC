@@ -33,9 +33,6 @@ jobs:
 
       - name: Install Hatch
         run: pip install --upgrade hatch
-        
-      - name: Run static code analysis with Hatch and Ruff 
-        run: hatch fmt --check
       
       - uses: astral-sh/ruff-action@v3
 
@@ -44,7 +41,7 @@ jobs:
 
       - name: Save coverage report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}
           path: .coverage/
