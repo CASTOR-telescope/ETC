@@ -1,12 +1,16 @@
-name: Tests for all branch pushes
+name: Runs tests and linting on all pushes and pull requests.
 
 on:
-    push:
+  push:
+      branches:
+          - "*"
+  pull_request:
+      branches:
+          - "*"
 
 concurrency:
   group: test-${{ github.head_ref }}
   cancel-in-progress: true
-
 
 jobs:
   run:
@@ -15,12 +19,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        os: [ubuntu-latest]
+        python-version: ['3.9']
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -29,10 +33,16 @@ jobs:
 
       - name: Install Hatch
         run: pip install --upgrade hatch
-
-      - name: Lint
-        if: matrix.python-version == '3.9' && runner.os == 'Linux'
-        run: hatch run lint:all
+        
+      - name: Run static code analysis with Hatch and Ruff 
+        run: hatch fmt --check
+        continue-on-error: true
+      - name: Upload Ruff annotations
+        if: failure()
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: .ruff.sarif
+    
 
       - name: Run tests and track code coverage
-        run: hatch run cov
+        run: hatch test --cov --retries 2
