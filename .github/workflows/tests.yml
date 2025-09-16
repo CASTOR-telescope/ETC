@@ -1,4 +1,4 @@
-name: Runs tests and linting on all pushes and pull requests.
+name: Multi-platform Tests & Format Check
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Running pipeline on Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -40,11 +40,4 @@ jobs:
           args: "format --check --diff"
 
       - name: Run tests and track code coverage
-        continue-on-error: true
         run: hatch test --cov
-
-      - name: Save coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: ${GITHUB_WORKSPACE}/.coverage
