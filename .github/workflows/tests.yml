@@ -35,13 +35,14 @@ jobs:
         run: pip install --upgrade hatch
       
       - uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check --diff"
 
       - name: Run tests and track code coverage
         run: hatch test --cov
 
       - name: Save coverage report
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: .coverage/
+          path: ${GITHUB_WORKSPACE}/.coverage
