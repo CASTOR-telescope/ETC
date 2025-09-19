@@ -15,6 +15,7 @@ Welcome to the CASTOR exposure time calculator documentation! Here you will find
    
    getting-started/quickstart.rst
    getting-started/installation.rst
+   getting-started/getting_started_photometry.ipynb
    
 .. toctree::
    :maxdepth: 2

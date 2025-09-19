@@ -25,7 +25,7 @@ Classes
 API
 ~~~
 
-.. py:class:: Background(earthshine_file=join(DATAPATH, 'sky_background', 'earthshine.fits'), zodi_file=join(DATAPATH, 'sky_background', 'zodi.fits'), mags_per_sq_arcsec=None)
+.. py:class:: Background(earthshine_file: str | None = join(DATAPATH, 'sky_background', 'earthshine.fits'), zodi_file: str | None = join(DATAPATH, 'sky_background', 'zodi.fits'), mags_per_sq_arcsec: dict[float] | None = None)
    :canonical: castor_etc.background.Background
 
    .. autodoc2-docstring:: castor_etc.background.Background

@@ -26,6 +26,12 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx_rtd_theme'
               ]
 
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'myst-nb',
+    '.ipynb': 'myst-nb'
+}
+
 # -- Options for Autodoc2 output -------------------------------------------------
 # https://sphinx-autodoc2.readthedocs.io/en/stable/config.html
 ## TODO: redo this so that it analyzes each "submodule" on its own
