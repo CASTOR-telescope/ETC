@@ -52,15 +52,20 @@ dependencies = [
     "isort"
 ]
 
-[tool.hatch.envs.hatch-test]
+[tool.hatch.envs.test]
 dependencies = [
     "pytest",
-    "pytest-cov"
+    "pytest-cov",
+    "pytest-xdist",
 ]
-installer = "pip"
 
 [tool.hatch.envs.docs]
 python = ["3.11", "3.12"]
 dependencies = [
-    "sphinx"
+    "sphinx",
+    "-r docs/requirements.txt"
 ]
+
+[tool.hatch.envs.docs.scripts]
+build = "sphinx-build -b html docs/source docs/build"
+serve = "sphinx-build -b html docs/source docs/build --open-in-browser"
