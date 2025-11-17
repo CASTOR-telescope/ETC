@@ -83,9 +83,12 @@ class TestTelescope(unittest.TestCase):
     
     ## Method 1 : test with a simple polynomial f(x) = x**2 - 4
 
+    def test_initialization(self):
+        bg = Background()
 
+        ## Confirm that earthshine data exists
 
-
+        pass
 
 
 
