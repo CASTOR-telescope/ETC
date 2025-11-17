@@ -59,71 +59,37 @@
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
 """
-test_energy.py
+test_etc_photometry.py
 
-Unit tests for the energy module.
 
-OUTDATED AND NO LONGER RELEVANT TO CURRENT VERSION.
 """
 import unittest
 
 import astropy.units as u
 import numpy as np
 
-from castor_etc.conversions import calc_photon_energy
-
-_TOL = 1e-15  # floating-point tolerance
-
-
-class TestEnergy(unittest.TestCase):
+def test_secant_method(self):
     """
-    Test castor_etc.energy module.
+    Tests the root finding function using secant method
     """
+    from castor_etc.telescope import secant_method
+    pass
 
-    def test_calc_photon_energy_wavelength_single(self):
-        """
-        Tests the calc_photon_energy method for a single wavelength.
-        """
-        results = calc_photon_energy(wavelength=100 * u.nm, wavelength_err=10 * u.nm)
-        #
-        true_energy = (100 * u.nm).to(u.erg, equivalencies=u.spectral()).value
-        true_uncer = (10 / 100) * true_energy
-        truths = [true_energy, true_uncer]
-        #
-        for result, truth in zip(results, truths):
-            self.assertAlmostEqual(result, truth, delta=_TOL)
+class TestTelescope(unittest.TestCase):
+    """
+    Test the castor_etc.telescope module
+    """
+    pass
+    
+    ## Method 1 : test with a simple polynomial f(x) = x**2 - 4
 
-    def test_calc_photon_energy_wavelength_multi(self):
-        """
-        Tests the calc_photon_energy method for an array of wavelengths.
-        """
-        wavelengths = np.array([0.100, 2, 30]) * u.um
-        wavelength_errs = np.array([1, 0.2, 30]) * u.um
-        #
-        results = calc_photon_energy(
-            wavelength=wavelengths, wavelength_err=wavelength_errs
-        )
-        #
-        true_energy = wavelengths.to(u.erg, equivalencies=u.spectral()).value
-        true_uncer = (wavelength_errs / wavelengths).value * true_energy
-        truths = [true_energy, true_uncer]
-        #
-        for result_arr, truth_arr in zip(results, truths):
-            for result, truth in zip(result_arr, truth_arr):
-                self.assertAlmostEqual(result, truth, delta=_TOL)
+    def test_initialization(self):
+        bg = Background()
 
-    def test_calc_photon_energy_frequency_single(self):
-        """
-        Tests the calc_photon_energy method for a single frequency.
-        """
-        raise NotImplementedError("Not implemented yet")
+        ## Confirm that earthshine data exists
 
-    def test_calc_photon_energy_frequency_multi(self):
-        """
-        Tests the calc_photon_energy method for an array of frequencies.
-        """
-        raise NotImplementedError("Not implemented yet")
+        pass
 
 
-if __name__ == "__main__":
-    unittest.main()
+
+
