@@ -144,3 +144,7 @@ dmypy.json
 .artifacts
 .artifacts
 .ruff_cache
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
