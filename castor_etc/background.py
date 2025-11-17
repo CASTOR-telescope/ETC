@@ -93,6 +93,10 @@ class Background:
     Object to characterize the sky background.
     """
 
+    ## TODO: for future, this class could be refactored to have a base Background class that is initiated by a factory class
+    ## The factory class has methods to create different types of Background objects
+
+    ## The Background class should really be defined a class of wavelength-dependent flux
     def __init__(
         self,
         earthshine_file: str | None = join(DATAPATH, "sky_background", "earthshine.fits"),

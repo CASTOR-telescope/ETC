@@ -12,7 +12,6 @@ concurrency:
   group: test-${{ github.head_ref }}
   cancel-in-progress: true
 
-
 jobs:
   run:
     name: Python ${{ matrix.python-version }} on ${{ matrix.os == 'macos-latest' && 'macOS' || matrix.os == 'windows-latest' && 'Windows' || 'Linux' }}
