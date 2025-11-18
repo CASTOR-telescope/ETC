@@ -61,8 +61,11 @@
 """
 test_photometry.py
 
+This module contains an integrated test suite to test different photometry calculations.
 
+This is modified from the getting started Jupyter notebook to ensure that the examples there work as expected.
 """
+
 import unittest
 
 import astropy.units as u
@@ -85,7 +88,6 @@ class PhotometryTestCase(unittest.TestCase):
         # Default background with one emission line
         self.bg = Background()
         self.bg.add_geocoronal_emission(flux="high") # add a high flux default emission
-
 
     def test_point_source_photometry(self):
         """
@@ -131,10 +133,5 @@ class PhotometryTestCase(unittest.TestCase):
         self.assertAlmostEqual(snr['u'], np.float64(10), delta=_TOL)
         self.assertAlmostEqual(snr['g'], np.float64(10), delta=_TOL)
 
-
-        
-
-
-
-
-
+if __name__ == '__main__':
+    unittest.main()

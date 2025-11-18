@@ -12,10 +12,6 @@ Due to the typically long development cycles of space telescope projects, this t
 To get started, you can visit our [Read the Docs](https://forecastor-etc.readthedocs.io/en/latest/) and view the
 [example notebooks](https://github.com/CASTOR-telescope/ETC_notebooks). Please also note the [acknowledgements](#acknowledgements) prior to using `castor_etc` in your work.
 
-### Features
-- This list is a TODO!
-
-
 ## Installation
 
 To get started quickly, run the following command:

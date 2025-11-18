@@ -1,7 +1,12 @@
 CANFAR Science Portal
 =====================
 
+What is CANFAR?
+----------------
+`Canadian Advanced Network for Astronomical Research (CANFAR) <https://www.canfar.net/en/>`_ is a platform for Canadian researchers in astronomy and operated by the Canadian Astronomy Data Centre (CADC) and the Digital Research Alliance of Canada (DRAC).
 
+
+It is highly recommended for any CASTOR developer affiliated with Canadian astronomy to utilize CANFAR for developing and testing of CASTOR ETC.
 
 Launching on CANFAR
 -------------------

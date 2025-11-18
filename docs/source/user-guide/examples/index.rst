@@ -12,4 +12,4 @@ Examples
     :maxdepth: 1
     :glob:
 
-    notebooks/*
+    ./getting_started_photometry.ipynb
