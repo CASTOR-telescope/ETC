@@ -76,17 +76,15 @@ class TestBackground(unittest.TestCase):
     Unit tests for background class
     """
 
+    @unittest.skip("Skipping until tests are implemented")
     def test_initialization(self):
-        bg = Background()
+        pass
 
-        ## Confirm that earthshine data exists
-
-        ass
-
-
+    @unittest.skip("Skipping until tests are implemented")
     def test_add_geocoronal_emission(self):
         pass
 
+    @unittest.skip("Skipping until tests are implemented")
     def test_calc_mags_per_sq_arcsec(self):
         pass
 

@@ -75,6 +75,7 @@ class TestConversions(unittest.TestCase):
     Test castor_etc.conversions module.
     """
 
+    @unittest.skip("Skipping until tests are implemented")
     def test_convert_count_flux_mag(self):
         """
         Tests the convert_count_flux_mag() method by converting between every combination

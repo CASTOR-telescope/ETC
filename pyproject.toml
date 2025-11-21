@@ -33,6 +33,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/CASTOR-telescope/ETC"
 
+[tool.pytest.ini_options]
+addopts = "--maxfail=1 --cov=castor_etc --cov-report term-missing"
+
 [tool.hatch.version]
 source = "vcs"
 
@@ -52,19 +55,6 @@ dependencies = [
     "isort"
 ]
 
-[tool.hatch.envs.test]
-dependencies = [
-    "pytest",
-    "pytest-cov",
-    "pytest-xdist",
-]
-
-[tool.hatch.envs.test.scripts]
-run = "pytest {env:HATCH_TEST_ARGS:} {args}"
-run-cov = "coverage run -m pytest{env:HATCH_TEST_ARGS:} {args}"
-cov-combine = "coverage combine"
-cov-report = "coverage report"
-
 [tool.hatch.envs.docs]
 python = ["3.11", "3.12"]
 dependencies = [
@@ -75,3 +65,9 @@ dependencies = [
 [tool.hatch.envs.docs.scripts]
 build = "sphinx-build -b html docs/source docs/build"
 serve = "sphinx-build -b html docs/source docs/build --open-in-browser"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+]

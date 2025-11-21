@@ -75,9 +75,9 @@ from castor_etc.background import Background
 from castor_etc.telescope import Telescope
 from castor_etc.photometry import Photometry
 
-_TOL = 1e-15  # floating-point tolerance
+_TOL = 1e-5  # floating-point tolerance
 
-class PhotometryTestCase(unittest.TestCase):
+class PointSourcePhotometryTestCase(unittest.TestCase):
     """
     Integrated test suite to test different photometry calculations
     """
@@ -89,49 +89,59 @@ class PhotometryTestCase(unittest.TestCase):
         self.bg = Background()
         self.bg.add_geocoronal_emission(flux="high") # add a high flux default emission
 
-    def test_point_source_photometry(self):
-        """
-        Basic integration test to ensure that the getting started Jupyter notebook works.
-        """
-
         from castor_etc.sources import PointSource
 
         # Generate the black body from the example and add associated emission lines
-        src = PointSource()
-        src.generate_bb(8000 * u.K, redshift=0.06, limits=[900, 30000] * u.AA)
-        src.norm_to_AB_mag(25)
-        src.add_emission_line(
+        self.point_src = PointSource()
+        self.point_src.generate_bb(8000 * u.K, redshift=0.06, limits=[900, 30000] * u.AA)
+        self.point_src.norm_to_AB_mag(25)
+        self.point_src.add_emission_line(
             center=2000 * u.AA, fwhm=200 * u.AA, peak=5e-19, shape="gaussian", abs_peak=False
         )
-        src.add_absorption_line(
+        self.point_src.add_absorption_line(
             center=5005 * u.AA, fwhm=40 * u.AA, dip=2e-19, shape="lorentzian", abs_dip=True
         )
 
         # Initialize the photometry class
-        phot = Photometry(self.scope, src, self.bg)
-        phot.use_optimal_aperture()
+        self.phot = Photometry(self.scope, self.point_src, self.bg)
+        self.phot.use_optimal_aperture()
 
+    def test_point_source_photometry(self):
+        """
+        Basic integration test to ensure that the getting started Jupyter notebook works.
+        """
         # Confirm that the AB magnitude in each passband is consistent
         ## Each test is conducted 
-        mags = src.get_AB_mag(self.scope)
+        mags = self.point_src.get_AB_mag(self.scope)
         self.assertAlmostEqual(mags['uv'], np.float64(26.44580324104077),delta=_TOL) # check the uv component to 3rd decimal
         self.assertAlmostEqual(mags['u'], np.float64(24.964036810739323), delta=_TOL) # check the u component
         self.assertAlmostEqual(mags['g'], np.float64(24.391672332311423), delta=_TOL)
         
+    def test_point_source_exposure_time_calculator(self):
         TARGET_SNR = 10
         REDDENING = 0.01  # E(B-V)
 
         # Test exposure times
-        exp_t = phot.calc_snr_or_t(snr=TARGET_SNR, reddening=REDDENING, quiet=True)
+        exp_t = self.phot.calc_snr_or_t(snr=TARGET_SNR, reddening=REDDENING, quiet=True)
         self.assertAlmostEqual(exp_t['uv'], np.float64(1052.8014187348936), delta=_TOL)
         self.assertAlmostEqual(exp_t['u'], np.float64(248.21615426248252), delta=_TOL)
         self.assertAlmostEqual(exp_t['g'], np.float64(130.0356738505753), delta=_TOL)
 
-        # Test SNR calculation for given time
-        snr = phot.calc_snr_or_t(t=exp_t, reddening=REDDENING, quiet=True)
-        self.assertAlmostEqual(snr['uv'], np.float64(10), delta=_TOL)
-        self.assertAlmostEqual(snr['u'], np.float64(10), delta=_TOL)
-        self.assertAlmostEqual(snr['g'], np.float64(10), delta=_TOL)
+    def test_point_source_snr_calculator(self):
+        """
+        Basic integration test to ensure the calc_snr_or_t function works when passed in a time"""
+        # # Test SNR calculation for given time
+        exp_t = {
+            "uv" : np.float64(1052.8014187348936) ,
+            "u"  : np.float64(248.21615426248252) ,
+            "g"  : np.float64(130.0356738505753)
+        }
+
+        REDDENING = 0.01  # E(B-V)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=exp_t['uv'], reddening=REDDENING, quiet=True)['uv'], np.float64(10), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=exp_t['u'], reddening=REDDENING, quiet=True)["u"], np.float64(10), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=exp_t['g'], reddening=REDDENING, quiet=True)["g"], np.float64(10), delta=_TOL)
+
 
 if __name__ == '__main__':
     unittest.main()

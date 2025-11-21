@@ -59,20 +59,82 @@
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
 """
-test_etc_photometry.py
+test_photometry.py
 
+This module contains an integrated test suite to test different photometry calculations.
 
+This is modified from the getting started Jupyter notebook to ensure that the examples there work as expected.
 """
+
 import unittest
 
 import astropy.units as u
 import numpy as np
 
-from castor_etc.sources import PointSource
+from castor_etc.background import Background
+from castor_etc.telescope import Telescope
+from castor_etc.photometry import Photometry
 
-class PointSourceTestCase(unittest.TestCase):
+_TOL = 1e-5  # floating-point tolerance
+
+class ExtendedSourcePhotometryTestCase(unittest.TestCase):
     """
-    Unit tests to test the castor_etc.sources module
+    Integrated test suite to test different photometry calculations
     """
     def setUp(self):
-        self.src = PointSource()
+        # Default Telescope parameters
+        self.scope = Telescope(dark_current=0.01)
+
+        # Default background with one emission line
+        self.bg = Background(mags_per_sq_arcsec={"uv": 26.08, "u": 23.74, "g": 22.60})
+        from castor_etc.sources import ExtendedSource
+
+
+        self.src = ExtendedSource(
+            angle_a=3 * u.arcsec,  # semimajor axis
+            angle_b=1 * u.arcsec,  # semiminor axis
+            rotation=45,  # CCW angle relative to x-axis
+            profile="uniform",  # "uniform" or "exponential" or a function
+        )
+
+        self.src.generate_emission_line(
+            center=5007 * u.AA,
+            fwhm=10 * u.AA,
+            peak=7e-21,  # will be renormalized
+            shape="lorentzian",
+        )
+        self.src.norm_to_AB_mag(24, "g", TelescopeObj=self.scope)
+
+        self.phot = Photometry(self.scope, self.src, self.bg)
+        self.phot.use_rectangular_aperture(
+            width=4.5 * u.arcsec, length=3 * u.arcsec, center=[0.5, -1] * u.arcsec
+        )
+  
+    def test_extended_source_exposure_time_calculator(self):
+        TARGET_SNR = 10
+        REDDENING = 0
+
+        # Test exposure times
+        exp_t = self.phot.calc_snr_or_t(snr=TARGET_SNR, reddening=REDDENING, quiet=True)
+        self.assertAlmostEqual(exp_t['uv'], np.float64(1838787157.018459), delta=_TOL)
+        self.assertAlmostEqual(exp_t['u'], np.float64(4377393648824651.5), delta=_TOL)
+        self.assertAlmostEqual(exp_t['g'], np.float64(8039.467736646107), delta=_TOL)
+
+    def test_extended_source_snr_calculator(self):
+        """
+        Basic integration test to ensure the calc_snr_or_t function works when passed in a time"""
+        # # Test SNR calculation for given time
+        exp_t = {
+            "uv" : np.float64(1838787157.018459) ,
+            "u"  : np.float64(4377393648824651.5) ,
+            "g"  : np.float64(8039.467736646107)
+        }
+
+        REDDENING = 0  # E(B-V)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=exp_t['uv'], reddening=REDDENING, quiet=True)['uv'], np.float64(10), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=exp_t['u'], reddening=REDDENING, quiet=True)["u"], np.float64(10), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=exp_t['g'], reddening=REDDENING, quiet=True)["g"], np.float64(10), delta=_TOL)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -59,37 +59,89 @@
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
 """
-test_etc_photometry.py
+test_photometry.py
 
+This module contains an integrated test suite to test different photometry calculations.
 
+This is modified from the getting started Jupyter notebook to ensure that the examples there work as expected.
 """
+
 import unittest
 
 import astropy.units as u
 import numpy as np
 
-def test_secant_method(self):
+from castor_etc.background import Background
+from castor_etc.telescope import Telescope
+from castor_etc.photometry import Photometry
+
+_TOL = 1e-2
+
+class GalaxySourcePhotometryTestCase(unittest.TestCase):
     """
-    Tests the root finding function using secant method
+    Integrated test suite to test different photometry calculations
     """
-    from castor_etc.telescope import secant_method
-    pass
+    def setUp(self):
+        # Default Telescope parameters
+        self.scope = Telescope()
 
-class TestTelescope(unittest.TestCase):
-    """
-    Test the castor_etc.telescope module
-    """
-    pass
-    
-    ## Method 1 : test with a simple polynomial f(x) = x**2 - 4
-
-    def test_initialization(self):
-        bg = Background()
-
-        ## Confirm that earthshine data exists
-
-        pass
+        # Default background with one emission line
+        self.bg = Background()  # default Earthshine and zodiacal light
+        self.bg.add_geocoronal_emission(
+                flux=1e-15, wavelength=2345 * u.AA, linewidth=0.023 * u.AA)
+              
+        from castor_etc.sources import GalaxySource
 
 
+        self.src = GalaxySource(
+            r_eff=3 * u.arcsec,  # effective radius, sqrt(a * b)
+            n=4,  # Sersic index
+            axial_ratio=0.9,  # ratio of semiminor axis (b) to semimajor axis (a)
+            rotation=135,  # CCW rotation from x-axis
+        )
+        self.src.use_galaxy_spectrum(gal_type="spiral")
+        self.src.norm_luminosity_dist(luminosity=1.4e8, dist=450 * u.Mpc)  # Luminosity in solar luminosities
+        self.src.redshift_wavelengths(0.1)
+
+        self.phot = Photometry(self.scope, self.src, self.bg)
+        self.phot.use_elliptical_aperture(
+            a=6 * u.arcsec, b=4 * u.arcsec, center=[0, 0] * u.arcsec, rotation=31.41592654
+        )
+
+    def test_absolute_magnitude_calculation(self):
+        # NOTE: This may make more sense in a test for the GalaxySource class, will move later
+        abs_mag = self.src.get_AB_mag(self.scope)
+        self.assertAlmostEqual(abs_mag['uv'], np.float64(25.69136659200104), delta=_TOL)
+        self.assertAlmostEqual(abs_mag['u'], np.float64(25.06673659547406), delta=_TOL)
+        self.assertAlmostEqual(abs_mag['g'], np.float64(23.609216549534842), delta=_TOL)
+
+        self.assertAlmostEqual(self.src.get_AB_mag(), np.float64(23.39051359135356), delta=_TOL )
+
+    def test_expectected_spectrum_plot(self):
+        self.src.show_spectrum(plot=False)
+        pass  # Just ensure no exceptions are raised
+
+    def test_galaxy_source_snr_calculator(self):
+        INTEGRATION_TIME = 4321  # seconds
+        REDDENING = 0.01
+
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)['uv'], np.float64(1.9289396333476412), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)["u"], np.float64(2.311967051585148), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)["g"], np.float64(4.912896778606595), delta=_TOL)
 
 
+    def test_galaxy_source_exposure_time_calculator(self):
+        TARGET_SNR = {
+            'uv': 1.9289396333476412,
+            'u': 2.311967051585148,
+            'g': 4.912896778606595,
+        }
+        REDDENING = 0.01
+
+        # Test exposure times
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(snr=TARGET_SNR["uv"], reddening=REDDENING, quiet=True)['uv'], np.float64(4321), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(snr=TARGET_SNR["u"], reddening=REDDENING, quiet=True)['u'], np.float64(4321), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(snr=TARGET_SNR["g"], reddening=REDDENING, quiet=True)['g'], np.float64(4321), delta=_TOL)
+
+if __name__ == '__main__':
+    unittest.main()

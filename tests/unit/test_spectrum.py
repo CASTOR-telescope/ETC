@@ -68,26 +68,28 @@ import unittest
 import astropy.units as u
 import numpy as np
 
-def test_secant_method(self):
+class TestSecantMethod(unittest.TestCase):
     """
-    Tests the root finding function using secant method
+    Test the secant method for root finding.
     """
-    from castor_etc.telescope import secant_method
-    pass
+    
+    @unittest.skip("Skipping until tests are implemented")
+    def test_secant_method(self):
+        """
+        Tests the root finding function using secant method
+        """
+        from castor_etc.telescope import secant_method
+        pass
 
 class TestTelescope(unittest.TestCase):
     """
     Test the castor_etc.telescope module
     """
-    pass
     
     ## Method 1 : test with a simple polynomial f(x) = x**2 - 4
 
+    @unittest.skip("Skipping until tests are implemented")
     def test_initialization(self):
-        bg = Background()
-
-        ## Confirm that earthshine data exists
-
         pass
 
 

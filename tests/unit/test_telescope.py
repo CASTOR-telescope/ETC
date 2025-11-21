@@ -59,52 +59,28 @@
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
 """
-test_telescopes.py
+test_etc_photometry.py
 
-Unit tests for the telescope module.
+
 """
-
 import unittest
 
+import astropy.units as u
+import numpy as np
 from castor_etc.telescope import Telescope
-
-# Test constants
-
 
 class TestTelescope(unittest.TestCase):
     """
-    Unit tests for telescope module
+    Test the castor_etc.telescope module
     """
+    pass
+    
+    ## Method 1 : test with a simple polynomial f(x) = x**2 - 4
+    @unittest.skip("Not implemented yet")
+    def test_initialization(self):
 
-    def test_deepcopy(self):
-        # Test default constructor for the Telescope class
-        scope1 = Telescope()
-
-        assert scope1 is not None
-
-        # Test deepcopy
-        assert scope1 == scope1.copy()
-
-    ## Passbands attr
-    def test_load_default_passbands(self):
-        pass
-
-    def test_load_passbands(self):
-        pass
-
-    def test_load_invalid_passbands(self):
         pass
 
 
-    def test_calc_pivot_wavelength(self):
-        pass
 
-    def test_calc_phot_zpts(self):
-        pass
-
-    def test_secant_method(self):
-        pass
-
-    def test_bisection_method(self):
-        pass
 

@@ -79,7 +79,7 @@ class TestEnergy(unittest.TestCase):
     """
     Test castor_etc.energy module.
     """
-
+    
     def test_calc_photon_energy_wavelength_single(self):
         """
         Tests the calc_photon_energy method for a single wavelength.
@@ -112,11 +112,12 @@ class TestEnergy(unittest.TestCase):
             for result, truth in zip(result_arr, truth_arr):
                 self.assertAlmostEqual(result, truth, delta=_TOL)
 
+    @unittest.skip("Skipping until tests are implemented")
     def test_calc_photon_energy_frequency_single(self):
         """
         Tests the calc_photon_energy method for a single frequency.
         """
-
+    @unittest.skip("Skipping until tests are implemented")
     def test_calc_photon_energy_frequency_multi(self):
         """
         Tests the calc_photon_energy method for an array of frequencies.

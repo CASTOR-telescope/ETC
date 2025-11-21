@@ -59,35 +59,20 @@
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
 """
-test_telescopes.py
+test_etc_photometry.py
 
-Unit tests for the telescope module.
+
 """
-
 import unittest
 
-from castor_etc.sources import *
+import astropy.units as u
+import numpy as np
 
-# Test constants
+from castor_etc.sources import PointSource
 
-
-class TestProfiles(unittest.TestCase):
+class PointSourceTestCase(unittest.TestCase):
     """
-    Unit tests for the Profile class
+    Unit tests to test the castor_etc.sources module
     """
-
-    def test_uniform_profile(self):
-        pass
-
-    def test_ellipse_profile(self):
-        pass
-
-    def test_sersic_profile(self):
-        pass
-
-class TestPointSource(unittest.TestCase):
-    """
-    Unit tests for Source class
-    """
-    def test_initialization(self):
-        pass
+    def setUp(self):
+        self.src = PointSource()
