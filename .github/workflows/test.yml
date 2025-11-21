@@ -23,15 +23,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -49,7 +49,7 @@ jobs:
 
       - name: Upload Ruff lint report
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ruff-lint-report
           path: ruff-lint-report.txt
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload coverage HTML report
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-html-report
           path: htmlcov/
