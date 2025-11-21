@@ -90,6 +90,7 @@ dependencies = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
+    "ruff",
 ]
 
 [tool.hatch.envs.test.scripts]

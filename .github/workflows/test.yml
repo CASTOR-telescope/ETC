@@ -43,10 +43,17 @@ jobs:
       - name: Run linting
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
         run: |
-          uv pip install --system black ruff mypy
-          uv run ruff check .
-          uv run black --check --diff .
+          uv run ruff check . --fix
+          uv run ruff check . --output-format=text > ruff-lint-report.txt
         continue-on-error: true
+
+      - name: Upload Ruff lint report
+        if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-lint-report
+          path: ruff-lint-report.txt
+          retention-days: 30
 
       - name: Run tests with coverage
         run: uv run pytest --cov=castor_etc --cov-report=html --cov-report=xml --cov-report=term-missing tests/

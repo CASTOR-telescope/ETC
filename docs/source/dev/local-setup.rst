@@ -89,8 +89,8 @@ Using venv
 1. Navigate to the root directory of the cloned FORECASTOR ETC repository.
 2. Create a virtual environment by running:
 .. code-block:: bash
-
     python -m venv castor-etc
+
 3. Activate the virtual environment:
 .. code-block:: bash
 
@@ -99,6 +99,7 @@ Using venv
 
     # On macOS/Linux
     source castor-etc/bin/activate
+
 4. Install required dependencies by 
 .. code-block:: bash
 
