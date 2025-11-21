@@ -85,6 +85,6 @@ serve = "sphinx-build -b html docs/source docs/build --open-in-browser"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.2"
+    "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
 ]
