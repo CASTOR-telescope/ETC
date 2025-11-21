@@ -1,37 +1,41 @@
 GitHub Actions CI/CD
 ===================
 
-The project uses GitHub Actions for continuous integration and deployment.
+The project uses GitHub Actions for continuous integration and deployment with `uv <https://docs.astral.sh/uv/>`_ for fast dependency management.
 
 Workflows
 ---------
 
 **Tests** (``test.yml``)
-  Runs on every push and pull request. Tests the package across Python 3.9-3.12 on Linux, Windows, and macOS. Generates coverage reports and posts them as PR comments.
-
-**Build Check** (``build.yml``)
-  Runs only on version tags. Verifies the package builds correctly before release.
+  Runs on every push and pull request. Tests the package across Python 3.10-3.12 on Linux, Windows, and macOS. Generates HTML coverage reports uploaded as artifacts.
 
 **Release** (``release.yml``)
-  Runs only on version tags. Builds multi-platform wheels, creates GitHub releases, and optionally publishes to PyPI.
+  Runs only on beta, RC, and stable version tags. Runs tests, builds packages with Hatch, and creates GitHub releases.
 
 Creating Releases
 -----------------
 
-Create and push a version tag to trigger a release:
+Create and push a version tag to trigger workflows:
 
 .. code-block:: bash
 
-   # Alpha release (for testing builds)
-   git tag -a v1.0.0-alpha -m "Alpha 1" && git push origin v1.0.0-alpha1
+   # Alpha release (CI testing only, no GitHub release)
+   git tag -a v1.0.0-alpha1 -m "Alpha 1" && git push origin v1.0.0-alpha1
 
-   # Beta release (feature-complete testing)
+   # Beta release (external testing, creates pre-release on GitHub)
    git tag -a v1.0.0-beta1 -m "Beta 1" && git push origin v1.0.0-beta1
 
-   # Stable release
+   # Release candidate (final testing, creates pre-release on GitHub)
+   git tag -a v1.0.0-rc1 -m "RC 1" && git push origin v1.0.0-rc1
+
+   # Stable release (creates full release on GitHub)
    git tag -a v1.0.0 -m "Release 1.0.0" && git push origin v1.0.0
 
-Alpha and beta releases are automatically marked as pre-releases on GitHub.
+**Release Workflow:**
+
+- **Alpha** → Tests only, no GitHub release (internal CI validation)
+- **Beta/RC** → Tests, builds, creates pre-release on GitHub (external testing)
+- **Stable** → Tests, builds, creates full release on GitHub
 
 Dependencies
 ------------
