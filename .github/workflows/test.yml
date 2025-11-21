@@ -35,16 +35,21 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install Hatch
-        run: uv tool install hatch
+      - name: Install package and dependencies with uv
+        run: |
+          uv pip install --system -e ".[test]"
+          uv pip install --system pytest pytest-cov
 
       - name: Run linting
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
-        run: hatch run lint:all
+        run: |
+          uv pip install --system black ruff mypy
+          uv run ruff check .
+          uv run black --check --diff .
         continue-on-error: true
 
       - name: Run tests with coverage
-        run: hatch run test:cov
+        run: uv run pytest --cov=castor_etc --cov-report=xml --cov-report=term-missing tests/
 
       - name: Coverage comment
         id: coverage_comment
@@ -79,8 +84,10 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Install Hatch
-        run: uv tool install hatch
+      - name: Install package and dependencies with uv
+        run: |
+          uv pip install --system -e ".[test]"
+          uv pip install --system pytest pytest-cov
 
       - name: Run tests
-        run: hatch run test:test --verbose
+        run: uv run pytest --verbose tests/
