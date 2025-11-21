@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout code
@@ -49,45 +49,12 @@ jobs:
         continue-on-error: true
 
       - name: Run tests with coverage
-        run: uv run pytest --cov=castor_etc --cov-report=xml --cov-report=term-missing tests/
+        run: uv run pytest --cov=castor_etc --cov-report=html --cov-report=xml --cov-report=term-missing tests/
 
-      - name: Coverage comment
-        id: coverage_comment
+      - name: Upload coverage HTML report
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
-        uses: py-cov-action/python-coverage-comment-action@v3
-        with:
-          GITHUB_TOKEN: ${{ github.token }}
-          MINIMUM_GREEN: 80
-          MINIMUM_ORANGE: 60
-
-      - name: Store Pull Request comment to be posted
         uses: actions/upload-artifact@v4
-        if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux' && steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
         with:
-          name: python-coverage-comment-action
-          path: python-coverage-comment-action.txt
-
-  test-min-versions:
-    name: Test minimum Python version (3.9)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-
-      - name: Install package and dependencies with uv
-        run: |
-          uv pip install --system -e ".[test]"
-          uv pip install --system pytest pytest-cov
-
-      - name: Run tests
-        run: uv run pytest --verbose tests/
+          name: coverage-html-report
+          path: htmlcov/
+          retention-days: 30

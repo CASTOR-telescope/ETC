@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "CASTOR Exposure Time Calculator (ETC)"
 readme = "README.md"
 license = "GPL-3.0-only"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "FORECASTOR Team" },
 ]
@@ -53,6 +53,19 @@ docs = [
 [tool.pytest.ini_options]
 addopts = "--maxfail=1 --cov=castor_etc --cov-report term-missing"
 
+[tool.coverage.run]
+relative_files = true
+source = ["castor_etc"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
 [tool.hatch.version]
 source = "vcs"
 
@@ -71,6 +84,17 @@ packages = ["/castor_etc"]
 dependencies = [
     "isort"
 ]
+
+[tool.hatch.envs.test]
+dependencies = [
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+]
+
+[tool.hatch.envs.test.scripts]
+test = "pytest {args:tests}"
+cov = "pytest --cov=castor_etc --cov-report=xml --cov-report=term-missing {args:tests}"
 
 [tool.hatch.envs.docs]
 python = ["3.11", "3.12"]
