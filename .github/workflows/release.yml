@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-beta*"
+      - "v*.*.*-rc*"
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  STABLE_PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    name: Run tests before release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.STABLE_PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Hatch
+        run: pip install --upgrade hatch
+
+      - name: Run tests
+        run: hatch run test:cov
+
+      - name: Run linting
+        run: hatch run lint:all
+        continue-on-error: true
+
+  build-sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.STABLE_PYTHON_VERSION }}
+
+      - name: Install Hatch
+        run: uv tool install hatch
+
+      - name: Build package
+        run: hatch build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist/*
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-sdist
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts directory
+        run: |
+          mkdir -p release-artifacts
+          cp artifacts/dist-artifacts/* release-artifacts/
+          ls -lh release-artifacts/
+
+      - name: Extract release notes from tag
+        id: release_notes
+        run: |
+          # Get tag message if it exists
+          TAG_MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
+          if [ -n "$TAG_MESSAGE" ]; then
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-artifacts/*
+          body: ${{ steps.release_notes.outputs.notes }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+
+#   publish-pypi:
+#     name: Publish to PyPI
+#     runs-on: ubuntu-latest
+#     needs: create-release
+#     environment:
+#       name: pypi
+#       url: https://pypi.org/p/castor-etc
+#     steps:
+#       - name: Download source distribution
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: dist-artifacts
+#           path: dist
+
+#       - name: Publish to PyPI
+#         uses: pypa/gh-action-pypi-publish@release/v1
+#         with:
+#           verbose: true
+#           print-hash: true

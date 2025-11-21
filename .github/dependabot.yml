@@ -1,0 +1,40 @@
+version: 2
+updates:
+  # Enable version updates for Python dependencies using uv
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      # Group pytest-related updates together
+      pytest:
+        patterns:
+          - "pytest*"
+      # Group development dependencies
+      dev-dependencies:
+        patterns:
+          - "black"
+          - "ruff"
+          - "mypy"
+          - "sphinx*"
+    # Use uv for faster dependency resolution
+    versioning-strategy: increase
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      # Group all GitHub Actions updates together
+      github-actions:
+        patterns:
+          - "*"

@@ -1,0 +1,67 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: test-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  STABLE_PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }} on ${{ startsWith(matrix.os, 'macos-') && 'macOS' || startsWith(matrix.os, 'windows-') && 'Windows' || 'Linux' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and dependencies with uv
+        run: |
+          uv pip install --system -e ".[test]"
+          uv pip install --system pytest pytest-cov
+
+      - name: Run linting
+        if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
+        run: |
+          uv run ruff check . --fix
+          uv run ruff check . --output-format=text > ruff-lint-report.txt
+        continue-on-error: true
+
+      - name: Upload Ruff lint report
+        if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-lint-report
+          path: ruff-lint-report.txt
+          retention-days: 30
+
+      - name: Run tests with coverage
+        run: uv run pytest --cov=castor_etc --cov-report=html --cov-report=xml --cov-report=term-missing tests/
+
+      - name: Upload coverage HTML report
+        if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-report
+          path: htmlcov/
+          retention-days: 30

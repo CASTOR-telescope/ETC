@@ -59,71 +59,89 @@
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
 """
-test_energy.py
+test_photometry.py
 
-Unit tests for the energy module.
+This module contains an integrated test suite to test different photometry calculations.
 
-OUTDATED AND NO LONGER RELEVANT TO CURRENT VERSION.
+This is modified from the getting started Jupyter notebook to ensure that the examples there work as expected.
 """
+
 import unittest
 
 import astropy.units as u
 import numpy as np
 
-from castor_etc.conversions import calc_photon_energy
+from castor_etc.background import Background
+from castor_etc.telescope import Telescope
+from castor_etc.photometry import Photometry
 
-_TOL = 1e-15  # floating-point tolerance
+_TOL = 1e-2
 
-
-class TestEnergy(unittest.TestCase):
+class GalaxySourcePhotometryTestCase(unittest.TestCase):
     """
-    Test castor_etc.energy module.
+    Integrated test suite to test different photometry calculations
     """
+    def setUp(self):
+        # Default Telescope parameters
+        self.scope = Telescope()
 
-    def test_calc_photon_energy_wavelength_single(self):
-        """
-        Tests the calc_photon_energy method for a single wavelength.
-        """
-        results = calc_photon_energy(wavelength=100 * u.nm, wavelength_err=10 * u.nm)
-        #
-        true_energy = (100 * u.nm).to(u.erg, equivalencies=u.spectral()).value
-        true_uncer = (10 / 100) * true_energy
-        truths = [true_energy, true_uncer]
-        #
-        for result, truth in zip(results, truths):
-            self.assertAlmostEqual(result, truth, delta=_TOL)
+        # Default background with one emission line
+        self.bg = Background()  # default Earthshine and zodiacal light
+        self.bg.add_geocoronal_emission(
+                flux=1e-15, wavelength=2345 * u.AA, linewidth=0.023 * u.AA)
+              
+        from castor_etc.sources import GalaxySource
 
-    def test_calc_photon_energy_wavelength_multi(self):
-        """
-        Tests the calc_photon_energy method for an array of wavelengths.
-        """
-        wavelengths = np.array([0.100, 2, 30]) * u.um
-        wavelength_errs = np.array([1, 0.2, 30]) * u.um
-        #
-        results = calc_photon_energy(
-            wavelength=wavelengths, wavelength_err=wavelength_errs
+
+        self.src = GalaxySource(
+            r_eff=3 * u.arcsec,  # effective radius, sqrt(a * b)
+            n=4,  # Sersic index
+            axial_ratio=0.9,  # ratio of semiminor axis (b) to semimajor axis (a)
+            rotation=135,  # CCW rotation from x-axis
         )
-        #
-        true_energy = wavelengths.to(u.erg, equivalencies=u.spectral()).value
-        true_uncer = (wavelength_errs / wavelengths).value * true_energy
-        truths = [true_energy, true_uncer]
-        #
-        for result_arr, truth_arr in zip(results, truths):
-            for result, truth in zip(result_arr, truth_arr):
-                self.assertAlmostEqual(result, truth, delta=_TOL)
+        self.src.use_galaxy_spectrum(gal_type="spiral")
+        self.src.norm_luminosity_dist(luminosity=1.4e8, dist=450 * u.Mpc)  # Luminosity in solar luminosities
+        self.src.redshift_wavelengths(0.1)
 
-    def test_calc_photon_energy_frequency_single(self):
-        """
-        Tests the calc_photon_energy method for a single frequency.
-        """
-        raise NotImplementedError("Not implemented yet")
+        self.phot = Photometry(self.scope, self.src, self.bg)
+        self.phot.use_elliptical_aperture(
+            a=6 * u.arcsec, b=4 * u.arcsec, center=[0, 0] * u.arcsec, rotation=31.41592654
+        )
 
-    def test_calc_photon_energy_frequency_multi(self):
-        """
-        Tests the calc_photon_energy method for an array of frequencies.
-        """
-        raise NotImplementedError("Not implemented yet")
+    def test_absolute_magnitude_calculation(self):
+        # NOTE: This may make more sense in a test for the GalaxySource class, will move later
+        abs_mag = self.src.get_AB_mag(self.scope)
+        self.assertAlmostEqual(abs_mag['uv'], np.float64(25.69136659200104), delta=_TOL)
+        self.assertAlmostEqual(abs_mag['u'], np.float64(25.06673659547406), delta=_TOL)
+        self.assertAlmostEqual(abs_mag['g'], np.float64(23.609216549534842), delta=_TOL)
+
+        self.assertAlmostEqual(self.src.get_AB_mag(), np.float64(23.39051359135356), delta=_TOL )
+
+    def test_expectected_spectrum_plot(self):
+        self.src.show_spectrum(plot=False)
+        pass  # Just ensure no exceptions are raised
+
+    def test_galaxy_source_snr_calculator(self):
+        INTEGRATION_TIME = 4321  # seconds
+        REDDENING = 0.01
+
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)['uv'], np.float64(1.9289396333476412), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)["u"], np.float64(2.311967051585148), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)["g"], np.float64(4.912896778606595), delta=_TOL)
 
 
-if __name__ == "__main__":
+    def test_galaxy_source_exposure_time_calculator(self):
+        TARGET_SNR = {
+            'uv': 1.9289396333476412,
+            'u': 2.311967051585148,
+            'g': 4.912896778606595,
+        }
+        REDDENING = 0.01
+
+        # Test exposure times
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(snr=TARGET_SNR["uv"], reddening=REDDENING, quiet=True)['uv'], np.float64(4321), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(snr=TARGET_SNR["u"], reddening=REDDENING, quiet=True)['u'], np.float64(4321), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(snr=TARGET_SNR["g"], reddening=REDDENING, quiet=True)['g'], np.float64(4321), delta=_TOL)
+
+if __name__ == '__main__':
     unittest.main()
