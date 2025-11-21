@@ -2,13 +2,11 @@ name: Build Check
 
 on:
   push:
-    branches:
-      - master
-      - main
-  pull_request:
-    branches:
-      - master
-      - main
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-alpha*"
+      - "v*.*.*-beta*"
+      - "v*.*.*-rc*"
 
 concurrency:
   group: build-${{ github.head_ref || github.ref }}
