@@ -1,3 +1,72 @@
+#For more information on this function with examples go to this link 
+# -> 'https://github.com/parkus/fiducial_flare/tree/master'
+#This package was created by Parke Loyd 2017
+
+
+
+# MIT License
+# Copyright (c) 2017 Parke Loyd
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
+
+
+
+#Information on package:
+
+# fiducial_flare is a package for generating a reasonable approximation of the 
+# UV emission of M dwarf stars over a single flare or a series of them. The simulated 
+# radiation is resolved in both wavelength and time. The intent is to provide 
+# consistent input for applications requiring time-dependent stellar UV radiation 
+# fields that balances simplicity with realism, namely for simulations of exoplanet atmospheres.
+
+# For this balance of simplicity and realism, the flares generated are idealized in the 
+# spectral and temporal distribution of their energy through the following assumptions:
+
+# -The energy budget of the flares is constant. It was compiled by Loyd et al. 2018
+# and is given in "relative_energy_budget.ecsv".
+
+# -The NUV continuum is taken to be a 9,000 K blackbody with energy scaled against the 
+# Si IV doublet per the energy budgets of Hawley et al. 2003.
+
+# -Some strong but unobserved lines are assumed to show the same response 
+# (relative to quiescent levels) as a proxy line with good observations and a similar 
+# formation temperature. Specified with the notation "unobserved line -> proxy," these are
+# - Lya core -> O I 1305
+# - Lyb -> O I 1305
+# - Lyg -> O I 1305
+# - Mg II 2796, 2804 -> O I 1305
+# - Al II 1670 -> C II 1334,1335
+# - O VI 1031,1037 -> N V 1238,1242
+
+# - The temporal evolution of flux is taken to a be a boxcar followed by exponential decay, 
+# following the formula given in Loyd et al. 2018.
+
+# -Flare energies are distributed as a power-law based on the fit to M dwarf 
+# Si IV 1394,1403 flares of Loyd et al. 2018.
+# - The flare rate is constant.
+
+# - Flare events follow a Poisson distribution (implying an exponential distribution 
+# in flare waiting times, e.g. Wheatland 2000)
+
+
 
 
 from astropy import table, constants as const, units as u
