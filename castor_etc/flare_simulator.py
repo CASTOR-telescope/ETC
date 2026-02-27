@@ -1,7 +1,7 @@
 #For more information on this function with examples go to this link 
 # -> 'https://github.com/parkus/fiducial_flare/tree/master'
 #This package was created by Parke Loyd 2017
-
+# This package was added to CASTOR Github in Feb 2026
 
 
 # MIT License
