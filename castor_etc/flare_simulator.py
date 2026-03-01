@@ -1291,4 +1291,10 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     # Wavlength and flux can be directly inputted into CASTOR_UVMOS to use
     return wavelength, flux
 
+    # Removes warnings for FITS file
+    import warnings
+    from astropy.io import fits
+    from astropy.units import UnitsWarning
+    warnings.filterwarnings('ignore', category=UnitsWarning, append=True)
+
 #endregion
