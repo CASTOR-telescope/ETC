@@ -466,8 +466,6 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
         #
         # Initialize some potential future attributes
         #
-        self.spectrum = None
-        self.wavelengths = None
         if init_dimensions:
             self.a = None
             self.b = None

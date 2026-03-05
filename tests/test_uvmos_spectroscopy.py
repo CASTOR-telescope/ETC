@@ -58,67 +58,64 @@
 # FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
+
 """
-A modular, user-friendly Python package for easy estimation and analysis of CASTOR imaging
-performance. See the [`ETC_frontend`](https://github.com/CASTOR-telescope/ETC_frontend)
-GitHub repository for a graphical user interface to complement this package.
+test_uvmos_spectroscopy.py
 
-Includes:
-  1. Astronomical source generation and background noise estimation
-  2. Telescope imaging chain simulation, featuring a pixel-based photometry approach
-  3. Convenience functions for converting between useful quantities (e.g., flux to
-     electron/s to AB magnitude)
-
-Author: Isaac Cheng
-Contact: isaac.cheng.ca@gmail.com
+This module contains an integrated test suite to the UVMOS spectroscopy calculations.
 """
 
-__all__ = [
-    "background",
-    "constants",
-    "conversions",
-    "data",
-    "filepaths",
-    "parameters",
-    "photometry",
-    "sources",
-    "spectrum",
-    "telescope",
-    "uvmos_spectroscopy",
-    "transit",
-    "grism"
-]
+import unittest
 
-import logging
-import numpy as np
+import astropy.units as u
+import matplotlib.pyplot as plt
 
-class BaseClass(object):
-    # Inspiration from this blogpost: https://bbengfort.github.io/2016/01/logging-mixin/
+from castor_etc.background import Background
+from castor_etc.sources import PointSource
+from castor_etc.telescope import Telescope
+
+from castor_etc.uvmos_spectroscopy import UVMOS_Spectroscopy
+
+_TOL = 1e-5  # floating-point tolerance
+
+class UVMOS_SpectroscopyTestCase(unittest.TestCase):
     """
-    A mixin class to allow classes to use loggers
+    Integrated test suite to test different photometry calculations
     """
+    def setUp(self):
+        # Default Telescope parameters
+        self.scope = Telescope()
 
-    @property
-    def logger(self) -> logging.Logger :
-        """
-        Instantiates a logger based on the class name
-        """
-        if not hasattr(self, '_logger') or not self._logger:
-            self._logger = logging.getLogger(__name__)
-        return self._logger
+        # Default background with one emission line
+        self.bg = Background(mags_per_sq_arcsec={"uv": 26.08, "u": 23.74, "g": 22.60})
+        from castor_etc.sources import ExtendedSource
 
-from . import (
-    background,
-    constants,
-    conversions,
-    data,
-    filepaths,
-    grism,
-    parameters,
-    photometry,
-    sources,
-    spectrum,
-    telescope,
-    transit,
-    uvmos_spectroscopy,
-)
+
+        self.src = PointSource()
+        self.src.use_pickles_spectrum("b0v")
+        self.src.norm_to_AB_mag(1) # check this!
+
+        # Create spectroscopy object
+
+        self.spec = UVMOS_Spectroscopy(self.scope, self.src, self.bg)
+        self.spec.specify_slit()
+
+        self.spec.calc_source_CASTORSpectrum(extraction_width=1, extraction_lowerlim=4, extraction_upperlim = 7)
+        self.spec.calc_background_CASTORSpectrum(extraction_width=1, extraction_lowerlim=4, extraction_upperlim = 7)
+
+    def test_calc_snr(self):
+        T_TARGET = 100  # seconds
+        LAMBDA = 2000   # Angstroms
+
+        snr = self.spec.calc_snr_from_t(T_TARGET, LAMBDA)
+        
+        # TODO: add assertions
+
+    def test_calc_exposure_time(self):
+        SNR_TARGET = 10
+        LAMBDA = 2000
+
+        t = self.spec.calc_t_from_snr(SNR_TARGET, LAMBDA)
+
+if __name__ == '__main__':
+    unittest.main()
