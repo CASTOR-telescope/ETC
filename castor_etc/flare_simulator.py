@@ -833,7 +833,7 @@ _format_doc(flare_series_spectra, wbins=_wbins_doc, tbins=_tbins_doc,
 
 
 
-# Function created outside of the fiducial_flare package
+# Function created with use of fiducial_flare package
 
 
 from astropy import units as u
@@ -844,7 +844,6 @@ from astropy import table
 from matplotlib import pyplot as plt
 from astropy import constants as const
 plt.ion()
-
 
 
 def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figure):
@@ -870,12 +869,12 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     """
 
     #Units (W / m2) converted later
-    R_sun = 6.95700e8  #Mean Radius in meters
+    R_sun = 6.95700e8  # Mean Radius in meters
     sigma_sb = 5.67037e-8 # Units W/m^2/k^4
     ly = 9.46073e15 #Units meters
     
     Calculated_flux = (((R_sun*star_radius)**2)*sigma_sb*(star_eff_temp**4))/((ly*dist_to_star)**2) 
-
+    
     # Depending on star temperature it will choose which flare profile has the closest match
     # Files correspond to Main Sequence M star flare spectra
     # Files are from the following link for MUSCLES spectra for M0-M5.5 'https://archive.stsci.edu/missions/hlsp/muscles/'
@@ -884,33 +883,33 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     # Partially Convective
     # M0-M1 
     if star_eff_temp >= 3600:
-        path_sed = 'M1.5V_hlsp_muscles_multi_multi_gj667c_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M1.5V_hlsp_muscles_multi_multi_gj667c_broadband_v22_adapt-const-res-sed.fits'
         
     # M2
     elif star_eff_temp < 3600 and star_eff_temp >= 3500:
-        path_sed = 'M2V_hlsp_muscles_multi_multi_gj176_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M2V_hlsp_muscles_multi_multi_gj176_broadband_v22_adapt-const-res-sed.fits'
 
     # M3
     elif star_eff_temp < 3500 and star_eff_temp >= 3400:
-        path_sed = 'M3V_hlsp_muscles_multi_multi_gj581_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M3V_hlsp_muscles_multi_multi_gj581_broadband_v22_adapt-const-res-sed.fits'
 
     # Fully Convective
+    # Fully Convective produce stronger more energetic flares
     # M4
     elif star_eff_temp < 3400 and star_eff_temp >= 3200:
 
-        path_sed = 'M4_hlsp_muscles_multi_multi_gj876_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M4_hlsp_muscles_multi_multi_gj876_broadband_v22_adapt-const-res-sed.fits'
 
     # M5.5
     else: 
-        path_sed = 'M5.5_hlsp_muscles_multi_multi_gj551_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M5.5_hlsp_muscles_multi_multi_gj551_broadband_v22_adapt-const-res-sed.fits'
     
     # No MUSCLES model available for M stars M6-M9, default will be M5.5
 
     
     # Spectral Energy Distribution (SED), the base quiescent SED is from the MSUCLES spectrum different for each star class
-    sed = table.Table.read(path_sed)
+    sed = table.Table.read(path_sed, hdu=1, unit_parse_strict="silent")
 
-    
     # Next part adds correction factors based on research paper "Optically Quiet, But FUV Loud:" cited below:
     # Paper used archival FUV observations of low-mass stars to test the UV predictions of literature flare models
     # Flare model used in this funtion is the MUSCLES model 
@@ -928,282 +927,129 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     
     # Paper accessed Feb 2026
 
+
+    w = sed["WAVELENGTH"]
+    f = sed['BOLOFLUX']
     
-    if star_eff_temp >= 3400: #Partially convective M0~M3
-        for i in range(len(sed['WAVELENGTH'])):
+    # Changing file format
+    w = np.asarray(w)
+    f = np.asarray(f)
 
-            #####  White Light Correction for partially convective ######
+    if star_eff_temp >= 3400: #Partially Convective Correction Factor Field Age M star M0~M3
+
+    #####  White Light Correction for partially convective ######
+       
+        # how this works: 1. condition, 2. if true, 3. if false
+        f = np.where((w > 1173.65) & (w < 1198.49), 0.42 * f, f)
+        f = np.where((w > 1201.71) & (w < 1206.50), 0.42 * f, f)
+        f = np.where((w > 1223.00) & (w < 1273.50), 0.42 * f, f)        
+        f = np.where((w > 1328.20) & (w < 1354.49), 0.42 * f, f)
+        f = np.where((w > 1356.71) & (w < 1357.59), 0.42 * f, f)
+        f = np.where((w > 1359.51) & (w < 1362.70), 0.42 * f, f)
+
+
+    ##### FUV Correction for partially convective #####
+
+        f = np.where((w > 1173.65) & (w < 1198.49), 0.5 * f, f)
+        f = np.where((w > 1201.71) & (w < 1212.16), 0.5 * f, f)
+        f = np.where((w > 1219.18) & (w < 1274.04), 0.5 * f, f)        
+        f = np.where((w > 1329.25) & (w < 1354.49), 0.5 * f, f)
+        f = np.where((w > 1356.71) & (w < 1357.59), 0.5 * f, f)
+        f = np.where((w > 1359.51) & (w < 1428.90), 0.5 * f, f)
             
-            if 1173.65 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1198.49:
-                sed['FLUX'][i] = 0.42 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.42 * sed['BOLOFLUX'][i]
 
-            if 1201.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1206.50:
-                sed['FLUX'][i] = 0.42 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.42 * sed['BOLOFLUX'][i]
+    ##### Pseudo-continuum 130 Correction for partially convective #####
 
-            if 1223.00 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1273.50:
-                sed['FLUX'][i] = 0.42 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.42 * sed['BOLOFLUX'][i]
-
-            if 1328.20 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1354.49:
-                sed['FLUX'][i] = 0.42 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.42 * sed['BOLOFLUX'][i]
-
-            if 1356.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1357.59:
-                sed['FLUX'][i] = 0.42 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.42 * sed['BOLOFLUX'][i]
-
-            if 1359.51 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1362.70:
-                sed['FLUX'][i] = 0.42 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.42 * sed['BOLOFLUX'][i]
+        f = np.where((w > 1173.65) & (w < 1174.50), 0.68 * f, f)
+        f = np.where((w > 1176.80) & (w < 1190.00), 0.68 * f, f)
+        f = np.where((w > 1223.00) & (w < 1238.40), 0.68 * f, f)        
+        f = np.where((w > 1239.30) & (w < 1242.00), 0.68 * f, f)
+        f = np.where((w > 1243.50) & (w < 1273.50), 0.68 * f, f)
+        f = np.where((w > 1329.00) & (w < 1334.00), 0.68 * f, f)    
+        f = np.where((w > 1336.00) & (w < 1354.49), 0.68 * f, f)
+        f = np.where((w > 1356.71) & (w < 1357.59), 0.68 * f, f)
+        f = np.where((w > 1359.51) & (w < 1362.70), 0.68 * f, f)
 
 
+     ##### Si IV Correction for partially convective #####
 
-            ##### FUV Correction for partially convective #####
-            
-            if 1173.65 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1198.49:
-                sed['FLUX'][i] = 0.5 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.5 * sed['BOLOFLUX'][i]
-
-            if 1201.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1212.16:
-                sed['FLUX'][i] = 0.5 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.5 * sed['BOLOFLUX'][i]
-
-            if 1219.18 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1274.04:
-                sed['FLUX'][i] = 0.5 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.5 * sed['BOLOFLUX'][i]
-
-            if 1329.25 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1354.49:
-                sed['FLUX'][i] = 0.5 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.5 * sed['BOLOFLUX'][i]
-
-            if 1356.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1357.59:
-                sed['FLUX'][i] = 0.5 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.5 * sed['BOLOFLUX'][i]
-
-            if 1359.51 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1428.90:
-                sed['FLUX'][i] = 0.5 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.5 * sed['BOLOFLUX'][i]
-
-
-            ##### Pseudo-continuum 130 Correction for partially convective #####
-            
-            if 1173.65 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1174.50:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-            if 1176.80 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1190.00:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-            if 1223.00 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1238.40:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-            if 1239.30 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1242.00:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-            if 1243.50 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1273.50:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-            if 1329.00 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1334.00:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-            if 1336.00 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1354.49:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-            if 1356.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1357.59:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-            if 1359.51 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1362.70:
-                sed['FLUX'][i] = 0.68 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.68 * sed['BOLOFLUX'][i]
-
-
-            ##### Si IV Correction for partially convective #####
-            
-            if 1393.76 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1402.77:
-                sed['FLUX'][i] = 0.19 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.19 * sed['BOLOFLUX'][i]
+        f = np.where((w > 1393.76) & (w < 1402.77), 0.19 * f, f)
                 
-            ##### Si III Correction for partially convective #####
-            
-            if 1206.51 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 0.10 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.10 * sed['BOLOFLUX'][i]
-                
-            ##### C III Correction for partially convective #####
-            
-            if 1174.93 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 0.84 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.84 * sed['BOLOFLUX'][i]
-            if 1175.25 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 0.84 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.84 * sed['BOLOFLUX'][i]
-            if 1175.59 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 0.84 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.84 * sed['BOLOFLUX'][i]
-            if 1175.71 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 0.84 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.84 * sed['BOLOFLUX'][i]
-            if 1175.99 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 0.84 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.84 * sed['BOLOFLUX'][i]
-            if 1176.37 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 0.84 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 0.84 * sed['BOLOFLUX'][i]
+    ##### Si III Correction for partially convective #####
 
-    # Fully Convective Correction Factor M4~M9
+        f = np.where((w == 1206.51), 0.10 * f, f)
+                
+    ##### C III Correction for partially convective #####
+
+        f = np.where((w == 1174.93), 0.84 * f, f)
+        f = np.where((w == 1175.25), 0.84 * f, f)
+        f = np.where((w == 1175.59), 0.84 * f, f)
+        f = np.where((w == 1175.71), 0.84 * f, f)
+        f = np.where((w == 1175.99), 0.84 * f, f)
+        f = np.where((w == 1176.37), 0.84 * f, f)
+
+
+    # Fully Convective Correction Factor Field Age M Star M4~M9 
     else:
-        for i in range(len(sed['WAVELENGTH'])):
 
-            #####  White Light Correction for fully convective ######
+    #####  White Light Correction for fully convective ######
+
+        f = np.where((w > 1173.65) & (w < 1198.49), 4.7 * f, f)
+        f = np.where((w > 1201.71) & (w < 1206.50), 4.7 * f, f)
+        f = np.where((w > 1223.00) & (w < 1273.50), 4.7 * f, f)        
+        f = np.where((w > 1328.20) & (w < 1354.49), 4.7 * f, f)
+        f = np.where((w > 1356.71) & (w < 1357.59), 4.7 * f, f)
+        f = np.where((w > 1359.51) & (w < 1362.70), 4.7 * f, f)
             
-            if 1173.65 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1198.49:
-                sed['FLUX'][i] = 4.7 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.7 * sed['BOLOFLUX'][i]
 
-            if 1201.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1206.50:
-                sed['FLUX'][i] = 4.7 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.7 * sed['BOLOFLUX'][i]
-
-            if 1223.00 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1273.50:
-                sed['FLUX'][i] = 4.7 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.7 * sed['BOLOFLUX'][i]
-
-            if 1328.20 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1354.49:
-                sed['FLUX'][i] = 4.7 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.7 * sed['BOLOFLUX'][i]
-
-            if 1356.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1357.59:
-                sed['FLUX'][i] = 4.7 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.7 * sed['BOLOFLUX'][i]
-
-            if 1359.51 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1362.70:
-                sed['FLUX'][i] = 4.7 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.7 * sed['BOLOFLUX'][i]
+    ##### FUV Correction for fully convective #####
 
 
-
-            ##### FUV Correction for fully convective #####
-            
-            if 1173.65 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1198.49:
-                sed['FLUX'][i] = 2.9 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 2.9 * sed['BOLOFLUX'][i]
-
-            if 1201.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1212.16:
-                sed['FLUX'][i] = 2.9 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 2.9 * sed['BOLOFLUX'][i]
-
-            if 1219.18 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1274.04:
-                sed['FLUX'][i] = 2.9 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 2.9 * sed['BOLOFLUX'][i]
-
-            if 1329.25 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1354.49:
-                sed['FLUX'][i] = 2.9 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 2.9 * sed['BOLOFLUX'][i]
-
-            if 1356.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1357.59:
-                sed['FLUX'][i] = 2.9 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 2.9 * sed['BOLOFLUX'][i]
-
-            if 1359.51 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1428.90:
-                sed['FLUX'][i] = 2.9 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 2.9 * sed['BOLOFLUX'][i]
+        f = np.where((w > 1173.65) & (w < 1198.49), 2.9 * f, f)
+        f = np.where((w > 1201.71) & (w < 1212.16), 2.9 * f, f)
+        f = np.where((w > 1219.18) & (w < 1274.04), 2.9 * f, f)        
+        f = np.where((w > 1329.25) & (w < 1354.49), 2.9 * f, f)
+        f = np.where((w > 1356.71) & (w < 1357.59), 2.9 * f, f)
+        f = np.where((w > 1359.51) & (w < 1428.90), 2.9 * f, f)
 
 
-            ##### Pseudo-continuum 130 Correction for fully convective #####
-            
-            if 1173.65 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1174.50:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
+    ##### Pseudo-continuum 130 Correction for fully convective #####
 
-            if 1176.80 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1190.00:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
-
-            if 1223.00 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1238.40:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
-
-            if 1239.30 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1242.00:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
-
-            if 1243.50 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1273.50:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
-
-            if 1329.00 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1334.00:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
-
-            if 1336.00 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1354.49:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
-
-            if 1356.71 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1357.59:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
-
-            if 1359.51 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1362.70:
-                sed['FLUX'][i] = 4.71 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.71 * sed['BOLOFLUX'][i]
+        f = np.where((w > 1173.65) & (w < 1174.50), 4.71 * f, f)
+        f = np.where((w > 1176.80) & (w < 1190.00), 4.71 * f, f)
+        f = np.where((w > 1223.00) & (w < 1238.40), 4.71 * f, f)        
+        f = np.where((w > 1239.30) & (w < 1242.00), 4.71 * f, f)
+        f = np.where((w > 1243.50) & (w < 1273.50), 4.71 * f, f)
+        f = np.where((w > 1329.00) & (w < 1334.00), 4.71 * f, f)    
+        f = np.where((w > 1336.00) & (w < 1354.49), 4.71 * f, f)
+        f = np.where((w > 1356.71) & (w < 1357.59), 4.71 * f, f)
+        f = np.where((w > 1359.51) & (w < 1362.70), 4.71 * f, f)
 
 
-            ##### Si IV Correction for fully convective #####
-            
-            if 1393.76 < sed['WAVELENGTH'][i] and sed['WAVELENGTH'][i] > 1402.77:
-                sed['FLUX'][i] = 3.09 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 3.09 * sed['BOLOFLUX'][i]
+    ##### Si IV Correction for fully convective #####
+        
+        f = np.where((w > 1393.76) & (w < 1402.77), 3.09 * f, f)
                 
-            ##### C II Correction for fully convective #####
-            
-            if 1334.53 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 4.70 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.70 * sed['BOLOFLUX'][i]
-            if 1335.71 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 4.70 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 4.70 * sed['BOLOFLUX'][i] 
+    ##### C II Correction for fully convective #####
+        
+        f = np.where((w == 1334.53), 4.70 * f, f)
+        f = np.where((w == 1335.71), 4.70 * f, f)
                 
-            ##### C III Correction for fully convective #####
-            
-            if 1174.93 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 6.41 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 6.41 * sed['BOLOFLUX'][i]
-            if 1175.25 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 6.41 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 6.41 * sed['BOLOFLUX'][i]
-            if 1175.59 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 6.41 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 6.41 * sed['BOLOFLUX'][i]
-            if 1175.71 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 6.41 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 6.41 * sed['BOLOFLUX'][i]
-            if 1175.99 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 6.41 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 6.41 * sed['BOLOFLUX'][i]
-            if 1176.37 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 6.41 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 6.41 * sed['BOLOFLUX'][i]
+    ##### C III Correction for fully convective #####
 
-            ##### N V Correction for fully convective #####
-            
-            if 1238.82 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 8.08* sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 8.08 * sed['BOLOFLUX'][i]
-            if 1242.80 == sed['WAVELENGTH'][i]:
-                sed['FLUX'][i] = 8.08 * sed['FLUX'][i]
-                sed['BOLOFLUX'][i] = 8.08 * sed['BOLOFLUX'][i] 
+        f = np.where((w == 1174.93), 6.41 * f, f)
+        f = np.where((w == 1175.25), 6.41 * f, f)
+        f = np.where((w == 1175.59), 6.41 * f, f)
+        f = np.where((w == 1175.71), 6.41 * f, f)
+        f = np.where((w == 1175.99), 6.41 * f, f)
+        f = np.where((w == 1176.37), 6.41 * f, f)
 
+    ##### N V Correction for fully convective #####
 
-
+        f = np.where((w == 1238.82), 8.08 * f, f)
+        f = np.where((w == 1242.80), 8.08 * f, f)
+   
+    # The rest of the function was modified from fiducial_flare package, refer to top of document for more information
 
     # The SED has higher resolution needed. 
     # In fiducial flare spectrum, lines are represented by single 200 km/s wide bins (about 1 Å in the FUV). 
@@ -1219,8 +1065,8 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     wbins_red = np.arange(3000, 5.5e4, 10) * u.AA
     wbins = np.hstack((wbins_fuv, wbins_red))
     
-    # Now rebin
-    Flux_quiescent_bolo = rebin(wbins.value, wbins_sed.value, sed['BOLOFLUX'])
+    # Now rebin, f is 'BOLOFLUX'
+    Flux_quiescent_bolo = rebin(wbins.value, wbins_sed.value, f)
     
     # Add the proper units since rebin can't work with them.
     Flux_quiescent_bolo = Flux_quiescent_bolo * u.Unit('AA-1')
@@ -1241,7 +1087,7 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     wbin_SiIV = [1390, 1410] * u.AA
     Fq_SiIV = rebin(wbin_SiIV.value, wbins.value, Flux_quiescent.value) * u.Unit('erg s-1 cm-2 AA-1')
     
-    # This actuyally spits out the flux density, but what we want is the flux.
+    # This actually spits out the flux density, but what we want is the flux.
     Fq_SiIV = Fq_SiIV * np.diff(wbin_SiIV)
 
 
@@ -1288,13 +1134,15 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     wavelength = wbins[:-1].value
     flux = Flux_tot[imax,:].value
 
+    #UVMOS has wavelengths from 1500Å to 5500Å, this is sliced to reflect that.
+    #If you have a different wavelength range comment out and return wavelength, flux
+    wavelength_sliced = wavelength[1400:3101]
+    flux_sliced = flux[1400:3101]
+ 
     # Wavlength and flux can be directly inputted into CASTOR_UVMOS to use
-    return wavelength, flux
-
-    # Removes warnings for FITS file
-    import warnings
-    from astropy.io import fits
-    from astropy.units import UnitsWarning
-    warnings.filterwarnings('ignore', category=UnitsWarning, append=True)
+    return wavelength_sliced, flux_sliced
+    
+    #If not using UVMOS range
+    #return wavelength, flux
 
 #endregion
