@@ -138,15 +138,25 @@ MIRROR_AREA = pi * (0.5 * MIRROR_DIAMETER) * (0.5 * MIRROR_DIAMETER)  # cm^2
 # Dark current is 0.01 electrons/s/pixel at -50°C and halves for every reduction of 5-6°C.
 # CASTOR operates at 180 K, implying:
 # dark current = 0.5^((223.15K - 180K) / 6) * 0.01 ~ 1e-4 electrons/s/pixel (negligible)
-DARK_CURRENT = 1e-4  # electrons/s/pixel
+
+# NOTE: update for 2.0 - We assumed a 0.01 in the past. The OU report found a mean per pixel
+#   dark current of 0.004 electrons/s/pixel at -50°C, so we expect a 0.4x scaling from previous
+
+DARK_CURRENT = 1e-4*0.4  # electrons/s/pixel
 # Dark current will increase linearly over time to 0.01 electrons/s/pixel by the end of 5
 # years
 
 BIAS = 100  # electron
 
-READ_NOISE = 3.0  # electron/pixel (high-gain). Read noise is 30 electrons for low-gain
+# NOTE: update for 2.0 - The OU report found a mean read noise of 5.49 at -50°C.
+#   no data is available at the 180 K operating temperature at the moment,
+#   so we will tentatively use 5.5 electrons / pixel as our estimate
+READ_NOISE = 5.5  # electron/pixel
 
-GAIN = 2.0  # electron/ADU
+# NOTE: update for 2.0 - Gain is dependent on SPI parameters
+#   for now, we will use the peak gain used at default setting as reported in the OU report
+#   this corresponds to 1.7 electrons/ADU
+GAIN = 1.7  # electron/ADU
 
 # Wavelength threshold for red leak. Flux longward of this is considered to be red leak
 REDLEAK_THRESHOLDS = {"uv": 3010 << u.AA, "u": 4160 << u.AA, "g": 5600 << u.AA}
