@@ -846,6 +846,7 @@ from astropy import constants as const
 plt.ion()
 
 
+
 def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figure):
     """ 
     Calculates flux from input values, picks corresponding spectra for M0-M9.
@@ -883,26 +884,25 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     # Partially Convective
     # M0-M1 
     if star_eff_temp >= 3600:
-        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M1.5V_hlsp_muscles_multi_multi_gj667c_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'M1.5V_hlsp_muscles_multi_multi_gj667c_broadband_v22_adapt-const-res-sed.fits'
         
     # M2
     elif star_eff_temp < 3600 and star_eff_temp >= 3500:
-        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M2V_hlsp_muscles_multi_multi_gj176_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'M2V_hlsp_muscles_multi_multi_gj176_broadband_v22_adapt-const-res-sed.fits'
 
     # M3
     elif star_eff_temp < 3500 and star_eff_temp >= 3400:
-        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M3V_hlsp_muscles_multi_multi_gj581_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'M3V_hlsp_muscles_multi_multi_gj581_broadband_v22_adapt-const-res-sed.fits'
 
     # Fully Convective
-    # Fully Convective produce stronger more energetic flares
     # M4
     elif star_eff_temp < 3400 and star_eff_temp >= 3200:
 
-        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M4_hlsp_muscles_multi_multi_gj876_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'M4_hlsp_muscles_multi_multi_gj876_broadband_v22_adapt-const-res-sed.fits'
 
     # M5.5
     else: 
-        path_sed = 'ETC/castor_etc/data/flare_simulator_data/M5.5_hlsp_muscles_multi_multi_gj551_broadband_v22_adapt-const-res-sed.fits'
+        path_sed = 'M5.5_hlsp_muscles_multi_multi_gj551_broadband_v22_adapt-const-res-sed.fits'
     
     # No MUSCLES model available for M stars M6-M9, default will be M5.5
 
@@ -935,10 +935,11 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
     w = np.asarray(w)
     f = np.asarray(f)
 
-    if star_eff_temp >= 3400: #Partially Convective Correction Factor Field Age M star M0~M3
+    if star_eff_temp >= 3400: #Partially convective M0~M3
+        
 
     #####  White Light Correction for partially convective ######
-       
+
         # how this works: 1. condition, 2. if true, 3. if false
         f = np.where((w > 1173.65) & (w < 1198.49), 0.42 * f, f)
         f = np.where((w > 1201.71) & (w < 1206.50), 0.42 * f, f)
@@ -981,6 +982,7 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
                 
     ##### C III Correction for partially convective #####
 
+
         f = np.where((w == 1174.93), 0.84 * f, f)
         f = np.where((w == 1175.25), 0.84 * f, f)
         f = np.where((w == 1175.59), 0.84 * f, f)
@@ -989,7 +991,7 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
         f = np.where((w == 1176.37), 0.84 * f, f)
 
 
-    # Fully Convective Correction Factor Field Age M Star M4~M9 
+    # Fully Convective Correction Factor M4~M9
     else:
 
     #####  White Light Correction for fully convective ######
@@ -1000,7 +1002,7 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
         f = np.where((w > 1328.20) & (w < 1354.49), 4.7 * f, f)
         f = np.where((w > 1356.71) & (w < 1357.59), 4.7 * f, f)
         f = np.where((w > 1359.51) & (w < 1362.70), 4.7 * f, f)
-            
+    
 
     ##### FUV Correction for fully convective #####
 
@@ -1048,9 +1050,8 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
 
         f = np.where((w == 1238.82), 8.08 * f, f)
         f = np.where((w == 1242.80), 8.08 * f, f)
-   
-    # The rest of the function was modified from fiducial_flare package, refer to top of document for more information
 
+    
     # The SED has higher resolution needed. 
     # In fiducial flare spectrum, lines are represented by single 200 km/s wide bins (about 1 Å in the FUV). 
     # Higher resolutions will yield odd-looking output once we add flare spectra to the SED. 
