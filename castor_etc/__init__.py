@@ -86,7 +86,8 @@ __all__ = [
     "telescope",
     "uvmos_spectroscopy",
     "transit",
-    "grism"
+    "grism",
+    "deprecated"
 ]
 
 import logging
@@ -121,4 +122,5 @@ from . import (
     telescope,
     transit,
     uvmos_spectroscopy,
+    deprecated
 )
