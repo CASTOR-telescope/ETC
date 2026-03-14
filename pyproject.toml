@@ -24,6 +24,7 @@ dependencies = [
     "pandas",
     "photutils",
     "pytransit",
+    "regions",
     "scikit-image",
     "scipy",
     "spectres",
@@ -64,7 +65,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--maxfail=1 --cov=castor_etc --cov-report term-missing"
+addopts = "--cov=castor_etc --cov-report markdown:docs/cov.md --cov-report html tests/"
 
 [tool.coverage.run]
 relative_files = true
@@ -87,11 +88,11 @@ version-file = "_version.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/castor_etc",
+    "castor_etc",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["/castor_etc"]
+packages = ["castor_etc"]
 
 [tool.hatch.envs.default]
 installer = "uv"
