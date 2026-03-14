@@ -75,6 +75,7 @@ from castor_etc.sources import PointSource
 from castor_etc.telescope import Telescope
 
 from castor_etc.uvmos_spectroscopy import UVMOS_Spectroscopy
+from castor_etc.deprecated.uvmos_single_slit import UVMOS_SingleObject
 
 _TOL = 1e-5  # floating-point tolerance
 
@@ -90,32 +91,70 @@ class UVMOS_SpectroscopyTestCase(unittest.TestCase):
         self.bg = Background(mags_per_sq_arcsec={"uv": 26.08, "u": 23.74, "g": 22.60})
         from castor_etc.sources import ExtendedSource
 
-
         self.src = PointSource()
         self.src.use_pickles_spectrum("b0v")
         self.src.norm_to_AB_mag(1) # check this!
 
-        # Create spectroscopy object
+        # # Create spectroscopy object
+        self.single_slit = UVMOS_SingleObject(self.scope, self.src, self.bg)
+        self.single_slit.specify_slit()
 
-        self.spec = UVMOS_Spectroscopy(self.scope, self.src, self.bg)
-        self.spec.specify_slit()
+        self.single_slit.calc_source_CASTORSpectrum()
+        self.single_slit.calc_background_CASTORSpectrum()
 
-        self.spec.calc_source_CASTORSpectrum(extraction_width=1, extraction_lowerlim=4, extraction_upperlim = 7)
-        self.spec.calc_background_CASTORSpectrum(extraction_width=1, extraction_lowerlim=4, extraction_upperlim = 7)
+        # Create UVMOS object with new implementation
+        delta_ra = [1] 
+        delta_dec = [-0.3]
+        theta_list = [0]
 
-    def test_calc_snr(self):
+        RA = 186.1
+        DEC = 12.3
+
+        self.uvmos = UVMOS_Spectroscopy(self.scope, [self.src], self.bg, RA, DEC, 
+                                        delta_ra = delta_ra, delta_dec = delta_dec, theta = theta_list, case = 2)
+
+    def test_single_slit_calc_snr(self):
         T_TARGET = 100  # seconds
         LAMBDA = 2000   # Angstroms
 
-        snr = self.spec.calc_snr_from_t(T_TARGET, LAMBDA)
-        
-        # TODO: add assertions
+        snr = self.single_slit.calc_snr_from_t(T_TARGET, LAMBDA)
 
-    def test_calc_exposure_time(self):
+        VAL = 6486.995100005579 # from local calculations
+        places = 2             # test with accuracy up to 0
+        self.assertAlmostEqual(snr, VAL, places=places)
+        
+    #     # TODO: add assertions
+
+    def test_single_slit_calc_exposure_time(self):
         SNR_TARGET = 10
         LAMBDA = 2000
 
-        t = self.spec.calc_t_from_snr(SNR_TARGET, LAMBDA)
+        t = self.single_slit.calc_t_from_snr(SNR_TARGET, LAMBDA)
+
+        VAL = 0.021226595876899314 # from local calculations
+        places = 5             # test with accuracy up to 1E2 since it's a large value
+        self.assertAlmostEqual(t, VAL, places=places)
+
+    #     # TODO: add assertion for these tests
+    
+    def test_multi_slit_calc_snr(self):
+        T_TARGET = 100  # seconds
+        LAMBDA = 2000   # Angstroms
+
+        snr = self.uvmos.calc_snr_from_t(T_TARGET, LAMBDA)[0]
+        
+        VAL = 9542.739326148867 # from local testing
+        self.assertAlmostEqual(snr, VAL, places=1)
+
+    def test_multi_slit_calc_exposure_time(self):
+        SNR_TARGET = 10  # seconds
+        LAMBDA = 2000   # Angstroms
+
+        t = self.uvmos.calc_t_from_snr(SNR_TARGET, LAMBDA)[0]
+        
+        VAL = 0.009464512847399582 # s, from local testing
+        self.assertAlmostEqual(t, VAL, places=5)
+        
 
 if __name__ == '__main__':
     unittest.main()

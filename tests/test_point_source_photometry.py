@@ -83,7 +83,7 @@ class PointSourcePhotometryTestCase(unittest.TestCase):
     """
     def setUp(self):
         # Default Telescope parameters
-        self.scope = Telescope()
+        self.scope = Telescope(read_noise=3.0, dark_current=1e-4, gain=2.0)
 
         # Default background with one emission line
         self.bg = Background()
