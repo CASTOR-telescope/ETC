@@ -136,7 +136,7 @@ class UVMOS_SpectroscopyTestCase(unittest.TestCase):
         T_TARGET = 100  # seconds
         LAMBDA = 2000   # Angstroms
 
-        snr = self.uvmos.calc_snr_from_t(T_TARGET, LAMBDA)[0]
+        snr = float(self.uvmos.calc_snr_from_t(T_TARGET, LAMBDA)[0])
 
         VAL = 9542.739326148867 # from local testing
         self.assertAlmostEqual(snr, VAL, places=1)
@@ -145,7 +145,7 @@ class UVMOS_SpectroscopyTestCase(unittest.TestCase):
         SNR_TARGET = 10  # seconds
         LAMBDA = 2000   # Angstroms
 
-        t = self.uvmos.calc_t_from_snr(SNR_TARGET, LAMBDA)[0]
+        t = float(self.uvmos.calc_t_from_snr(SNR_TARGET, LAMBDA)[0])
 
         VAL = 0.009464512847399582 # s, from local testing
         self.assertAlmostEqual(t, VAL, places=5)

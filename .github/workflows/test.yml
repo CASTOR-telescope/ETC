@@ -58,10 +58,13 @@ jobs:
       - name: Run tests with coverage
         run: |
           uv run pytest --cov=castor_etc --cov-report=xml --cov-report=html --cov-report=term-missing tests/
-          if [ "${{ runner.os }}" == "Linux" ] && [ "${{ matrix.python-version }}" == "${{ env.STABLE_PYTHON_VERSION }}" ]; then
-            echo "### Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
-            uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
-          fi
+
+      - name: Generate Coverage Summary
+        # Use GHA logic instead of shell logic to handle cross-platform compatibility
+        if: runner.os == 'Linux' && matrix.python-version == '3.11'
+        run: |
+          echo "### Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage HTML report
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'

@@ -109,6 +109,21 @@ class BaseClass(object):
             self._logger = logging.getLogger(__name__)
         return self._logger
 
+# This is a "hacky" way of dealing with the annoying pytransit failure from not finding trapz!
+if not hasattr(np, "trapz"):
+    try:
+        # Try the new NumPy 2.x location
+        from numpy import trapezoid as _trapz
+        np.trapz = _trapz
+    except ImportError:
+        # Fallback for other versions/scipy
+        try:
+            from scipy.integrate import trapz as _trapz
+            np.trapz = _trapz
+        except ImportError:
+            pass
+
+
 from . import (
     background,
     constants,
