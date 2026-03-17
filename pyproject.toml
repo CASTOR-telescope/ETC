@@ -85,7 +85,7 @@ exclude_lines = [
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "_version.py"
+version-file = "castor_etc/_version.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
