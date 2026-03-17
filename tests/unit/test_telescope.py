@@ -65,16 +65,12 @@ test_etc_photometry.py
 """
 import unittest
 
-import astropy.units as u
-import numpy as np
-from castor_etc.telescope import Telescope
 
 class TestTelescope(unittest.TestCase):
     """
     Test the castor_etc.telescope module
     """
-    pass
-    
+
     ## Method 1 : test with a simple polynomial f(x) = x**2 - 4
     @unittest.skip("Not implemented yet")
     def test_initialization(self):

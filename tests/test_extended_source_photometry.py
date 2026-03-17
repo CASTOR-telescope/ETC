@@ -72,8 +72,8 @@ import astropy.units as u
 import numpy as np
 
 from castor_etc.background import Background
-from castor_etc.telescope import Telescope
 from castor_etc.photometry import Photometry
+from castor_etc.telescope import Telescope
 
 _TOL = 1e-5  # floating-point tolerance
 
@@ -109,7 +109,7 @@ class ExtendedSourcePhotometryTestCase(unittest.TestCase):
         self.phot.use_rectangular_aperture(
             width=4.5 * u.arcsec, length=3 * u.arcsec, center=[0.5, -1] * u.arcsec
         )
-  
+
     def test_extended_source_exposure_time_calculator(self):
         TARGET_SNR = 10
         REDDENING = 0

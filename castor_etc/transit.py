@@ -333,9 +333,9 @@ class Observation:
                 except Exception:
                     raise KeyError(
                         "No sky background magnitude (`mags_per_sq_arcsec` from "
-                        + "`Background` object) or photometric zero point (`phot_zpts` "
-                        + f"from `Telescope` object) for {band}-band!\n"
-                        + "(The issue is likely with the `Background` object...)"
+                         "`Background` object) or photometric zero point (`phot_zpts` "
+                         f"from `Telescope` object) for {band}-band!\n"
+                         "(The issue is likely with the `Background` object...)"
                     )
         #
         # Add geocoronal emission line contribution to sky background
@@ -349,7 +349,7 @@ class Observation:
         for gw, gf, gl in zip(
             self.BackgroundObj.geo_wavelength,
             self.BackgroundObj.geo_flux,
-            self.BackgroundObj.geo_linewidth,
+            self.BackgroundObj.geo_linewidth, strict=False,
         ):
             for band in self.TelescopeObj.passbands:
                 # Add geocoronal emission (electron/s) to proper passband(s)
@@ -377,7 +377,7 @@ class Observation:
                     if not np.isfinite(geo_erate):
                         warnings.warn(
                             "Could not estimate geocoronal emission noise contribution "
-                            + f"(electron/s) in {band}-band!",
+                             f"(electron/s) in {band}-band!",
                             RuntimeWarning,
                         )
                     else:
@@ -461,9 +461,9 @@ class Observation:
             if np.all(~isgood_passband):
                 raise RuntimeError(
                     f"{self.passband_name}-band response could not be estimated"
-                    + " at any source spectrum wavelength"
+                     " at any source spectrum wavelength"
                 )
-            elif np.any(
+            if np.any(
                 ~isgood_passband[
                     (wavelength_AA >= passband_wavelengths.min())
                     & (wavelength_AA <= passband_wavelengths.max())
@@ -477,7 +477,7 @@ class Observation:
         if np.any(~isgood_spectrum):
             if np.all(~isgood_spectrum):
                 raise RuntimeError("Source spectrum values are all non-infinite!")
-            elif np.any(
+            if np.any(
                 ~isgood_spectrum[
                     (wavelength_AA >= passband_wavelengths.min())
                     & (wavelength_AA <= passband_wavelengths.max())
@@ -528,8 +528,7 @@ class Observation:
             raise ValueError("Bandpass must be specified, i.e., ['uv','u','g']")
         if passband_name not in self.TelescopeObj.passbands:
             raise TypeError("Specified bandpass must belong to CASTOR telescope filter, i.e., ['uv','u','g']")
-        else:
-            self.passband_name = passband_name
+        self.passband_name = passband_name
 
 
     def id_guide_stars(self,gs_criteria=None,plot_SN=False):
@@ -727,7 +726,7 @@ class Observation:
                     "dark_current_weights",
                     "_aper_xs",
                     "_aper_ys"
-                ],
+                ], strict=False,
             ):
                 if arr is not None:
                     arr = arr[:, isgood_columns]

@@ -143,8 +143,8 @@ class Photometry:
         ):
             raise ValueError(
                 "The `CustomSource` object's surface brightness profile passband "
-                + f"('{SourceObj.passband}') is not a valid `TelescopeObj` "
-                + f"passband ({TelescopeObj.passbands})"
+                 f"('{SourceObj.passband}') is not a valid `TelescopeObj` "
+                 f"passband ({TelescopeObj.passbands})"
             )
         #
         # Assign attributes
@@ -284,11 +284,10 @@ class Photometry:
         if not overwrite and (self._aper_xs is not None or self._aper_ys is not None):
             raise ValueError(
                 "An aperture for this `Photometry` object already exists. "
-                + "Use `overwrite=True` to allow overwriting of the aperture "
-                + " and all associated weights (i.e., source, sky background, "
-                + "and dark current weights will all be reset)."
+                 "Use `overwrite=True` to allow overwriting of the aperture "
+                 " and all associated weights (i.e., source, sky background, "
+                 "and dark current weights will all be reset)."
             )
-        #
         px_scale_arcsec = self.TelescopeObj.px_scale.to(u.arcsec).value
         half_px_scale = 0.5 * px_scale_arcsec  # to ensure correct arange/extent
         #
@@ -310,7 +309,6 @@ class Photometry:
         ys = np.linspace(
             -half_y, half_y, self._ydim * self.TelescopeObj.psf_supersample_factor
         )  # length M
-        #
         self._aper_xs, self._aper_ys = np.meshgrid(xs, ys, sparse=False, indexing="xy")
         self._aper_extent = [
             xs[0] + center[0],
@@ -436,7 +434,6 @@ class Photometry:
             raise KeyError(f"{passband} is not 'noiseless' or a valid passband.")
         if source_weights is None or self._aper_extent is None:
             raise ValueError("Please select an aperture first.")
-        #
         rc = {"axes.grid": False}
         with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
             fig, ax = plt.subplots()
@@ -465,12 +462,12 @@ class Photometry:
             if passband == "noiseless":
                 ax.set_title(
                     "Fraction of Flux Contained Within Aperture:\n"
-                    + f"{np.nansum(source_weights) * 100:.2f}{percent} (noiseless)"
+                     f"{np.nansum(source_weights) * 100:.2f}{percent} (noiseless)"
                 )
             else:
                 ax.set_title(
                     "Fraction of Flux Contained Within Aperture:\n"
-                    + f"{np.nansum(source_weights) * 100:.2f}{percent} ({passband}-band)"
+                     f"{np.nansum(source_weights) * 100:.2f}{percent} ({passband}-band)"
                 )
             if plot:
                 plt.show()
@@ -772,7 +769,7 @@ class Photometry:
                 "dark_current_weights",
                 "_aper_xs",
                 "_aper_ys",
-            ],
+            ], strict=False,
         ):
             if arr is not None:
                 arr = arr[:, isgood_columns]  # remove all NaN columns
@@ -842,8 +839,8 @@ class Photometry:
             #     np.ceil((abs_sin_rotate * a + abs_cos_rotate * b) / px_scale_arcsec)
             #     * px_scale_arcsec
             # ).value
-            x = x if x >= a.value else a.value
-            y = y if y >= b.value else b.value
+            x = max(x, a.value)
+            y = max(y, b.value)
         else:
             # Circular aperture
             x = a.value
@@ -929,15 +926,15 @@ class Photometry:
         if not isinstance(self.SourceObj, PointSource):
             raise TypeError(
                 "Only point sources are supported for optimal aperture. "
-                + "Please manually define an aperture instead."
+                 "Please manually define an aperture instead."
             )
         if factor <= 0:
             raise ValueError("factor must be a positive number")
         if not quiet and self.SourceObj.angle_a > 0.5 * self.TelescopeObj.fwhm:
             warnings.warn(
                 "The point source's diameter is larger than the telescope's FWHM. "
-                + "Will use the telescope's FWHM for calculating the optimal aperture "
-                + "and, for now, the encircled energy fraction.",
+                 "Will use the telescope's FWHM for calculating the optimal aperture "
+                 "and, for now, the encircled energy fraction.",
                 RuntimeWarning,
             )
         #
@@ -1013,7 +1010,7 @@ class Photometry:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
-                + "Contact the developer with a minimal working example please. Thanks!",
+                 "Contact the developer with a minimal working example please. Thanks!",
                 RuntimeWarning,
             )
 
@@ -1099,7 +1096,7 @@ class Photometry:
             except Exception:
                 raise TypeError(
                     "a and b must be `astropy.Quantity` angles (e.g., u.arcsec, u.deg) "
-                    + " or, if in pixel units, ints or floats"
+                     " or, if in pixel units, ints or floats"
                 )
         else:
             a = a * px_scale_arcsec * u.arcsec
@@ -1109,7 +1106,7 @@ class Photometry:
             except Exception:
                 raise TypeError(
                     "a and b must be `astropy.Quantity` angles (e.g., u.arcsec, u.deg) "
-                    + " or, if in pixel units, ints or floats"
+                     " or, if in pixel units, ints or floats"
                 )
         else:
             b = b * px_scale_arcsec * u.arcsec
@@ -1136,8 +1133,8 @@ class Photometry:
             if not quiet and isinstance(self.SourceObj, ExtendedSource):
                 warnings.warn(
                     "The ExtendedSource calculation assumes 100% of the flux is "
-                    + "contained within the size defined in the ExtendedSource (i.e., "
-                    + "by angle_a and angle_b).",
+                     "contained within the size defined in the ExtendedSource (i.e., "
+                     "by angle_a and angle_b).",
                     UserWarning,
                 )
             _tot_x, _tot_y = Photometry._rotate_ab_to_xy(
@@ -1185,7 +1182,7 @@ class Photometry:
                     sum_tot_source_weights[band] *= 2
             need_overwrite = True
         else:  # CustomSource
-            sum_tot_source_weights = {band: 1.0 for band in self.source_weights}
+            sum_tot_source_weights = dict.fromkeys(self.source_weights, 1.0)
         #
         # Create source weights with arbitrary source flux profile through aperture
         #
@@ -1238,15 +1235,15 @@ class Photometry:
             # Discrepancy larger than 0.1 pixels
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
-                + "Contact the developer with a minimal working example please. Thanks!",
+                 "Contact the developer with a minimal working example please. Thanks!",
                 RuntimeWarning,
             )
         if isinstance(self.SourceObj, PointSource):
             if a < self._optimal_aperture_radius or b < self._optimal_aperture_radius:
                 warnings.warn(
                     "Chosen a/b is smaller than the 'ideal' aperture size "
-                    + "for this source! a & b should be at least "
-                    + f"{self._optimal_aperture_radius}.",
+                     "for this source! a & b should be at least "
+                     f"{self._optimal_aperture_radius}.",
                     UserWarning,
                 )
 
@@ -1331,7 +1328,7 @@ class Photometry:
             except Exception:
                 raise TypeError(
                     "length and width must be `astropy.Quantity` angles "
-                    + "(e.g., u.arcsec, u.deg) or, if in pixel units, ints or floats"
+                     "(e.g., u.arcsec, u.deg) or, if in pixel units, ints or floats"
                 )
         else:
             width = width * self.TelescopeObj.px_scale.to(u.arcsec)
@@ -1341,11 +1338,10 @@ class Photometry:
             except Exception:
                 raise TypeError(
                     "length and width must be `astropy.Quantity` angles "
-                    + "(e.g., u.arcsec, u.deg) or, if in pixel units, ints or floats"
+                     "(e.g., u.arcsec, u.deg) or, if in pixel units, ints or floats"
                 )
         else:
             length = length * self.TelescopeObj.px_scale.to(u.arcsec)
-        #
         min_ifov_dimen = min(self.TelescopeObj.ifov_dimen)
         if (max(length, width) > max(self.TelescopeObj.ifov_dimen)) or (
             length > min_ifov_dimen and width > min_ifov_dimen
@@ -1374,8 +1370,8 @@ class Photometry:
             if not quiet and isinstance(self.SourceObj, ExtendedSource):
                 warnings.warn(
                     "The ExtendedSource calculation assumes 100% of the flux is "
-                    + "contained within the size defined in the ExtendedSource (i.e., "
-                    + "by angle_a and angle_b).",
+                     "contained within the size defined in the ExtendedSource (i.e., "
+                     "by angle_a and angle_b).",
                     UserWarning,
                 )
             _tot_x, _tot_y = Photometry._rotate_ab_to_xy(
@@ -1422,7 +1418,7 @@ class Photometry:
                     sum_tot_source_weights[band] *= 2
             need_overwrite = True
         else:  # CustomSource
-            sum_tot_source_weights = {band: 1.0 for band in self.source_weights}
+            sum_tot_source_weights = dict.fromkeys(self.source_weights, 1.0)
         #
         # Create source weights with arbitrary source flux profile through aperture
         #
@@ -1487,12 +1483,12 @@ class Photometry:
             #
             warnings.warn(
                 "Effective aperture area is off by more than 0.1 pixels... "
-                + "Contact the developer with a minimal working example please. Thanks!"
-                + "\nNOTE: As of photutils-v1.4.0, there seems to be a bug where, in "
-                + "some cases, the rectangular aperture mask will return the wrong "
-                + "number of pixels regardless of the array size used to house the "
-                + "aperture mask!! This requires a fix from the `photutils` team, "
-                + "unfortunately.",
+                 "Contact the developer with a minimal working example please. Thanks!"
+                 "\nNOTE: As of photutils-v1.4.0, there seems to be a bug where, in "
+                 "some cases, the rectangular aperture mask will return the wrong "
+                 "number of pixels regardless of the array size used to house the "
+                 "aperture mask!! This requires a fix from the `photutils` team, "
+                 "unfortunately.",
                 RuntimeWarning,
             )
             print("eff_npix, exact_npix", self._eff_npix, self._exact_npix)
@@ -1501,8 +1497,8 @@ class Photometry:
             if (length < aper_threshold) or (width < aper_threshold):
                 warnings.warn(
                     "Chosen length/width is smaller than the 'ideal' aperture "
-                    + "size for this source! "
-                    + f"Length/width should be at least {aper_threshold}.",
+                     "size for this source! "
+                     f"Length/width should be at least {aper_threshold}.",
                     UserWarning,
                 )
 
@@ -1588,7 +1584,7 @@ class Photometry:
         if np.any([isinstance(var, u.Quantity) for var in variables]):
             raise ValueError(
                 "All inputs must be scalars or scalar arrays. "
-                + "`astropy.Quantity` objects are not supported."
+                 "`astropy.Quantity` objects are not supported."
             )
         if not isinstance(read_npix, (int, np.integer)):
             raise ValueError("read_npix must be an integer")
@@ -1692,7 +1688,7 @@ class Photometry:
         if np.any([isinstance(var, u.Quantity) for var in variables]):
             raise ValueError(
                 "All inputs must be scalars or scalar arrays. "
-                + "`astropy.Quantity` objects are not supported."
+                 "`astropy.Quantity` objects are not supported."
             )
         if not isinstance(read_npix, (int, np.integer)):
             raise ValueError("read_npix must be an integer")
@@ -1790,7 +1786,7 @@ class Photometry:
         if isinstance(self.SourceObj, CustomSource) and not quiet:
             print(
                 "INFO: The `reddening` parameter is ignored for `CustomSource` objects. "
-                + "You can silence this message by setting `quiet=True`."
+                 "You can silence this message by setting `quiet=True`."
             )
         #
         # Make some useful variables
@@ -1839,9 +1835,9 @@ class Photometry:
                 except Exception:
                     raise KeyError(
                         "No sky background magnitude (`mags_per_sq_arcsec` from "
-                        + "`Background` object) or photometric zero point (`phot_zpts` "
-                        + f"from `Telescope` object) for {band}-band!\n"
-                        + "(The issue is likely with the `Background` object...)"
+                         "`Background` object) or photometric zero point (`phot_zpts` "
+                         f"from `Telescope` object) for {band}-band!\n"
+                         "(The issue is likely with the `Background` object...)"
                     )
         #
         # Add geocoronal emission line contribution to sky background
@@ -1856,7 +1852,7 @@ class Photometry:
         for gw, gf, gl in zip(
             self.BackgroundObj.geo_wavelength,
             self.BackgroundObj.geo_flux,
-            self.BackgroundObj.geo_linewidth,
+            self.BackgroundObj.geo_linewidth, strict=False,
         ):
             for band in self.TelescopeObj.passbands:
                 # Add geocoronal emission (electron/s) to proper passband(s)
@@ -1884,7 +1880,7 @@ class Photometry:
                     if not np.isfinite(geo_erate):
                         warnings.warn(
                             "Could not estimate geocoronal emission noise contribution "
-                            + f"(electron/s) in {band}-band!",
+                             f"(electron/s) in {band}-band!",
                             RuntimeWarning,
                         )
                     else:
@@ -1921,7 +1917,7 @@ class Photometry:
                 if not quiet:
                     print(
                         f"INFO: Fraction of flux within aperture in {band}-band = "
-                        + f"{encircled_energy}"
+                         f"{encircled_energy}"
                     )
                 # Account for extinction
                 source_passband_mag = source_ab_mags[band] + (

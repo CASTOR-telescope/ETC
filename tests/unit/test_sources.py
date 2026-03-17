@@ -65,10 +65,8 @@ test_etc_photometry.py
 """
 import unittest
 
-import astropy.units as u
-import numpy as np
-
 from castor_etc.sources import PointSource
+
 
 class PointSourceTestCase(unittest.TestCase):
     """

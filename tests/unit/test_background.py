@@ -66,8 +66,6 @@ Unit tests for the telescope module.
 
 import unittest
 
-from castor_etc.background import Background
-
 # Test constants
 
 

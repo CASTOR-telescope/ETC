@@ -1,4 +1,4 @@
-#For more information on this function with examples go to this link 
+#For more information on this function with examples go to this link
 # -> 'https://github.com/parkus/fiducial_flare/tree/master'
 #This package was created by Parke Loyd 2017
 # This package was added to CASTOR Github in Feb 2026
@@ -28,23 +28,23 @@
 
 #Information on package:
 
-# fiducial_flare is a package for generating a reasonable approximation of the 
-# UV emission of M dwarf stars over a single flare or a series of them. The simulated 
-# radiation is resolved in both wavelength and time. The intent is to provide 
-# consistent input for applications requiring time-dependent stellar UV radiation 
+# fiducial_flare is a package for generating a reasonable approximation of the
+# UV emission of M dwarf stars over a single flare or a series of them. The simulated
+# radiation is resolved in both wavelength and time. The intent is to provide
+# consistent input for applications requiring time-dependent stellar UV radiation
 # fields that balances simplicity with realism, namely for simulations of exoplanet atmospheres.
 
-# For this balance of simplicity and realism, the flares generated are idealized in the 
+# For this balance of simplicity and realism, the flares generated are idealized in the
 # spectral and temporal distribution of their energy through the following assumptions:
 
 # -The energy budget of the flares is constant. It was compiled by Loyd et al. 2018
 # and is given in "relative_energy_budget.ecsv".
 
-# -The NUV continuum is taken to be a 9,000 K blackbody with energy scaled against the 
+# -The NUV continuum is taken to be a 9,000 K blackbody with energy scaled against the
 # Si IV doublet per the energy budgets of Hawley et al. 2003.
 
-# -Some strong but unobserved lines are assumed to show the same response 
-# (relative to quiescent levels) as a proxy line with good observations and a similar 
+# -Some strong but unobserved lines are assumed to show the same response
+# (relative to quiescent levels) as a proxy line with good observations and a similar
 # formation temperature. Specified with the notation "unobserved line -> proxy," these are
 # - Lya core -> O I 1305
 # - Lyb -> O I 1305
@@ -53,24 +53,28 @@
 # - Al II 1670 -> C II 1334,1335
 # - O VI 1031,1037 -> N V 1238,1242
 
-# - The temporal evolution of flux is taken to a be a boxcar followed by exponential decay, 
+# - The temporal evolution of flux is taken to a be a boxcar followed by exponential decay,
 # following the formula given in Loyd et al. 2018.
 
-# -Flare energies are distributed as a power-law based on the fit to M dwarf 
+# -Flare energies are distributed as a power-law based on the fit to M dwarf
 # Si IV 1394,1403 flares of Loyd et al. 2018.
 # - The flare rate is constant.
 
-# - Flare events follow a Poisson distribution (implying an exponential distribution 
+# - Flare events follow a Poisson distribution (implying an exponential distribution
 # in flare waiting times, e.g. Wheatland 2000)
 
-from astropy import table, constants as const, units as u
-import numpy as np
 import os
+from os.path import join
+
 import mpmath
-from os.path import join 
+import numpy as np
+from astropy import constants as const
+from astropy import table
+from astropy import units as u
 
 ## DATA PATH CONSTANTS
 from castor_etc.filepaths import DATAPATH
+
 FLARE_DATA_PATH = join(DATAPATH, "flare_simulator_data")
 
 # Abbbreviations:
@@ -127,9 +131,9 @@ def _check_unit(func, var, unit):
     try:
         var.to(unit)
     except (AttributeError, u.UnitConversionError):
-        raise ValueError('Variable {} supplied to the {} must be an '
+        raise ValueError(f'Variable {var} supplied to the {func} must be an '
                          'astropy.Units.Quantity object with units '
-                         'convertable to {}'.format(var, func, unit))
+                         f'convertable to {unit}')
 
 
 def _integrate_spec_table(spec_table):
@@ -287,10 +291,9 @@ def blackbody_binned(wbins, T, bolometric=None):
     # renormalize, if desired, and return
     if bolometric is None:
         return f.to('erg s-1 cm-2 AA-1')
-    else:
-        fbolo = const.sigma_sb*T**4
-        fnorm = (f/fbolo).to(1/wbins.unit)
-        return fnorm*bolometric
+    fbolo = const.sigma_sb*T**4
+    fnorm = (f/fbolo).to(1/wbins.unit)
+    return fnorm*bolometric
 _format_doc(blackbody_binned, wbins=_wbins_doc)
 
 
@@ -323,10 +326,9 @@ def blackbody_points(w, T, bolometric=None):
     # return flux density, renormalized if desired
     if bolometric is None:
         return f.to('erg s-1 cm-2 AA-1')
-    else:
-        fbolo = const.sigma_sb*T**4
-        fnorm = (f/fbolo).to(1/w.unit)
-        return fnorm*bolometric
+    fbolo = const.sigma_sb*T**4
+    fnorm = (f/fbolo).to(1/w.unit)
+    return fnorm*bolometric
 #endregion
 
 
@@ -437,8 +439,7 @@ def shot_times(rate, time_span):
     # if the last event occurs before user-specified length of time, try again. Else, return the times.
     if tshot[-1] < time_span:
         return shot_times(rate, time_span)
-    else:
-        return tshot[tshot < time_span]
+    return tshot[tshot < time_span]
 
 
 def boxcar_decay(tbins, t0, area_box, height_box, area_decay):
@@ -702,8 +703,7 @@ def flare_series_lightcurve(tbins, return_flares=False, **flare_params):
 
     if return_flares:
         return y, (tflares, eqds)
-    else:
-        return y
+    return y
 _format_doc(flare_series_lightcurve, tbins=_tbins_doc,
             flare_params=_get_param_string('eqd_min', 'eqd_max', 'cumulative_index', 'boxcar_height_function',
                                            'decay_boxcar_ratio'))

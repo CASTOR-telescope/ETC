@@ -13,6 +13,9 @@ the version numbers.
 - Minor refactoring of `spectrum.py` to enforce typings
   - `wavelengths` is now enforced to be an `astropy.Quantity`
   - `spectrum` is now stored as `flam` where applicable. Any instances where an "arbitrary unit" is specified has been noted for future changes.
+- Addition of `simulator` subpackage
+  - This is a new addition with not a lot of components for now. It provides an interface to add more complex backend classes/methods that can extend base classes.
+  - For example, the current addition of the `flare_simulator` code can be utilized to allow 
 
 ## [1.3.3](https://github.com/CASTOR-telescope/ETC/tree/v1.3.3) (2025-02-24)
 

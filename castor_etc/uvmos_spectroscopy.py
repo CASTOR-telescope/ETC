@@ -73,36 +73,32 @@ proposed design for the UVMOS instrument.
 import math
 from os.path import join
 
-from scipy.interpolate import RectBivariateSpline, interp1d
-import scipy
-from scipy.optimize import curve_fit
-from scipy.ndimage import rotate
-
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import numpy as np
-
 import astropy.units as u
-from astropy.coordinates import angular_separation, Angle, SkyCoord
-from astropy.stats import gaussian_fwhm_to_sigma
-from astropy.coordinates import offset_by
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy
 from astropy import constants as const
-from regions import RectanglePixelRegion, PixCoord 
+from astropy.coordinates import SkyCoord, offset_by
+from astropy.stats import gaussian_fwhm_to_sigma
+from matplotlib import patches
+from regions import PixCoord, RectanglePixelRegion
+from scipy.interpolate import RectBivariateSpline, interp1d
+from scipy.ndimage import rotate
+from scipy.optimize import curve_fit
 
 from .background import Background
+from .filepaths import DATAPATH
 from .sources import PointSource, Source
 from .telescope import Telescope
-from .filepaths import DATAPATH
-
 
 UVMOS_DATAPATH = join(DATAPATH, "UVMOS_data")
 
 def Gaussian(x, x0, sigma, a):
     return a * np.e**(- (x-x0)**2 / (2*sigma**2)  )
 
-def Gaussian2D(x, y, sigma, a=1, x0=0, y0=0): 
-    term1 = ( (x-x0)**2 )/(2*sigma**2)  
-    term2 = ( (y-y0)**2 )/(2*sigma**2)  
+def Gaussian2D(x, y, sigma, a=1, x0=0, y0=0):
+    term1 = ( (x-x0)**2 )/(2*sigma**2)
+    term2 = ( (y-y0)**2 )/(2*sigma**2)
     return a * np.e**( - (term1 + term2 ) )
 
 class UVMOS_Spectroscopy:
@@ -110,10 +106,10 @@ class UVMOS_Spectroscopy:
     UVMOS_Spectroscopy class.
     """
 
-    def __init__(self, TelescopeObj : Telescope, 
+    def __init__(self, TelescopeObj : Telescope,
                  SourceList : list[Source],
                  BackgroundObj : Background,
-                 fieldRA, fieldDEC, **kwargs): 
+                 fieldRA, fieldDEC, **kwargs):
         """
         Initializes the UVMOS_Spectroscopy class
 
@@ -179,7 +175,7 @@ class UVMOS_Spectroscopy:
             for theta in thetaList:
                 if type(theta)!=float and type(theta)!=int:
                     raise TypeError("thetaList must be comprised of floats or integers")
-                elif theta<0 or theta>180:
+                if theta<0 or theta>180:
                     raise ValueError("theta must be between 0 and 180 degrees")
 
         #Initialize fieldRA and fieldDEC
@@ -200,9 +196,9 @@ class UVMOS_Spectroscopy:
                     raise TypeError("deltaDEC must be a list of floats or integers")
 
         self.TelescopeObj = TelescopeObj
-        self.SourceList = SourceList 
+        self.SourceList = SourceList
         self.BackgroundObj = BackgroundObj
-        self.fieldRA = fieldRA 
+        self.fieldRA = fieldRA
         self.fieldDEC = fieldDEC
         self.numSources=len(SourceList)
         self.case = case
@@ -217,7 +213,7 @@ class UVMOS_Spectroscopy:
 
             distance = origin.separation(coord)
             position_angle = origin.position_angle(coord)
-            
+
             offset = offset_by(fieldRA, fieldDEC, position_angle, distance)
             offsets.append(offset)
 
@@ -234,25 +230,25 @@ class UVMOS_Spectroscopy:
         else:
             self.deltaRA = None
             self.deltaDEC = None
-        
+
         #  These attributes may later be moved to the Telescope object
         self.gain = 1
-        self.min_wave = (150 * u.nm).to(u.AA) # Minimum wavelength 
-        self.max_wave = (300 * u.nm).to(u.AA) # Maximum wavelength 
+        self.min_wave = (150 * u.nm).to(u.AA) # Minimum wavelength
+        self.max_wave = (300 * u.nm).to(u.AA) # Maximum wavelength
         self.slit_width =  0.214 * u.arcsec
         self.slit_height = 1 * u.arcsec
 
-        self.FWHM = TelescopeObj.fwhm 
+        self.FWHM = TelescopeObj.fwhm
         self.dispersion = 0.061 * u.nm
         self.pixel_size = TelescopeObj.px_scale #0.1 arcsec/pixel
-        
+
         self.source_detector = None
         self.background_detector = None
         self.source_CASTORSpectrum = None
         self.background_CASTORSpectrum = None
         self.waves_CASTORSpectrum  = None
         self.waves_CASTORSpectrumBackground = None
-        
+
         self.slit_width_pix = None
         self.slit_height_pix = None
         self.source_extracted_numpixs = None
@@ -268,7 +264,7 @@ class UVMOS_Spectroscopy:
 
         self.detectorDMDScale = 10.8 / 10.0  # DMD pixel width / detector pixel width
         self.DMDPixelDimen = (1920, 1080) # pixels
-        
+
         longerDetectorLength = np.sin(np.pi/4) * self.DMDPixelDimen[0] * self.detectorDMDScale
         shorterDetectorLength = np.sin(np.pi/4) * self.DMDPixelDimen[1] * self.detectorDMDScale
         self.detectorPixelLength = math.ceil(longerDetectorLength + shorterDetectorLength) #pixels
@@ -276,13 +272,13 @@ class UVMOS_Spectroscopy:
 
         self.slit_width = 0.214 * u.arcsec # Specify slit dimensions
         self.slit_height = 1 * u.arcsec
-        
+
         self.slit_width_pix = math.ceil((self.slit_width/self.pixel_size).value) # Generate pixel dimensions
-        self.slit_height_pix = math.ceil((self.slit_height/self.pixel_size).value) 
+        self.slit_height_pix = math.ceil((self.slit_height/self.pixel_size).value)
 
         self.pixel_FWHM = self.FWHM.value * self.plate_scale.value / (self.detector_pix_width.value * 10e-3)
 
-    
+
     def _check_source_separation(self):
         """
         Checks for sources that are less than 5 sigma apart.
@@ -290,29 +286,28 @@ class UVMOS_Spectroscopy:
 
         #---- Returns None if there is only one source.
         if self.numSources == 1 or self.deltaRA is None or self.deltaDEC is None:
-            return None 
-        
-        else:
-            sourceCatalog = []
+            return None
 
-            #---- Define a 5 sigma separation based on the FWHM of the telescope, assume a PointSource
-            sep_5sig = 5 * self.FWHM.value * gaussian_fwhm_to_sigma
+        sourceCatalog = []
 
-            #---- Create a catalog of the coordinates of the sources.
-            for sourceNum in range(len(self.offsets)):
+        #---- Define a 5 sigma separation based on the FWHM of the telescope, assume a PointSource
+        sep_5sig = 5 * self.FWHM.value * gaussian_fwhm_to_sigma
 
-                sourceCatalog = np.append(sourceCatalog, self.offsets[sourceNum])
+        #---- Create a catalog of the coordinates of the sources.
+        for sourceNum in range(len(self.offsets)):
 
-            #---- Check for overlapping sources.  If there is, returns a ValueError
-            for sourceNum in range(len(sourceCatalog)):
-                for source in range(len(sourceCatalog)):
-                    if source!=sourceNum:
-                        scalarc=sourceCatalog[sourceNum]
-                        d2d=scalarc.separation(sourceCatalog[source])
-                        if d2d.deg<(sep_5sig):
-                            raise ValueError("The sources must be 5 sigma apart")  
+            sourceCatalog = np.append(sourceCatalog, self.offsets[sourceNum])
 
-    
+        #---- Check for overlapping sources.  If there is, returns a ValueError
+        for sourceNum in range(len(sourceCatalog)):
+            for source in range(len(sourceCatalog)):
+                if source!=sourceNum:
+                    scalarc=sourceCatalog[sourceNum]
+                    d2d=scalarc.separation(sourceCatalog[source])
+                    if d2d.deg<(sep_5sig):
+                        raise ValueError("The sources must be 5 sigma apart")
+
+
     def _specify_DMD_FOV(self):
         """
         Creates an array the size of the DMD
@@ -330,19 +325,19 @@ class UVMOS_Spectroscopy:
             self.centre = PixCoord(round(self.detectorPixelLength / 2), round(self.detectorPixelLength / 2))
             self.dmdArea = RectanglePixelRegion(self.centre, self.DMDPixelDimen[0],
                                             self.DMDPixelDimen[1], angle = 45.0 * u.deg)
-            dmdMask = self.dmdArea.to_mask(mode = "center") 
+            dmdMask = self.dmdArea.to_mask(mode = "center")
 
         else: # case 2, detector is straight
 
             self.detectorArray = np.zeros((self.detectorPixelDimen[1], self.detectorPixelDimen[0])) # Have the detector be oriented vertically
             self.centre = PixCoord(round(self.detectorPixelLength / 2), round(self.detectorPixelLength / 2))
             self.dmdArea = RectanglePixelRegion(self.centre, self.DMDPixelDimen[0], self.DMDPixelDimen[1], angle = 90.0 * u.deg)
-        
+
             dmdMask = self.dmdArea.to_mask(mode = "center")
 
         return [dmdMask, self.dmdArea]
 
-        
+
     def _make_pixel_source_catalog(self):
         '''
         Makes a catalog of sources with their ra and decs in pixel coordinates.
@@ -356,7 +351,7 @@ class UVMOS_Spectroscopy:
 
         # self.centre, transform the coordinates from RA and DEC.  Disregard the centres and just transform them and then add them to self.centre
         sourceCatalog = []
-        
+
         for sourceNum in range(self.numSources):
             delta_x = self.deltaRA[sourceNum] * 60 * 60 * self.pixel_size.value #pixel size is in arcsecs, deltara is in degrees
             delta_y = self.deltaDEC[sourceNum] * 60 * 60 * self.pixel_size.value
@@ -368,19 +363,19 @@ class UVMOS_Spectroscopy:
             y = y_cent + delta_y
 
             if self.case == 1:
-                
+
                 sourceCoord = PixCoord(round(x), round(y))
                 sourceCatalog = np.append(sourceCatalog, sourceCoord)
 
             else:
-                
+
                 sourceCoord = PixCoord(round(x), round(y))
-                sourceCatalog = np.append(sourceCatalog, sourceCoord)        
+                sourceCatalog = np.append(sourceCatalog, sourceCoord)
 
         return sourceCatalog
 
 
-    def _generate_slits(self):   
+    def _generate_slits(self):
         """
         Creates a list of slits (RectanglePixelRegions)
 
@@ -390,7 +385,7 @@ class UVMOS_Spectroscopy:
         """
 
         sourceCatalog = self._make_pixel_source_catalog()
-        
+
         slitCatalog = []
 
         if self.thetaList != None:
@@ -406,14 +401,14 @@ class UVMOS_Spectroscopy:
                     slitRegion = RectanglePixelRegion(center = sourceCatalog[source], height = self.slit_height_pix, width = self.slit_width_pix, angle = self.thetaList * 45 * u.deg)
                 else:
                     slitRegion = RectanglePixelRegion(center = sourceCatalog[source], height = self.slit_height_pix, width = self.slit_width_pix, angle = self.thetaList * u.deg)
-            
+
 
                 slitCatalog = np.append(slitCatalog, slitRegion)
 
         return slitCatalog
 
-    
-    def _check_slits(self):   
+
+    def _check_slits(self):
         """
         Checks that no slits are off the detector and that no slits are overlapping.
 
@@ -425,20 +420,20 @@ class UVMOS_Spectroscopy:
         dmdFOV = dmdFOV.to_image((self.detectorPixelDimen[0], self.detectorPixelDimen[1]))
 
         for i in range(len(slitCatalog)):
-            slitMask = slitCatalog[i].to_mask(mode = "center") 
+            slitMask = slitCatalog[i].to_mask(mode = "center")
             slitMask = slitMask.to_image((self.detectorPixelDimen[0], self.detectorPixelDimen[1]))
             results = np.where(slitMask == dmdFOV, 0, -100)
             print(results)
-            
+
             if -100 in results:
                 raise ValueError("Slit at "+str(slitCatalog[i].center)+" is out of DMD FOV.")
                 #print(ValueError("Slit at "+str(slitCatalog[i].center)+" is out of DMD FOV."))
-            
+
             for j in range(len(slitCatalog)):
                 jMask = slitCatalog[j].to_mask(mode = "center")
                 jMask = jMask.to_image((self.detectorPixelDimen[0], self.detectorPixelDimen[1]))
                 res = np.where(jMask == slitMask, 0, -100)
-                
+
                 if i!=j and -100 in res:
                     raise ValueError("Slit "+str(i.center)+" and slit "+str(j.center)+" are overlapping.")
                     #print(ValueError("Slit "+str(slitCatalog[i].center)+" and slit "+str(slitCatalog[j].center)+" are overlapping."))
@@ -455,7 +450,7 @@ class UVMOS_Spectroscopy:
         dmdFOV = self._specify_DMD_FOV()[1] # This is the rectangular pixel region
 
         #self._check_slits() # This will check if all of our slits are within the DMD FOV
-        
+
         avg_bkg_mag = self.BackgroundObj.calc_mags_per_sq_arcsec(self.TelescopeObj, overwrite = True)["uv"]
         avg_bkg_flux = 10 ** (-0.4 * (avg_bkg_mag - (-48.60)))
         background = self.detectorArray + avg_bkg_flux # Add the flux to the array of zeros to simulate a background
@@ -470,20 +465,20 @@ class UVMOS_Spectroscopy:
         plt.colorbar()
         # ax.imshow(background, cmap = "gray") # To apply the mask maybe use np.where
 
-        self.slit_width_pix = self.slit_width_pix 
-        self.slit_height_pix = self.slit_height_pix 
+        self.slit_width_pix = self.slit_width_pix
+        self.slit_height_pix = self.slit_height_pix
 
         for slit in range(len(slitCatalog)):
             # Plot the sources
 
             pixel_FWHM = self.FWHM.value * self.plate_scale.value / (self.detector_pix_width.value * 10e-3) * 2
 
-            nt = 100 
-            x = np.linspace(-round(pixel_FWHM * 3.0)  , round(pixel_FWHM * 3.0) , nt) 
+            nt = 100
+            x = np.linspace(-round(pixel_FWHM * 3.0)  , round(pixel_FWHM * 3.0) , nt)
             y = np.linspace( -round(pixel_FWHM * 3.0) , round(pixel_FWHM * 3.0) , nt)
             XX, YY = np.meshgrid(x,y)
-     
-            sigma = self.FWHM.value / (2*np.sqrt(2*np.log(2))) 
+
+            sigma = self.FWHM.value / (2*np.sqrt(2*np.log(2)))
 
             # Create the point source
             ZZ = Gaussian2D(XX, YY, sigma) + avg_bkg_flux
@@ -493,7 +488,7 @@ class UVMOS_Spectroscopy:
 
             # Plot the slits
             bottom_corner = [slitCatalog[slit].center.x - self.slit_width_pix/2, slitCatalog[slit].center.y - self.slit_height_pix/2]
-            slit_patch = patches.Rectangle(bottom_corner, self.slit_width_pix, 
+            slit_patch = patches.Rectangle(bottom_corner, self.slit_width_pix,
                                            self.slit_height_pix, angle = self.thetaList[slit],
                                            rotation_point = "center", edgecolor = "r", fill = False)
             ax.add_patch(slit_patch)
@@ -518,14 +513,14 @@ class UVMOS_Spectroscopy:
             plt.ylabel('Arcseconds')
 
 
-            #-------- Plot entire light distribution 
+            #-------- Plot entire light distribution
             nt = 500
             x = np.linspace(-1,1 ,nt)
             y = np.linspace( -1,1,nt)
             XX, YY = np.meshgrid(x,y)
-        
+
             sigma = self.FWHM.value / (2*np.sqrt(2*np.log(2)))
-       
+
             ZZ = Gaussian2D(XX,YY,sigma)
 
             cax = ax.pcolor(x,y,ZZ,cmap='binary',shading='auto')
@@ -591,48 +586,48 @@ class UVMOS_Spectroscopy:
 
         for i in range(len(sourceCatalog)):
             self.size = 10
-            nt = self.size * 2 + 1 
+            nt = self.size * 2 + 1
             x = np.linspace(-self.size, self.size, nt)
             y = np.linspace(-self.size, self.size, nt)
             XX, YY = np.meshgrid(x, y)
 
             sigma = self.FWHM.value / (2 * np.sqrt(2 * np.log(2)))
-            ZZ = Gaussian2D(XX, YY, sigma) 
+            ZZ = Gaussian2D(XX, YY, sigma)
 
             slitMask = slitCatalog[i].to_mask(mode = "center")
             slitImg = slitMask.to_image((self.detectorPixelDimen[0], self.detectorPixelDimen[1]))
-            img_slit = np.where(slitImg == 0, slitImg, background) 
+            img_slit = np.where(slitImg == 0, slitImg, background)
             slit_cutout = img_slit[sourceCatalog[i].y - self.size : sourceCatalog[i].y + self.size + 1, sourceCatalog[i].x - self.size : sourceCatalog[i].x + self.size + 1]
 
             interp_spline = RectBivariateSpline(x, y, ZZ, kx=5, ky=5) # was 5 for both
 
         # ------- Total transmitted intensity
             vol1 = interp_spline.integral(-self.size, self.size, -self.size, self.size)
-                                            
+
             pix_weights = np.zeros((self.size*2 + 1, self.size*2 + 1))
-    
+
             vals = []
-            for j in range(-self.size, self.size + 1):    
+            for j in range(-self.size, self.size + 1):
                 for k in range(-self.size, self.size + 1):
 
                 # Intensity transmitted to this "pixel"
                     vol2 = interp_spline.integral(j - 1, j, k - 1, k)
-                    pix_weights[j+self.size, k+self.size] = pix_weights[j+self.size, k+self.size] + vol2/vol1 
+                    pix_weights[j+self.size, k+self.size] = pix_weights[j+self.size, k+self.size] + vol2/vol1
 
-            # This line is because some of them were weirdly below zero.  It looks okay with this line but should 
+            # This line is because some of them were weirdly below zero.  It looks okay with this line but should
             # probably go back sometime and do an actual fix
             pix_weights = np.where(pix_weights < 0, -1 * pix_weights, pix_weights)
             pix_dist = np.where(slit_cutout == 0, slit_cutout, pix_weights)
 
             vol1 = np.sum(pix_weights)
-            vol2 = np.sum(pix_dist)    
+            vol2 = np.sum(pix_dist)
 
             fractional_slit_transmission_2D = vol2 / vol1
             transmissions.append(fractional_slit_transmission_2D)
 
             if print_transmission_fact:
-                print('Fractional slit transmission (2D estimation) {}'.format(fractional_slit_transmission_2D))
-                print('Fractional slit loss (2D estimation) {}'.format(1 - fractional_slit_transmission_2D))
+                print(f'Fractional slit transmission (2D estimation) {fractional_slit_transmission_2D}')
+                print(f'Fractional slit loss (2D estimation) {1 - fractional_slit_transmission_2D}')
 
         return transmissions
 
@@ -656,20 +651,20 @@ class UVMOS_Spectroscopy:
 
         for i in range(len(sourceCatalog)):
 
-            self.size = 6 # This sets the size of the cutout.  
+            self.size = 6 # This sets the size of the cutout.
 
             nt = self.size*2 + 1
             x = np.linspace(-self.size, self.size, nt)
             y = np.linspace(-self.size, self.size, nt)
-            XX, YY = np.meshgrid(x, y) 
+            XX, YY = np.meshgrid(x, y)
 
-            sigma = self.pixel_FWHM / (2 * np.sqrt(2 * np.log(2))) 
+            sigma = self.pixel_FWHM / (2 * np.sqrt(2 * np.log(2)))
             ZZ = Gaussian2D(XX, YY, sigma) #+ avg_bkg_flux # This makes the point source with the average background flux added to it.
 
             # Makes the mask
             slitMask = slitCatalog[i].to_mask(mode = "center")
             slitImg = slitMask.to_image((self.detectorPixelDimen[0], self.detectorPixelDimen[1]))
-            img_slit = np.where(slitImg == 0, slitImg, background) 
+            img_slit = np.where(slitImg == 0, slitImg, background)
             slit_cutout = img_slit[sourceCatalog[i].y - self.size : sourceCatalog[i].y + self.size + 1, sourceCatalog[i].x - self.size : sourceCatalog[i].x + self.size + 1]
 
             masked_ZZ = np.where(slit_cutout == 0, slit_cutout, ZZ)
@@ -678,30 +673,30 @@ class UVMOS_Spectroscopy:
 
         # ------- Total transmitted intensity
             vol1 = interp_spline.integral(-self.size, self.size, -self.size, self.size)
-                                            
+
         # -------
             pix_dist = np.zeros((self.size*2 + 1, self.size*2 + 1))
             # This is the per pixel transmitted intensity
             # Then divide the per pixel transmitted intensity by the total transmitted intensity
             vals = []
-            for j in range(-self.size, self.size + 1):    
+            for j in range(-self.size, self.size + 1):
                 for k in range(-self.size, self.size + 1):
 
                 # Intensity transmitted to this "pixel"
                     vol2 = interp_spline.integral(j - 1, j, k - 1, k)
-                    pix_dist[j+self.size, k+self.size] = pix_dist[j+self.size, k+self.size] + vol2/vol1 
-            
+                    pix_dist[j+self.size, k+self.size] = pix_dist[j+self.size, k+self.size] + vol2/vol1
+
             pix_dist = np.where(pix_dist < 0, -1 * pix_dist, pix_dist)
             pix_dist = np.where(slit_cutout == 0, slit_cutout, pix_dist)
             pix_dist_list.append(pix_dist)
-         
+
         return pix_dist_list
-    
+
     def show_source_pix_weights(self):
         """
         This plots the results of the calc_source_pix_weights() function.
         """
-        
+
         pix_dist_list = self.calc_source_pix_weights()
 
         for i in range(len(pix_dist_list)):
@@ -721,10 +716,10 @@ class UVMOS_Spectroscopy:
             cbar.set_label('Normalized Intensity')
             ax.set_aspect('equal')
 
-            plt.savefig("source_pix_weights_"+str(i)) 
+            plt.savefig("source_pix_weights_"+str(i))
 
-    
-    def show_slit_image(self, wavelength): 
+
+    def show_slit_image(self, wavelength):
         """ 
         Shows the smeared out slit.  This is accomplished by rotating the slit to be vertical, then smearing out the slit horizontally, then 
         rotating the smeared out slit back to it's original position.
@@ -740,26 +735,26 @@ class UVMOS_Spectroscopy:
         center_pix_list = (list of int) a list of the center pixels of the smeared out slits
         """
 
-        pix_dist_list = self.calc_source_pix_weights() 
+        pix_dist_list = self.calc_source_pix_weights()
 
         detector_list = []
         center_pix_list = []
 
         for i in range(len(pix_dist_list)):
             y = self.SourceList[i].spectrum # gets the spectrum and the wavelengths
-            x = self.SourceList[i].wavelengths.value 
+            x = self.SourceList[i].wavelengths.value
 
             # ----- Extract only the wavelengths in the spectral region
             ind = np.where( (x >= self.min_wave.value) & (x <= self.max_wave.value) )
             xx = x[ind]
-            yy = y[ind] 
+            yy = y[ind]
 
             # ------- Determine the fractional slit transmission
             fractional_slit_transmission = self._calc_slit_transmission()[i]
 
         # --------- Find detected flux
             fact = 1/(const.h*const.c).to('erg angstrom')
-            T = self._getTransmission(xx) 
+            T = self._getTransmission(xx)
             yy_phot = yy*(xx*(fact.value))*self.TelescopeObj.mirror_area.value*T*fractional_slit_transmission*self.gain # Detected flux in counts / s / angstrom
 
             interp_source_spectrum = interp1d(xx, yy_phot, kind='cubic',  ) # Something is weird here
@@ -769,13 +764,13 @@ class UVMOS_Spectroscopy:
             wave = (wavelength * u.nm).to(u.AA).value
             if (wave - self.size < min(xx)): # Not sure how to go about this
                 wave = wave + self.size + self.dispersion.to(u.AA).value
-        
+
             if (wave + self.slit_width_pix > max(xx)):
                 wave = wave - self.size - self.dispersion.to(u.AA).value
 
             # -------- Create the detector heat map
             if self.case == 1:
-                angle = 45 - self.thetaList[i] 
+                angle = 45 - self.thetaList[i]
             else:
                 angle = 90 - self.thetaList[i]
 
@@ -783,19 +778,17 @@ class UVMOS_Spectroscopy:
 
             slit_idxs = []
 
-            for k in range(len(straight_detector[0, :])): # 
+            for k in range(len(straight_detector[0, :])):
                 slit_idx = np.where(straight_detector[k, :] > 0)[0]
                 for j in slit_idx:
-                    slit_idxs.append(j) 
+                    slit_idxs.append(j)
 
-            max_slit = 0 
-            min_slit = 50 
+            max_slit = 0
+            min_slit = 50
 
             for j in slit_idxs:
-                if max_slit < j:
-                    max_slit = j
-                if min_slit > j:
-                    min_slit = j
+                max_slit = max(max_slit, j)
+                min_slit = min(min_slit, j)
 
             max_slit_width = max_slit - min_slit - 1
 
@@ -805,7 +798,7 @@ class UVMOS_Spectroscopy:
             tot_xpixels = len(bands) + max_slit_width
 
 
-            detector = np.zeros((np.shape(straight_detector)[0], tot_xpixels)) 
+            detector = np.zeros((np.shape(straight_detector)[0], tot_xpixels))
 
             for k in range(len(bands)-1):
 
@@ -814,8 +807,8 @@ class UVMOS_Spectroscopy:
                     center_pix_list.append(center_pix)
 
                 x = np.linspace(bands[k], bands[k+1], 1000 )
-                y = interp_source_spectrum(x) 
-                y = np.where(y < 0, 0, y) 
+                y = interp_source_spectrum(x)
+                y = np.where(y < 0, 0, y)
 
                 # Flux in photons per second
                 phot_in_band = np.array(scipy.integrate.cumulative_trapezoid(y, x )[-1])
@@ -823,15 +816,15 @@ class UVMOS_Spectroscopy:
                 # Create the pixel map for this band
                 pix_map = straight_detector * phot_in_band
 
-                for j in range(max_slit_width): 
+                for j in range(max_slit_width):
                     detector[:,k+j] = detector[:,k+j] + pix_map[:,j]
 
             rotated_detector = rotate(detector, angle = -angle, reshape = True, mode = "constant")
             detector_list.append(rotated_detector)
-            
+
         return detector_list, center_pix_list
 
-    
+
     def _extraction(self, detector, pix_waves, extraction_width, extraction_lowerlim, extraction_upperlim):
         """
         Extracts the wavelengths, flux, and number of pixels from the smeared slit.
@@ -888,7 +881,7 @@ class UVMOS_Spectroscopy:
 
         extracted_flux = [] # counts / extraction box
 
-        for i in range(num_extractions): 
+        for i in range(num_extractions):
 
             x_left = extraction_width* i
             x_right = extraction_width* i + extraction_width
@@ -897,7 +890,7 @@ class UVMOS_Spectroscopy:
 
         return extracted_waves, extracted_flux, extracted_numpix
 
-    
+
     def _getTransmission(self, x):
         """
         Unpacks spectrographTransmission_CASTOR.txt.  Fits it with a cubic spline.
@@ -909,7 +902,7 @@ class UVMOS_Spectroscopy:
         returns
         -------
         the transmission values from the cubic spline
-        """ 
+        """
         transmissionpath = join(UVMOS_DATAPATH, "spectrographTransmission_CASTOR.txt")
         lines = open(transmissionpath).readlines() #  NOTE: Could be moved to 'data' folder  later
         trans_w = [float(line.split()[0]) * 10 for line in lines if '#' not in line.split()]
@@ -919,7 +912,7 @@ class UVMOS_Spectroscopy:
 
         return func(x)
 
-        
+
     def _getDispersion(self, x):
         """
         Unpacks dispersion_resolution2.dat and fits it with a cubic spline.
@@ -942,7 +935,7 @@ class UVMOS_Spectroscopy:
 
         return func(x)
 
-    
+
     def showTransmission(self):
         """
         Plots the transmission as a function of wavelength
@@ -955,7 +948,7 @@ class UVMOS_Spectroscopy:
         plt.ylabel('Efficiency')
         plt.xlabel(r"Wavelength [$\AA$]")
 
-    
+
     def _calc_sigmaPix(self, dispersion):
         """
         Calculate the sigma value of a Gaussian fit to a pixel with a width in wavelength equal
@@ -988,7 +981,7 @@ class UVMOS_Spectroscopy:
 
         return abs(cf_sigma)
 
-    
+
     def _calc_sigmaPSF(self, dispersion):
         """
         Calculate the sigma value of the Gaussian PSF on the detector
@@ -1007,7 +1000,7 @@ class UVMOS_Spectroscopy:
 
         return sigma_psf_wave
 
-    
+
     def _calcR(self, x, disp ):
         """
         Calculate the resolving power
@@ -1028,7 +1021,7 @@ class UVMOS_Spectroscopy:
 
         return [x[i] / dL[i] for i in range(len(x))]
 
-    
+
     def showResolvingPower(self,):
 
         minn = self.min_wave.to('nm').value
@@ -1043,9 +1036,9 @@ class UVMOS_Spectroscopy:
 
         plt.title('Resolving power as a function of wavelength for the UVMOS spectrograph')
         plt.ylabel('Resolving Power (R)')
-        plt.xlabel(r'Wavelength [$\AA$]')  
+        plt.xlabel(r'Wavelength [$\AA$]')
 
-    
+
     def calc_source_CASTORSpectrum(self, extraction_width=1, extraction_lowerlim=1 , extraction_upperlim='max' ):
         """
         Calculates the source spectrum.  Done for non-vertical slits by rotating the slit to be vertical and then smearing
@@ -1097,23 +1090,21 @@ class UVMOS_Spectroscopy:
                 angle = -(270 - self.thetaList[k])
 
             rot_pix_dist = rotate(pix_dist_list[k], angle = angle, reshape = True, mode = "constant") # Straighten slit
-            rot_pix_dist = np.where(rot_pix_dist > 0.001, rot_pix_dist, 0) # Mask out noise 
+            rot_pix_dist = np.where(rot_pix_dist > 0.001, rot_pix_dist, 0) # Mask out noise
 
             slit_idxs = []
 
             for i in range(len(rot_pix_dist[0, :])): # I just need rows
                 slit_idx = np.where(rot_pix_dist[i, :] > 0)[0]
                 for j in slit_idx:
-                    slit_idxs.append(j) 
+                    slit_idxs.append(j)
 
             max_slit = 0 # This is for width only
             min_slit = 10 # I know it's lower than this, I just don't want to set it to low to begin with
 
             for j in slit_idxs:
-                if max_slit < j:
-                    max_slit = j
-                if min_slit > j:
-                    min_slit = j
+                max_slit = max(max_slit, j)
+                min_slit = min(min_slit, j)
 
             max_slit_width = max_slit - min_slit - 1
             rot_pix_dist = rot_pix_dist[:, min_slit:max_slit - 1]
@@ -1121,10 +1112,10 @@ class UVMOS_Spectroscopy:
             self.rot_pix_dist_list.append(rot_pix_dist)
 
             bands = np.arange(min(xx), max(xx), self.dispersion.to('angstrom').value)
-            
-            tot_xpixels =  math.ceil(( (self.max_wave - self.min_wave ) / self.dispersion ).si.value) + max_slit_width 
 
-            pix_waves = [ round((min(xx)-self.dispersion.to('angstrom').value/2) + (i*self.dispersion.to('angstrom').value ),2) for i  in range(tot_xpixels) ] 
+            tot_xpixels =  math.ceil(( (self.max_wave - self.min_wave ) / self.dispersion ).si.value) + max_slit_width
+
+            pix_waves = [ round((min(xx)-self.dispersion.to('angstrom').value/2) + (i*self.dispersion.to('angstrom').value ),2) for i  in range(tot_xpixels) ]
 
             source_detector = np.zeros((np.shape(rot_pix_dist)[0], tot_xpixels))
 
@@ -1141,7 +1132,7 @@ class UVMOS_Spectroscopy:
                 pix_map = rot_pix_dist * phot_in_band
 
                 # Update the detctor heat map
-                for j in range(max_slit_width): 
+                for j in range(max_slit_width):
                     source_detector[:,i+j] = source_detector[:,i+j] + pix_map[:,j]
 
             # ------ Extract the spectrum from the detector heat map
@@ -1155,7 +1146,7 @@ class UVMOS_Spectroscopy:
             self.source_extracted_numpixs_list.append(source_extracted_numpixs)
             self.source_detector_list.append(source_detector)
 
-            
+
 
     def calc_background_CASTORSpectrum(self, extraction_width=1, extraction_lowerlim=1 , extraction_upperlim='max' ):
         """
@@ -1201,7 +1192,7 @@ class UVMOS_Spectroscopy:
 
             rot_pix = self.rot_pix_dist_list[k] # Why is the width of this still 1
             max_slit_width = np.shape(rot_pix)[1]
-            rot_pix_dist = np.ones(np.shape(rot_pix)) * (1/(self.slit_height_pix * max_slit_width)) 
+            rot_pix_dist = np.ones(np.shape(rot_pix)) * (1/(self.slit_height_pix * max_slit_width))
 
             # ------ Create the detector heat map
             tot_xpixels = math.ceil(( (self.max_wave - self.min_wave ) / self.dispersion ).si.value) + max_slit_width
@@ -1244,7 +1235,7 @@ class UVMOS_Spectroscopy:
             self.background_extracted_numpixs_list.append(background_extracted_numpixs)
 
 
-    
+
     def calc_snr_from_t(self, t, wave, nread=1):
         """
         Calculates the signal to noise ratio from the exposure time.
@@ -1272,7 +1263,7 @@ class UVMOS_Spectroscopy:
             read_npix = self.source_extracted_numpixs_list[i]
 
             signal = np.array(self.source_CASTORSpectrum_list[i]) # This is what does not match, this is 13 because it's the width + spectrum
-            signal_t = signal * t # This means that I will have to do the rotation stuff with the background 
+            signal_t = signal * t # This means that I will have to do the rotation stuff with the background
 
             noise = signal_t + t * read_npix * (np.array(self.background_CASTORSpectrum_list[i]) + self.TelescopeObj.dark_current) + read_npix * self.TelescopeObj.read_noise**2 * nread
 
@@ -1291,7 +1282,7 @@ class UVMOS_Spectroscopy:
 
         return snr_list
 
-        
+
 
     def calc_t_from_snr(self, snr, wave, nread=1):
         """
@@ -1345,6 +1336,6 @@ class UVMOS_Spectroscopy:
 
         return t_list
 
-            
+
 
 

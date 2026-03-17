@@ -165,9 +165,6 @@ class UVMOS_SingleObject:
         self.dispersion = 0.061 * u.nm
         self.pixel_size = TelescopeObj.px_scale
 
-        #
-        #
-        #
         self.source_detector = None
         self.background_detector = None
         self.source_CASTORSpectrum = None
@@ -610,7 +607,7 @@ class UVMOS_SingleObject:
         # ------ Extract the spectrum from the detector heat map
         if extraction_upperlim == 'max':
             extraction_upperlim = self.slit_height_pix
-        
+
         self.waves_CASTORSpectrum, self.source_CASTORSpectrum, self.source_extracted_numpixs =  self._extraction(self.source_detector, pix_waves, extraction_width, extraction_lowerlim, extraction_upperlim)
 
     def calc_background_CASTORSpectrum(self, extraction_width=1, extraction_lowerlim=0, extraction_upperlim='max' ):

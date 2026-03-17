@@ -65,9 +65,6 @@ dev = [
     "pip-audit",
 ]
 
-[tool.pytest.ini_options]
-addopts = "--cov=castor_etc --cov-report markdown:docs/cov.md --cov-report html tests/"
-
 [tool.coverage.run]
 relative_files = true
 source = ["castor_etc"]

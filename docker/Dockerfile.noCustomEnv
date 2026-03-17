@@ -39,8 +39,8 @@ COPY docker/startup-hook.sh /usr/local/bin/start-notebook.d/
 # Install castor_etc package (always install newest version via CACHEBUST)
 # See <https://github.com/moby/moby/issues/1996#issuecomment-185872769>
 ARG CACHEBUST=1
-ADD castor_etc /opt/mypackage/castor_etc
-COPY LICENSE setup.py /opt/mypackage/
+ADD castor_etc /opt/castor_etc
+COPY LICENSE setup.py /opt/
 WORKDIR /opt/mypackage
 RUN pip install .
 

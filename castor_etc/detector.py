@@ -13,9 +13,10 @@ This is meant to abstract some of the features such that they can be added to th
 This is still work in progress, so please do not import this package directly for use.
 """
 
-from . import BaseClass
+
 import numpy as np
-from typing import Literal
+
+from . import BaseClass
 
 # TODO: implement gain profile based on measured gain from different SPI settings
 
@@ -30,13 +31,13 @@ class TempDependentNoise(BaseClass):
     def get_mean_value(self, target_temp : float):
         # TODO: add docstrings
         return np.interp(target_temp, self._profile['temps'], self._profile['means'])
-    
+
     def get_median_value(self, target_temp : float):
         return np.interp(target_temp, self._profile['temps'], self._profile['medians'])
 
     def get_peak_value(self, target_temp : float):
         return np.interp(target_temp, self._profile['temps'], self._profile['peaks'])
-    
+
     # TODO: add a load-profile from JSON class!
     ## The ideal behaviour is:
     ### profiles are stored as JSON files inside data, and "defaults" are assigned by the JSON it imports

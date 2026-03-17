@@ -72,8 +72,8 @@ import astropy.units as u
 import numpy as np
 
 from castor_etc.background import Background
-from castor_etc.telescope import Telescope
 from castor_etc.photometry import Photometry
+from castor_etc.telescope import Telescope
 
 _TOL = 1e-2
 
@@ -89,7 +89,7 @@ class GalaxySourcePhotometryTestCase(unittest.TestCase):
         self.bg = Background()  # default Earthshine and zodiacal light
         self.bg.add_geocoronal_emission(
                 flux=1e-15, wavelength=2345 * u.AA, linewidth=0.023 * u.AA)
-              
+
         from castor_etc.sources import GalaxySource
 
 
@@ -119,7 +119,7 @@ class GalaxySourcePhotometryTestCase(unittest.TestCase):
 
     def test_expected_spectrum_plot(self):
         self.src.show_spectrum(plot=False)
-        pass  # Just ensure no exceptions are raised
+        # Just ensure no exceptions are raised
 
     def test_galaxy_source_snr_calculator(self):
         INTEGRATION_TIME = 4321  # seconds

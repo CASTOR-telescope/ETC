@@ -67,15 +67,11 @@ This module contains an integrated test suite to the UVMOS spectroscopy calculat
 
 import unittest
 
-import astropy.units as u
-import matplotlib.pyplot as plt
-
 from castor_etc.background import Background
+from castor_etc.deprecated.uvmos_single_slit import UVMOS_SingleObject
 from castor_etc.sources import PointSource
 from castor_etc.telescope import Telescope
-
 from castor_etc.uvmos_spectroscopy import UVMOS_Spectroscopy
-from castor_etc.deprecated.uvmos_single_slit import UVMOS_SingleObject
 
 _TOL = 1e-5  # floating-point tolerance
 
@@ -89,7 +85,6 @@ class UVMOS_SpectroscopyTestCase(unittest.TestCase):
 
         # Default background with one emission line
         self.bg = Background(mags_per_sq_arcsec={"uv": 26.08, "u": 23.74, "g": 22.60})
-        from castor_etc.sources import ExtendedSource
 
         self.src = PointSource()
         self.src.use_pickles_spectrum("b0v")
@@ -103,14 +98,14 @@ class UVMOS_SpectroscopyTestCase(unittest.TestCase):
         self.single_slit.calc_background_CASTORSpectrum()
 
         # Create UVMOS object with new implementation
-        delta_ra = [1] 
+        delta_ra = [1]
         delta_dec = [-0.3]
         theta_list = [0]
 
         RA = 186.1
         DEC = 12.3
 
-        self.uvmos = UVMOS_Spectroscopy(self.scope, [self.src], self.bg, RA, DEC, 
+        self.uvmos = UVMOS_Spectroscopy(self.scope, [self.src], self.bg, RA, DEC,
                                         delta_ra = delta_ra, delta_dec = delta_dec, theta = theta_list, case = 2)
 
     def test_single_slit_calc_snr(self):
@@ -122,7 +117,7 @@ class UVMOS_SpectroscopyTestCase(unittest.TestCase):
         VAL = 6486.995100005579 # from local calculations
         places = 2             # test with accuracy up to 0
         self.assertAlmostEqual(snr, VAL, places=places)
-        
+
     #     # TODO: add assertions
 
     def test_single_slit_calc_exposure_time(self):
@@ -136,13 +131,13 @@ class UVMOS_SpectroscopyTestCase(unittest.TestCase):
         self.assertAlmostEqual(t, VAL, places=places)
 
     #     # TODO: add assertion for these tests
-    
+
     def test_multi_slit_calc_snr(self):
         T_TARGET = 100  # seconds
         LAMBDA = 2000   # Angstroms
 
         snr = self.uvmos.calc_snr_from_t(T_TARGET, LAMBDA)[0]
-        
+
         VAL = 9542.739326148867 # from local testing
         self.assertAlmostEqual(snr, VAL, places=1)
 
@@ -151,10 +146,10 @@ class UVMOS_SpectroscopyTestCase(unittest.TestCase):
         LAMBDA = 2000   # Angstroms
 
         t = self.uvmos.calc_t_from_snr(SNR_TARGET, LAMBDA)[0]
-        
+
         VAL = 0.009464512847399582 # s, from local testing
         self.assertAlmostEqual(t, VAL, places=5)
-        
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -179,7 +179,7 @@ class Background:
                 if not isinstance(mag, Number):
                     raise ValueError(
                         "mags_per_sq_arcsec must be a dict of floats. For example, "
-                        + "`mags_per_sq_arcsec={'uv': 26.08, 'u': 23.74, 'g': 22.60}`."
+                         "`mags_per_sq_arcsec={'uv': 26.08, 'u': 23.74, 'g': 22.60}`."
                     )
         self.mags_per_sq_arcsec = mags_per_sq_arcsec
         #
@@ -296,7 +296,7 @@ class Background:
         ):
             warnings.warn(
                 "No Earthshine and zodiacal light spectra. The sky background AB mags "
-                + "per sq. arcsec will be zero!",
+                 "per sq. arcsec will be zero!",
                 RuntimeWarning,
             )
         #
@@ -338,14 +338,13 @@ class Background:
                 if np.all(~isgood_passband):
                     raise RuntimeError(
                         "Earthshine and/or zodiacal light spectrum could not be "
-                        + f"estimated at any {band}-band wavelength"
+                         f"estimated at any {band}-band wavelength"
                     )
-                else:
-                    warnings.warn(
-                        "Earthshine and/or zodiacal light spectrum could not be "
-                        + f"estimated at some {band}-band wavelengths",
-                        RuntimeWarning,
-                    )
+                warnings.warn(
+                    "Earthshine and/or zodiacal light spectrum could not be "
+                     f"estimated at some {band}-band wavelengths",
+                    RuntimeWarning,
+                )
             # 3. Integrate to get AB mag per square arcsecond
             if isinstance(sky_background_flam, Number):
                 # No sky background spectra
@@ -398,7 +397,7 @@ class Background:
         if not overwrite and self.mags_per_sq_arcsec is not None:
             raise AttributeError(
                 "`mags_per_sq_arcsec` has already been provided/calculated. "
-                + "Use `overwrite=True` to overwrite existing `mags_per_sq_arcsec`."
+                 "Use `overwrite=True` to overwrite existing `mags_per_sq_arcsec`."
             )
         #
         # Calculate sky background AB mags per sq. arcsec

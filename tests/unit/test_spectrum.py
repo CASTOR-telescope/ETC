@@ -65,27 +65,23 @@ test_etc_photometry.py
 """
 import unittest
 
-import astropy.units as u
-import numpy as np
 
 class TestSecantMethod(unittest.TestCase):
     """
     Test the secant method for root finding.
     """
-    
+
     @unittest.skip("Skipping until tests are implemented")
     def test_secant_method(self):
         """
         Tests the root finding function using secant method
         """
-        from castor_etc.telescope import secant_method
-        pass
 
 class TestTelescope(unittest.TestCase):
     """
     Test the castor_etc.telescope module
     """
-    
+
     ## Method 1 : test with a simple polynomial f(x) = x**2 - 4
 
     @unittest.skip("Skipping until tests are implemented")

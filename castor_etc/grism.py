@@ -210,7 +210,7 @@ class Grism:
         #Get pixels of source that need to be dispered (i.e., pixels in non-masked region)
         nb_rows_img, nb_columns_img = source_image.shape
         r_i, c_i = np.where(source_disperse_region)
-        indices = [(r,c) for r,c in zip(r_i, c_i)]
+        indices = [(r,c) for r,c in zip(r_i, c_i, strict=False)]
 
         #Create grism box that will be populated as we disperse the source sprectum onto it.
         margin_grism_profile = 10./100. #in percent
@@ -406,9 +406,9 @@ class Grism:
                 except Exception:
                     raise KeyError(
                         "No sky background magnitude (`mags_per_sq_arcsec` from "
-                        + "`Background` object) or photometric zero point (`phot_zpts` "
-                        + f"from `Telescope` object) for {band}-band!\n"
-                        + "(The issue is likely with the `Background` object...)"
+                         "`Background` object) or photometric zero point (`phot_zpts` "
+                         f"from `Telescope` object) for {band}-band!\n"
+                         "(The issue is likely with the `Background` object...)"
                     )
         #
         # Add geocoronal emission line contribution to sky background
@@ -422,7 +422,7 @@ class Grism:
         for gw, gf, gl in zip(
             self.BackgroundObj.geo_wavelength,
             self.BackgroundObj.geo_flux,
-            self.BackgroundObj.geo_linewidth,
+            self.BackgroundObj.geo_linewidth, strict=False,
         ):
             for band in self.TelescopeObj.passbands:
                 # Add geocoronal emission (electron/s) to proper passband(s)
@@ -450,7 +450,7 @@ class Grism:
                     if not np.isfinite(geo_erate):
                         warnings.warn(
                             "Could not estimate geocoronal emission noise contribution "
-                            + f"(electron/s) in {band}-band!",
+                             f"(electron/s) in {band}-band!",
                             RuntimeWarning,
                         )
                     else:
