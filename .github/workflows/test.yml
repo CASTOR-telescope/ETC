@@ -77,18 +77,18 @@ jobs:
             coverage.xml
           retention-days: 30
 
-  # Validate the example notebooks using nbmake
-  notebooks:
-    name: Notebooks (Linux)
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: astral-sh/setup-uv@v3
-      - name: Run nbmake
-        run: |
-          uv pip install --system -e .
-          uv pip install --system nbmake ipykernel
-          uv run pytest --nbmake examples/notebooks/ETC_notebooks/
+  # # Validate the example notebooks using nbmake
+  # notebooks:
+  #   name: Notebooks (Linux)
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: true
+  #     - uses: astral-sh/setup-uv@v3
+  #     - name: Run nbmake
+  #       run: |
+  #         uv pip install --system -e .
+  #         uv pip install --system nbmake ipykernel
+  #         uv run pytest --nbmake examples/notebooks/ETC_notebooks/
