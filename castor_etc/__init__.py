@@ -78,16 +78,17 @@ __all__ = [
     "constants",
     "conversions",
     "data",
+    "deprecated",
     "filepaths",
     "parameters",
     "photometry",
+    "simulator",
     "sources",
     "spectrum",
     "telescope",
     "uvmos_spectroscopy",
     "transit",
     "grism",
-    "deprecated"
 ]
 
 import logging
@@ -119,6 +120,7 @@ from . import (
     photometry,
     sources,
     spectrum,
+    simulator,
     telescope,
     transit,
     uvmos_spectroscopy,

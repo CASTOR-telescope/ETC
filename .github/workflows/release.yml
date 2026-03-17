@@ -59,11 +59,11 @@ jobs:
           python-version: ${{ env.STABLE_PYTHON_VERSION }}
 
       - name: Install Hatch
-        run: uv tool install hatch
-
+        uses: pypa/hatch@install
+      
       - name: Build package
         run: hatch build
-
+      
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:

@@ -20,6 +20,7 @@ dependencies = [
     "corner",
     "emcee",
     "matplotlib",
+    "mpmath",
     "numpy",
     "pandas",
     "photutils",

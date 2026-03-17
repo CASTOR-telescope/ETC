@@ -2844,6 +2844,10 @@ class SpectrumMixin:
                 + "quirk in the file). Please contact the developer with a minimal "
                 + "working example."
             )
+        
+    def use_flare_simulator(self):
+        # TODO: implement this based on the flare simulator code!
+        pass
 
     def show_spectrum(self, plot=True):
         """

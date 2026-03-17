@@ -20,9 +20,11 @@
 | castor\_etc/grism.py                                   |      193 |      169 |     12% |
 | castor\_etc/parameters.py                              |       27 |        0 |    100% |
 | castor\_etc/photometry.py                              |      427 |      114 |     73% |
+| castor\_etc/simulator/\_\_init\_\_.py                  |        1 |        0 |    100% |
+| castor\_etc/simulator/flare\_simulator.py              |      349 |      267 |     23% |
 | castor\_etc/sources.py                                 |      240 |      106 |     56% |
 | castor\_etc/spectrum.py                                |      724 |      435 |     40% |
 | castor\_etc/telescope.py                               |      230 |       79 |     66% |
 | castor\_etc/transit.py                                 |      608 |      567 |      7% |
 | castor\_etc/uvmos\_spectroscopy.py                     |      601 |      236 |     61% |
-| **TOTAL**                                              | **3670** | **1996** | **46%** |
+| **TOTAL**                                              | **4020** | **2263** | **44%** |
