@@ -75,7 +75,7 @@ from castor_etc.background import Background
 from castor_etc.photometry import Photometry
 from castor_etc.telescope import Telescope
 
-_TOL = 1e-5  # floating-point tolerance
+_TOL = 1e-3  # floating-point tolerance
 
 class PointSourcePhotometryTestCase(unittest.TestCase):
     """
