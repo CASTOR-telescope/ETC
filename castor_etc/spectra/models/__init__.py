@@ -1,0 +1,1 @@
+from .flare import compute_flux_wavelength

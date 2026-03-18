@@ -58,111 +58,25 @@
 # FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
-"""
-A modular, user-friendly Python package for easy estimation and analysis of CASTOR imaging
-performance. See the [`ETC_frontend`](https://github.com/CASTOR-telescope/ETC_frontend)
-GitHub repository for a graphical user interface to complement this package.
+import logging
 
-Includes:
-  1. Astronomical source generation and background noise estimation
-  2. Telescope imaging chain simulation, featuring a pixel-based photometry approach
-  3. Convenience functions for converting between useful quantities (e.g., flux to
-     electron/s to AB magnitude)
-
-Author: Isaac Cheng
-Contact: isaac.cheng.ca@gmail.com
-"""
-
-try:
-    from ._version import __version__
-except ImportError:
-    try:
-        import importlib.metadata
-        __version__ = importlib.metadata.version("castor-etc")
-    except importlib.metadata.PackageNotFoundError:
-        __version__ = "unknown" # or "unknown"
-
-# ------------------------- FILEPATHS (N.B. no trailing slash) ------------------------- #
-from pathlib import Path
-
-# The location of the castor_etc package
-__BASEPATH = Path(__file__).resolve().parent  # + "/"
-
-# The directory containing the data files (e.g., passbands, sky background, etc.)
-DATAPATH = __BASEPATH / "data"
-
-def verify_data_installation():
-    """
-    Scans the DATAPATH and checks if subdirectories contain any files.
-    
-    Returns a dictionary of {folder_name: not_empty_bool}.
-    """
-    from pathlib import Path
-    
-    data_dir = Path(DATAPATH)
-    
-    if not data_dir.exists():
-        return {}
-    
-    # Iterate through all the folders for all non hidden sub-folders
-    subfolders = [
-        d for d in data_dir.iterdir() 
-        if d.is_dir() and not d.name.startswith((".", "__"))
-    ]
-    
-    results = {}
-    for folder_path in subfolders:
-        # Check if a non-directory file exists and returns boolean if true
-        has_files = any(f.is_file() for f in folder_path.iterdir())
-        results[folder_path.name] = has_files
-        
-    return results
-
-# -------------------------------------------------------------------------------------- #
-
-__all__ = [
-    "background",
-    "detector",
-    "grism",
-    "photometry",
-    "sources",
-    "spectra",
-    "telescope",
-    "transit",
-    "utils",
-    "uvmos_spectroscopy",
-    "deprecated",
-]
-
-import numpy as np
-
-# This is a "hacky" way of dealing with the annoying pytransit failure from not finding trapz!
-if not hasattr(np, "trapz"):
-    try:
-        # Try the new NumPy 2.x location
-        from numpy import trapezoid as _trapz
-        np.trapz = _trapz
-    except ImportError:
-        # Fallback for other versions/scipy
-        try:
-            from scipy.integrate import trapz as _trapz
-            np.trapz = _trapz
-        except ImportError:
-            pass
-
-# Relative import of all scientific sub-packages
 from . import (
-    background,
-    data,
-    detector,
-    grism,
-    photometry,
-    sources,
-    spectra,
-    telescope,
-    transit,
-    uvmos_spectroscopy,
-    deprecated,
-    utils
+    constants,
+    conversions,
+    parameters
 )
 
+class BaseClass(object):
+    # Inspiration from this blogpost: https://bbengfort.github.io/2016/01/logging-mixin/
+    """
+    A mixin class to allow classes to use loggers
+    """
+
+    @property
+    def logger(self) -> logging.Logger :
+        """
+        Instantiates a logger based on the class name
+        """
+        if not hasattr(self, '_logger') or not self._logger:
+            self._logger = logging.getLogger(__name__)
+        return self._logger

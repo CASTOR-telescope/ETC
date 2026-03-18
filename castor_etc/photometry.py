@@ -76,10 +76,10 @@ from photutils.aperture import EllipticalAperture, RectangularAperture
 from scipy.interpolate import interp1d
 from scipy.signal import oaconvolve
 
-from .background import Background
-from .conversions import calc_photon_energy, mag_to_flux
-from .sources import CustomSource, ExtendedSource, GalaxySource, PointSource, Source
-from .telescope import Telescope
+from castor_etc.background import Background
+from castor_etc.utils.conversions import calc_photon_energy, mag_to_flux
+from castor_etc.sources import CustomSource, ExtendedSource, GalaxySource, PointSource, Source
+from castor_etc.telescope import Telescope
 
 # The optimal aperture for a point source is a circular aperture with a radius equal
 # to the factor below times half the telescope's FWHM

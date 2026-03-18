@@ -101,10 +101,10 @@ from astroquery.gaia import Gaia
 from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
-from . import constants as const
-from .conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
-from .filepaths import DATAPATH
-from .telescope import Telescope
+from castor_etc import DATAPATH
+from castor_etc.utils import constants as const
+from castor_etc.utils.conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
+from castor_etc.telescope import Telescope
 
 ## DEFINE CUSTOM UNITS
 fnu = u.def_unit("fnu", u.erg / (u.s * u.cm**2 * u.Hz))
@@ -569,7 +569,7 @@ class SpectrumMixin:
         -------
           None
         """
-        from .sources import CustomSource  # avoid circular import error
+        from ..sources import CustomSource  # avoid circular import error
 
         if isinstance(self, CustomSource):
             raise ValueError("A `CustomSource` object does not support a spectrum.")
@@ -2899,7 +2899,7 @@ class SpectrumMixin:
           redleak_fracs :: dict of floats
             Dictionary containing the red leak fraction in each passband.
         """
-        from .sources import CustomSource  # avoid circular import error
+        from ..sources import CustomSource  # avoid circular import error
 
         if isinstance(self, CustomSource):
             raise AttributeError("Custom sources do not have red leak fractions!")

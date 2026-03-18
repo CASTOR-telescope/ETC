@@ -76,16 +76,16 @@ import numpy as np
 from astropy.io import fits
 from scipy.interpolate import interp1d
 
-from .conversions import flam_to_AB_mag
-from .data.sky_background.background_values import (
+from castor_etc.utils.conversions import flam_to_AB_mag
+from castor_etc.data.sky_background.background_values import (
     GEOCORONAL_FLUX_AVG,
     GEOCORONAL_FLUX_HIGH,
     GEOCORONAL_FLUX_LOW,
     GEOCORONAL_LINEWIDTH,
     GEOCORONAL_WAVELENGTH,
 )
-from .filepaths import DATAPATH
-from .telescope import Telescope
+from castor_etc import DATAPATH
+from castor_etc.telescope import Telescope
 
 
 class Background:
@@ -93,10 +93,6 @@ class Background:
     Object to characterize the sky background.
     """
 
-    ## TODO: for future, this class could be refactored to have a base Background class that is initiated by a factory class
-    ## The factory class has methods to create different types of Background objects
-
-    ## The Background class should really be defined a class of wavelength-dependent flux
     def __init__(
         self,
         earthshine_file: str | None = join(DATAPATH, "sky_background", "earthshine.fits"),

@@ -58,18 +58,90 @@
 # FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
+
 """
-Contains filepaths for CASTOR. Mostly private constants that should be re-factored elsewhere later.
+cli.py
+
+FORECASTOR ETC Command Line tool - built using the click module
 """
 
-from os.path import abspath, dirname, join
+import click
+import os
+import sys
+import platform
+import numpy as np
+import astropy
+import scipy
+import pandas
+import castor_etc
 
-# ------------------------- FILEPATHS (N.B. no trailing slash) ------------------------- #
+@click.group()
+@click.version_option(version=castor_etc.__version__)
+def cli():
+    """
+    FORECASTOR ETC Command Line Interface.
 
-# The location of the castor_etc package
-__BASEPATH = dirname(abspath(__file__))  # + "/"
+    The CASTOR Exposure Time Calculator (ETC) helps users estimate the SNR 
+    and performance of the CASTOR telescope across its UV, U, and G bands.
+    This command line tool validates your installation, check local data assets 
+    (passbands, PSFs), and gather information for bug reports.
+    """
+    pass
 
-# The directory containing the data files (e.g., passbands, sky background, etc.)
-DATAPATH = join(__BASEPATH, "data")
+@cli.command()
+def info():
+    """Prints installation and system information for bug reports"""
+    click.secho("--- Environment Info ---", fg="cyan", bold=True)
+    click.echo(f"OS/Platform:    {platform.platform()}")
+    click.echo(f"Python:         {sys.version.split()[0]}")
+    click.echo(f"Executable:     {sys.executable}")
+    
+    click.secho("\n--- Package Info ---", fg="cyan", bold=True)
+    click.echo(f"Version:        {castor_etc.__version__}")
+    click.echo(f"Install Path:   {os.path.dirname(castor_etc.__file__)}")
+    
+    click.secho("\n--- Core Dependencies ---", fg="cyan", bold=True)
+    click.echo(f"NumPy:          {np.__version__}")
+    click.echo(f"SciPy:          {scipy.__version__}")
+    click.echo(f"Astropy:        {astropy.__version__}")
+    click.echo(f"Pandas:         {pandas.__version__}")
 
-# -------------------------------------------------------------------------------------- #
+@cli.command()
+def validate():
+    """Verify data folder content to ensure data folders exist and have content
+
+    NOTE: This only validates that local data assets exist in the package 
+    directory. It does NOT verify if the package is correctly installed 
+    in your Python environment. Use 'info' for installation details.
+    """
+    from castor_etc import verify_data_installation, DATAPATH
+    
+    click.secho(f"Validating data content in: {DATAPATH}", fg="yellow")
+    
+    results = verify_data_installation()
+    
+    if not results:
+        click.secho("\n[!] Data directory is empty/not found.", fg="red", bold=True)
+        click.echo(f"Expected path: {DATAPATH}")
+        sys.exit(1)
+
+    all_ok = True
+    click.echo("--- Content Check ---")
+    for folder, has_content in sorted(results.items()):
+        if has_content:
+            status = click.style("FOUND", fg="green")
+            click.echo(f"  [{status}] {folder}")
+        else:
+            status = click.style("EMPTY", fg="red")
+            click.echo(f"  [{status}] {folder}")
+            all_ok = False
+            
+    if all_ok:
+        click.secho("\nSuccess: local data assets found.", fg="green", bold=True)
+    else:
+        click.secho("\nWarning: missing local data assets", 
+                    fg="red", bold=True)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    cli()

@@ -76,7 +76,7 @@ import astropy.units as u
 import numpy as np
 from scipy.integrate import simpson
 
-from . import constants as const
+import castor_etc.utils.constants as const
 
 
 def calc_photon_energy(
