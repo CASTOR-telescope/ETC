@@ -3,6 +3,20 @@
 See [semantic versioning](https://semver.org/spec/v2.0.0.html) for the rationale behind
 the version numbers.
 
+## [2.0.0]
+- Updated `params.py` with newly measured dark current, read noise, and gain from OU report
+  - `detector.py` additionally implements temperature dependent profiles for dark current and read noise.
+  The profiles are currently NOT implemented into the Telescope class and are a work in progress.
+- Added new `UVMOS_Spectroscopy` class with multiple slit features
+  - Previous version of `UVMOS_Spectroscopy` has been moved under `castor_etc.deprecated.uvmos_single_slit.UVMOS_SingleObject`
+- Added tests to verify class implementations
+- Minor refactoring of `spectrum.py` to enforce typings
+  - `wavelengths` is now enforced to be an `astropy.Quantity`
+  - `spectrum` is now stored as `flam` where applicable. Any instances where an "arbitrary unit" is specified has been noted for future changes.
+- Addition of `simulator` subpackage
+  - This is a new addition with not a lot of components for now. It provides an interface to add more complex backend classes/methods that can extend base classes.
+  - For example, the current addition of the `flare_simulator` code can be utilized to allow 
+
 ## [1.3.3](https://github.com/CASTOR-telescope/ETC/tree/v1.3.3) (2025-02-24)
 
 - Fixed a bug ([#31](https://github.com/CASTOR-telescope/ETC/issues/31)) in the definition

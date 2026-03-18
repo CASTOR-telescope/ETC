@@ -38,14 +38,14 @@ jobs:
       - name: Install package and dependencies with uv
         run: |
           uv pip install --system -e ".[test]"
-          uv pip install --system pytest pytest-cov
+          uv pip install --system nbmake ipykernel
 
-      - name: Run linting
+      - name: Run linting (continues on error)
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
+        continue-on-error: true 
         run: |
-          uv run ruff check . --fix
-          uv run ruff check . --output-format=text > ruff-lint-report.txt
-        continue-on-error: true
+          uv run ruff check .  --output-format=text > ruff-lint-report.txt || true
+          cat ruff-lint-report.txt
 
       - name: Upload Ruff lint report
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
@@ -56,12 +56,39 @@ jobs:
           retention-days: 30
 
       - name: Run tests with coverage
-        run: uv run pytest --cov=castor_etc --cov-report=html --cov-report=xml --cov-report=term-missing tests/
+        run: |
+          uv run pytest --cov=castor_etc --cov-report=xml --cov-report=html --cov-report=term-missing tests/
+
+      - name: Generate Coverage Summary
+        # Use GHA logic instead of shell logic to handle cross-platform compatibility
+        if: runner.os == 'Linux' && matrix.python-version == '3.11'
+        run: |
+          echo "### Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage HTML report
         if: matrix.python-version == env.STABLE_PYTHON_VERSION && runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-html-report
-          path: htmlcov/
+          path: |
+            htmlcov/
+            ruff-lint-report.txt
+            coverage.xml
           retention-days: 30
+
+  # # Validate the example notebooks using nbmake
+  # notebooks:
+  #   name: Notebooks (Linux)
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: true
+  #     - uses: astral-sh/setup-uv@v3
+  #     - name: Run nbmake
+  #       run: |
+  #         uv pip install --system -e .
+  #         uv pip install --system nbmake ipykernel
+  #         uv run pytest --nbmake examples/notebooks/ETC_notebooks/

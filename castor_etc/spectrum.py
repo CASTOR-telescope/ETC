@@ -79,6 +79,9 @@ Includes:
     - normalize a spectrum to a given bolometric luminosity and distance
     - calculate the average value of a spectrum (erg/s/cm^2/A or AB mag) either within a
       passband or over the whole spectrum
+
+The two main classes that implement theres are `castor_etc.spectrum.SpectrumMixin` and 
+ `castor_etc.spectrum.NormMixin`.
 """
 
 import os
@@ -102,6 +105,10 @@ from . import constants as const
 from .conversions import calc_photon_energy, flam_to_AB_mag, fnu_to_flam, mag_to_flux
 from .filepaths import DATAPATH
 from .telescope import Telescope
+
+## DEFINE CUSTOM UNITS
+fnu = u.def_unit("fnu", u.erg / (u.s * u.cm**2 * u.Hz))
+flam = u.def_unit("flam", u.erg / (u.s * u.cm**2 * u.AA))
 
 
 def getStarData(
@@ -146,11 +153,10 @@ def getStarData(
         if not os.path.exists(os.path.join(stellar_model_dir, "BTSettl_CIFIST/")):
             raise RuntimeError(
                 f"The specified directory path `{stellar_model_dir}` does not contain "
-                + "the stellar_models directory. Please make sure the path variable "
-                + "points to the correct directory."
+                 "the stellar_models directory. Please make sure the path variable "
+                 "points to the correct directory."
             )
-        else:
-            grid_dir = os.path.join(stellar_model_dir, "BTSettl_CIFIST/")
+        grid_dir = os.path.join(stellar_model_dir, "BTSettl_CIFIST/")
 
         # Scan directory to inventory model grid
         # Assumes all files starting with 'lte' are model files
@@ -196,10 +202,9 @@ def getStarData(
         if not os.path.exists(os.path.join(stellar_model_dir, "ATLAS9/ck04models/")):
             raise RuntimeError(
                 f"The specified directory path `{stellar_model_dir}` does not contain "
-                + "the stellar_model directory. Please modify the path variable. "
+                 "the stellar_model directory. Please modify the path variable. "
             )
-        else:
-            grid_dir = os.path.join(stellar_model_dir, "ATLAS9/ck04models/")
+        grid_dir = os.path.join(stellar_model_dir, "ATLAS9/ck04models/")
 
         teff_grid = np.array(
             [
@@ -490,21 +495,70 @@ def redshift_wavelengths(wavelengths, redshift):
 class SpectrumMixin:
     """
     Mixin for generating spectra. To be used with `Source` object. Do not use directly!
+
+    This class contains various static methods to initialize a spectrum:
+        - `generate_uniform`
+        - `generate_bb`
+        - `generate_power_law`
+        - `generate_emission_line`
+        - 
     """
+
+    __spectrum = None
+    __wavelengths = None
+
+    @property
+    def spectrum(self):
+        arr = self._spectrum.view()
+        arr.flags.writeable = False
+        return arr
+
+    @property
+    def wavelengths(self):
+        arr = self._wavelengths.view()
+        arr.flags.writeable = False
+        return arr
+
+    ## ------------------------- INTERNAL PROPERTIES -------------------------  ##
+    # This may seem redundant, but this ensures that any internal calls to self._spectrum or self._wavelengths
+    #   saves it in writeable format.
+
+    @property
+    def _spectrum(self):
+        return self.__spectrum
+
+    @_spectrum.setter
+    def _spectrum(self, value):
+        temp = value.copy()
+        temp.flags.writeable = True
+        self.__spectrum = temp
+
+    @property
+    def _wavelengths(self):
+        return self.__wavelengths
+
+    @_wavelengths.setter
+    def _wavelengths(self, value):
+        if not isinstance(value, u.Quantity):
+            raise TypeError("`_wavelengths` must be an astropy Quantity.")
+
+        temp = value.copy()
+        temp.flags.writeable = True
+        self.__wavelengths = temp
 
     def _check_existing_spectrum(self, overwrite, quiet=False):
         """
         Check for existing spectrum and if the source is a `CustomSource` instance. If the
-        object is a `CustomSource` instance, raise an error. If self.wavelengths and/or
-        self.spectrum is not None, raise an error if overwrite is False; otherwise print a
+        object is a `CustomSource` instance, raise an error. If self._wavelengths and/or
+        self._spectrum is not None, raise an error if overwrite is False; otherwise print a
         message notifying user that the method will overwrite the existing spectrum
         (unless `quiet` is True).
 
         Parameters
         ----------
           overwrite :: bool
-            If False and self.wavelengths and/or self.spectrum is not None, raise an
-            error. If True and self.wavelengths and/or self.spectrum is not None, print a
+            If False and self._wavelengths and/or self._spectrum is not None, raise an
+            error. If True and self._wavelengths and/or self._spectrum is not None, print a
             message informing the user that the existing spectrum will be overwritten
             (unless `quiet` is True).
 
@@ -519,16 +573,16 @@ class SpectrumMixin:
 
         if isinstance(self, CustomSource):
             raise ValueError("A `CustomSource` object does not support a spectrum.")
-        if self.wavelengths is not None or self.spectrum is not None:
+        if self._wavelengths is not None or self._spectrum is not None:
             if not overwrite:
                 raise ValueError(
                     "wavelengths/spectrum already exists! "
-                    + "Use overwrite=True to overwrite wavelengths/spectrum."
+                     "Use overwrite=True to overwrite wavelengths/spectrum."
                 )
-            elif not quiet:
+            if not quiet:
                 print(
                     "INFO: Overwriting existing wavelengths/spectrum "
-                    + "with new wavelengths/spectrum."
+                     "with new wavelengths/spectrum."
                 )
 
     def spectrum_erg_to_photon(self):
@@ -545,11 +599,11 @@ class SpectrumMixin:
         -------
           None
         """
-        if self.spectrum is None or self.wavelengths is None:
+        if self._spectrum is None or self._wavelengths is None:
             raise ValueError(
                 "Please generate a spectrum before converting ergs to photons."
             )
-        self.spectrum /= calc_photon_energy(wavelength=self.wavelengths)[0]
+        self._spectrum /= calc_photon_energy(wavelength=self._wavelengths)[0]
 
     def redshift_wavelengths(self, redshift):
         """
@@ -572,7 +626,7 @@ class SpectrumMixin:
         """
         if not isinstance(redshift, Number):
             raise TypeError("redshift must be an int or float")
-        self.wavelengths *= 1 + redshift
+        self._wavelengths *= 1 + redshift
 
     def generate_uniform(
         self, wavelengths, value, unit="ABmag", overwrite=False, quiet=False
@@ -648,8 +702,10 @@ class SpectrumMixin:
         elif unit == "STmag":
             # Convert directly to flam
             spectrum = mag_to_flux(mag=spectrum, mag_err=0.0, zpt=-21.10)[0]
-        self.wavelengths = wavelengths
-        self.spectrum = spectrum
+
+        # Save results to class
+        self._wavelengths = wavelengths
+        self._spectrum = spectrum*flam
 
     def generate_bb(
         self,
@@ -733,6 +789,7 @@ class SpectrumMixin:
         self._check_existing_spectrum(overwrite, quiet=quiet)
         if isinstance(T, u.Quantity):
             T = T.to(u.K, equivalencies=u.temperature()).value
+
         if wavelengths is None:
             limits = list(limits)
             for i, lim in enumerate(limits):
@@ -768,8 +825,8 @@ class SpectrumMixin:
         #
         # Assign to `Source` object attributes. Spectrum is in erg/s/cm^2/A
         #
-        self.wavelengths = wavelengths * u.AA
-        self.spectrum = NormMixin.norm_to_star(spectrum, radius=radius, dist=dist)  # flam
+        self._wavelengths = wavelengths*u.AA
+        self._spectrum = NormMixin.norm_to_star(spectrum, radius=radius, dist=dist)*flam  # flam
 
     def generate_power_law(
         self, ref_wavelength, wavelengths, exponent, overwrite=False, quiet=False
@@ -832,8 +889,8 @@ class SpectrumMixin:
         # Power-law
         #
         spectrum = (wavelengths / ref_wavelength) ** exponent
-        self.wavelengths = wavelengths * u.AA
-        self.spectrum = spectrum
+        self._wavelengths = wavelengths * u.AA
+        self._spectrum = spectrum # NOTE: no unit in this implementation
 
     @staticmethod
     def _generate_gaussian(
@@ -937,12 +994,18 @@ class SpectrumMixin:
         ):
             if add:
                 raise ValueError("peak must be a single int or float >= 0.")
-            else:
-                raise ValueError("dip must be a single int or float >= 0.")
-        elif tot_flux is not None and (
+            raise ValueError("dip must be a single int or float >= 0.")
+        if tot_flux is not None and (
             np.size(tot_flux) != 1 or not isinstance(tot_flux, Number) or tot_flux <= 0
         ):
             raise ValueError("tot_flux must be a single int or float >= 0.")
+        # Preserve spectra unit
+        if isinstance(spectrum, u.Quantity):
+            spectra_unit = spectrum.unit
+            spectrum = spectrum.value
+        else:
+            spectra_unit = None
+
         # Convert lengths to angstrom
         if isinstance(wavelengths, u.Quantity):
             wavelengths_unit = wavelengths.unit
@@ -1010,6 +1073,10 @@ class SpectrumMixin:
             # )
         if wavelengths_unit is not None:
             sorted_wavelengths <<= wavelengths_unit  # convert to `astropy.Quantity` array
+
+        if spectra_unit is not None:
+            sorted_spectrum <<= spectra_unit
+
         return sorted_wavelengths, sorted_spectrum
 
     @staticmethod
@@ -1117,22 +1184,31 @@ class SpectrumMixin:
         ):
             if add:
                 raise ValueError("peak must be a single int or float >= 0.")
-            else:
-                raise ValueError("dip must be a single int or float >= 0.")
-        elif tot_flux is not None and (
+            raise ValueError("dip must be a single int or float >= 0.")
+        if tot_flux is not None and (
             np.size(tot_flux) != 1 or not isinstance(tot_flux, Number) or tot_flux <= 0
         ):
             raise ValueError("tot_flux must be a single int or float >= 0.")
+
+        if isinstance(spectrum, u.Quantity):
+            spectra_unit = spectrum.unit
+            spectrum = spectrum.value
+        else:
+            spectra_unit = None
+
         # Convert lengths to angstrom
         if isinstance(wavelengths, u.Quantity):
             wavelengths_unit = wavelengths.unit
             wavelengths = wavelengths.to(u.AA).value
         else:
             wavelengths_unit = None
+
         if isinstance(center, u.Quantity):
             center = center.to(u.AA).value
+
         if isinstance(fwhm, u.Quantity):
             fwhm = fwhm.to(u.AA).value
+
         if fwhm <= 0:
             raise ValueError("fwhm must be >= 0.")
         #
@@ -1190,6 +1266,9 @@ class SpectrumMixin:
             # )
         if wavelengths_unit is not None:
             sorted_wavelengths <<= wavelengths_unit  # convert to `astropy.Quantity` array
+        if spectra_unit is not None:
+            sorted_spectrum <<= spectra_unit
+
         return sorted_wavelengths, sorted_spectrum
 
     def add_emission_line(
@@ -1248,7 +1327,7 @@ class SpectrumMixin:
         -------
           None
         """
-        if self.wavelengths is None or self.spectrum is None:
+        if self._wavelengths is None or self._spectrum is None:
             raise ValueError("Please generate or load a spectrum first")
         if shape == "gaussian":
             spectrum_func = SpectrumMixin._generate_gaussian
@@ -1256,9 +1335,9 @@ class SpectrumMixin:
             spectrum_func = SpectrumMixin._generate_lorentzian
         else:
             raise ValueError("Emission line shape must be 'gaussian' or 'lorentzian'")
-        self.wavelengths, self.spectrum = spectrum_func(
-            self.wavelengths,
-            self.spectrum,
+        self._wavelengths, self._spectrum = spectrum_func(
+            self._wavelengths,
+            self._spectrum,
             center,
             fwhm,
             peak=peak,
@@ -1320,7 +1399,7 @@ class SpectrumMixin:
         -------
           None
         """
-        if self.wavelengths is None or self.spectrum is None:
+        if self._wavelengths is None or self._spectrum is None:
             raise ValueError("Please generate or load a spectrum first")
         if shape == "gaussian":
             spectrum_func = SpectrumMixin._generate_gaussian
@@ -1328,9 +1407,9 @@ class SpectrumMixin:
             spectrum_func = SpectrumMixin._generate_lorentzian
         else:
             raise ValueError("Absorption line shape must be 'gaussian' or 'lorentzian'")
-        self.wavelengths, self.spectrum = spectrum_func(
-            self.wavelengths,
-            self.spectrum,
+        self._wavelengths, self._spectrum = spectrum_func(
+            self._wavelengths,
+            self._spectrum,
             center,
             fwhm,
             peak=dip,
@@ -1431,7 +1510,7 @@ class SpectrumMixin:
         # Assume flat (zero) spectrum as baseline. Then add emission line on top of this
         resolution = (limits_AA[1] - limits_AA[0]) / 100
         wavelengths = np.arange(limits_AA[0], limits_AA[1] + 0.5 * resolution, resolution)
-        self.wavelengths, self.spectrum = spectrum_func(
+        self._wavelengths, self._spectrum = spectrum_func(
             wavelengths=wavelengths * u.AA,
             spectrum=np.zeros(len(wavelengths), dtype=float),
             center=center,
@@ -1441,6 +1520,7 @@ class SpectrumMixin:
             add=True,
             abs_peak=False,
         )
+        # TODO: maybe add a checker to make sure that the spectra is stored as an astropy Quantity
 
     def set_spectrum(self, wavelengths, spectrum, unit, overwrite=False, quiet=False):
         """
@@ -1523,8 +1603,9 @@ class SpectrumMixin:
         elif unit == "STmag":
             # Convert directly to flam
             spectrum = mag_to_flux(mag=spectrum, mag_err=0.0, zpt=-21.10)[0]
-        self.wavelengths = wavelengths
-        self.spectrum = spectrum
+
+        self._wavelengths = wavelengths
+        self._spectrum = spectrum*flam
 
     def use_custom_spectrum(
         self, filepath, wavelength_unit=u.AA, overwrite=False, quiet=False
@@ -1587,10 +1668,10 @@ class SpectrumMixin:
         try:
             if file_ext == "fit" or file_ext == "fits":
                 data = fits.getdata(filepath)
-                self.wavelengths = (data.field(0)[0] * wavelength_unit).to(u.AA)
+                self._wavelengths = (data.field(0)[0] * wavelength_unit).to(u.AA)
                 # Dhananjhay's comment for `data.field(1)` below - index 0 to access the
                 # corresponding arrays; data variable contains embedded arrays
-                self.spectrum = data.field(1)[0]
+                self._spectrum = data.field(1)[0]
             else:
                 data = pd.read_csv(
                     filepath,
@@ -1599,12 +1680,12 @@ class SpectrumMixin:
                     comment="#",
                     engine="python",
                 )  # sep=" +" is Python regex to match a variable number of spaces
-                self.wavelengths = (data[0].values * wavelength_unit).to(u.AA)
-                self.spectrum = data[1].values
+                self._wavelengths = (data[0].values * wavelength_unit).to(u.AA)
+                self._spectrum = data[1].values * flam
         except Exception:
             raise RuntimeError(
                 "Could not read spectrum from file. File must be in ASCII or FITS format "
-                + "and adhere to the guidelines specified in the docstring."
+                 "and adhere to the guidelines specified in the docstring."
             )
 
     def use_galaxy_spectrum(self, gal_type, overwrite=False, quiet=False):
@@ -1659,8 +1740,8 @@ class SpectrumMixin:
             comment="#",
             engine="python",
         )  # sep=" +" is Python regex to match a variable number of spaces
-        self.wavelengths = (data[0].values * u.nm).to(u.AA)
-        self.spectrum = data[1].values
+        self._wavelengths = (data[0].values * u.nm).to(u.AA)
+        self._spectrum = data[1].values # NOTE: no unit implemented for spectra
 
     def _calc_xy(self):
         """
@@ -1730,11 +1811,11 @@ class SpectrumMixin:
         try:
             srch_str = (
                 f"SELECT *, DISTANCE(POINT({self.ra.value:.6f},{self.dec.value:.6f}), POINT(ra,dec))"
-                + "AS ang_sep FROM gaiadr2.gaia_source "
-                + f"WHERE 1 = CONTAINS( POINT({self.ra.value:.6f},{self.dec.value:.6f}), "
-                + f"CIRCLE(ra,dec,{self.srch_rad.value:.2f}))"
-                + f"AND phot_g_mean_mag <={self.srch_Gmax:.2f}"
-                + "AND parallax IS NOT NULL ORDER BY ang_sep ASC"
+                 "AS ang_sep FROM gaiadr2.gaia_source "
+                 f"WHERE 1 = CONTAINS( POINT({self.ra.value:.6f},{self.dec.value:.6f}), "
+                 f"CIRCLE(ra,dec,{self.srch_rad.value:.2f}))"
+                 f"AND phot_g_mean_mag <={self.srch_Gmax:.2f}"
+                 "AND parallax IS NOT NULL ORDER BY ang_sep ASC"
             )
 
             job = Gaia.launch_job(srch_str)
@@ -1768,7 +1849,7 @@ class SpectrumMixin:
                 ti = np.argmin(sep)
                 print(
                     f"No Gaia sources found within {sep_max * 3600.0:.2f} arcsec of "
-                    + "specified RA and DEC"
+                     "specified RA and DEC"
                 )
 
             gi = np.delete(np.arange(len(ra)), ti)
@@ -1872,7 +1953,7 @@ class SpectrumMixin:
             self.Rpmag,
         ]
         scalars_str = ["Teff", "Gmag", "logg", "radius", "metallicity", "Bpmag", "Rpmag"]
-        for scalar, scalar_str in zip(scalars, scalars_str):
+        for scalar, scalar_str in zip(scalars, scalars_str, strict=False):
             if scalar is not None:
                 self.gaia[scalar_str][0] = scalar
 
@@ -2072,7 +2153,7 @@ class SpectrumMixin:
         if not isinstance(stellar_model_dir, str):
             raise TypeError(
                 "Please specify the path to the stellar models directory"
-                + "(e.g., ../../stellar_models)"
+                 "(e.g., ../../stellar_models)"
             )
 
         if not isinstance(stellar_model_grid, str):
@@ -2088,12 +2169,12 @@ class SpectrumMixin:
 
         scalars = [ra, dec, fov, fov_pa, srch_rad]
         scalars_str = ["ra", "dec", "fov", "fov_pa", "srch_rad"]
-        for scalar, scalar_str in zip(scalars, scalars_str):
+        for scalar, scalar_str in zip(scalars, scalars_str, strict=False):
             if scalar is not None:
                 if not isinstance(scalar, u.Quantity):
                     raise TypeError(
                         f"{scalar_str} must `astropy.Quantity` angles"
-                        + "(e.g., u.arcsec, u.deg)"
+                         "(e.g., u.arcsec, u.deg)"
                     )
 
         scalars = [srch_Gmax, Teff, Gmag, logg, radius, metallicity, Bpmag, Rpmag]
@@ -2107,7 +2188,7 @@ class SpectrumMixin:
             "Bpmag",
             "Rpmag",
         ]
-        for scalar, scalar_str in zip(scalars, scalars_str):
+        for scalar, scalar_str in zip(scalars, scalars_str, strict=False):
             if scalar is not None:
                 if not isinstance(scalar, Number):
                     raise TypeError(f"{scalar_str} must be an int or float")
@@ -2164,13 +2245,13 @@ class SpectrumMixin:
             # CASTOR wavelength range.
             _range = np.where(wavelengths.to(u.AA).value <= 11000)
 
-            self.wavelengths = wavelengths[_range]
-            self.spectrum = spectrum[_range]
+            self._wavelengths = wavelengths[_range]
+            self._spectrum = spectrum[_range] * flam
 
         except Exception:
             raise RuntimeError(
                 f"Could not load the {stellar_model_grid} data for some reason. Please contact the developer with a minimal"
-                + "working example."
+                 "working example."
             )
 
     def use_pickles_spectrum(self, spectral_class, overwrite=False, quiet=False):
@@ -2751,14 +2832,18 @@ class SpectrumMixin:
                 colspecs=[(0, 7), (7, 17)],
                 header=None,
             )
-            self.wavelengths = data[0].values * u.AA
-            self.spectrum = data[1].values
+            self._wavelengths = data[0].values * u.AA
+            self._spectrum = data[1].values # NOTE: no units associated with spectra
         except Exception:
             raise RuntimeError(
                 "Could not load the Pickles data for some reason (probably a formatting "
-                + "quirk in the file). Please contact the developer with a minimal "
-                + "working example."
+                 "quirk in the file). Please contact the developer with a minimal "
+                 "working example."
             )
+
+    def use_flare_simulator(self):
+        # TODO: implement this based on the flare simulator code!
+        pass
 
     def show_spectrum(self, plot=True):
         """
@@ -2777,11 +2862,11 @@ class SpectrumMixin:
           fig, ax (if plot is False) :: `matplotlib.figure.Figure`, `matplotlib.axes.Axes`
             The figure and axis instance associated with the plot.
         """
-        if self.spectrum is None or self.wavelengths is None:
+        if self._spectrum is None or self._wavelengths is None:
             raise ValueError("Please generate a spectrum before plotting.")
         fig, ax = plt.subplots()
-        ax.plot(self.wavelengths.to(u.AA).value, self.spectrum, "k", lw=1)
-        ax.fill_between(self.wavelengths.to(u.AA).value, self.spectrum, alpha=0.5)
+        ax.plot(self._wavelengths.to(u.AA).value, self._spectrum, "k", lw=1)
+        ax.fill_between(self._wavelengths.to(u.AA).value, self._spectrum, alpha=0.5)
         if plt.rcParams["text.usetex"]:
             ax.set_xlabel(r"Wavelength [\AA]")
             ax.set_ylabel(r"Flux Density [$\rm erg\, s^{-1}\, cm^{-2}\,$\AA$^{-1}$]")
@@ -2818,7 +2903,7 @@ class SpectrumMixin:
 
         if isinstance(self, CustomSource):
             raise AttributeError("Custom sources do not have red leak fractions!")
-        if self.wavelengths is None or self.spectrum is None:
+        if self._wavelengths is None or self._spectrum is None:
             raise ValueError("Please generate or load a spectrum first")
         #
         # Calculate red leak fraction (red leak electron/s to total electron/s)
@@ -2827,9 +2912,9 @@ class SpectrumMixin:
         #
         # Make useful source spectrum-derived quantities
         #
-        source_wavelengths_AA = self.wavelengths.to(u.AA).value
+        source_wavelengths_AA = self._wavelengths.to(u.AA).value
         source_photon_s_A = (  # photon/s/A
-            self.spectrum  # erg/s/cm^2/A
+            self._spectrum  # erg/s/cm^2/A
             * TelescopeObj.mirror_area.to(u.cm**2).value  # cm^2
             / calc_photon_energy(wavelength=source_wavelengths_AA)[0]  # photon/erg
         )
@@ -2865,14 +2950,14 @@ class SpectrumMixin:
             if not quiet and (not np.all(isgood_redleak) or not np.all(isgood_total)):
                 warnings.warn(
                     "Could not estimate red leak fraction "
-                    + f"at 1 or more wavelengths in {band}-band. "
-                    + "This may just be caused by the source spectrum not being "
-                    + f"defined at all wavelengths present in the {band}-band definition "
-                    + "file (which runs from "
-                    + f"{round(min(full_response_curve_wavelengths_AA), 2)} A "
-                    + f"to {round(max(full_response_curve_wavelengths_AA), 2)} A)."
-                    + "and is typically not a reason to worry. "
-                    + "This warning can be suppressed with `quiet=True`.",
+                     f"at 1 or more wavelengths in {band}-band. "
+                     "This may just be caused by the source spectrum not being "
+                     f"defined at all wavelengths present in the {band}-band definition "
+                     "file (which runs from "
+                     f"{round(min(full_response_curve_wavelengths_AA), 2)} A "
+                     f"to {round(max(full_response_curve_wavelengths_AA), 2)} A)."
+                     "and is typically not a reason to worry. "
+                     "This warning can be suppressed with `quiet=True`.",
                     RuntimeWarning,
                 )
             try:
@@ -2887,8 +2972,8 @@ class SpectrumMixin:
             except Exception:
                 raise RuntimeError(
                     f"Unable to calculate red leak fraction for {band}-band! "
-                    + "Please ensure there is at least 1 wavelength that is above "
-                    + "the red leak threshold."
+                     "Please ensure there is at least 1 wavelength that is above "
+                     "the red leak threshold."
                 )
             if np.isfinite(redleak_frac):
                 if redleak_frac > 1:
@@ -2900,7 +2985,7 @@ class SpectrumMixin:
             elif not quiet:
                 warnings.warn(
                     "Source red leak fraction could not be calculated "
-                    + f"in {band}-band!",
+                     f"in {band}-band!",
                     RuntimeWarning,
                 )
         return redleak_fracs
@@ -3002,14 +3087,14 @@ class NormMixin:
         #
         # Check inputs
         #
-        if self.spectrum is None or self.wavelengths is None:
+        if self._spectrum is None or self._wavelengths is None:
             raise ValueError("Please generate a spectrum before normalizing.")
         if (TelescopeObj is None and passband is not None) or (
             TelescopeObj is not None and passband is None
         ):
             raise ValueError(
                 "Please either specify both `TelescopeObj` and `passband`"
-                + "or neither of them."
+                 "or neither of them."
             )
         #
         # Normalize
@@ -3022,7 +3107,7 @@ class NormMixin:
                 )
             current_ab_mag = current_ab_mag[passband]
         norm_factor = 10 ** (-0.4 * (ab_mag - current_ab_mag))
-        self.spectrum *= norm_factor
+        self._spectrum *= norm_factor
 
     def norm_luminosity_dist(self, luminosity, dist):
         """
@@ -3053,7 +3138,7 @@ class NormMixin:
         #
         # Check inputs
         #
-        if self.spectrum is None or self.wavelengths is None:
+        if self._spectrum is None or self._wavelengths is None:
             raise ValueError("Please generate a spectrum before normalizing.")
         if not isinstance(luminosity, u.Quantity):
             luminosity = luminosity * const.SUN_LUMINOSITY
@@ -3064,10 +3149,10 @@ class NormMixin:
         #
         # Normalize spectrum (originally in erg/s/cm^2/A)
         #
-        erg_s_A = 4 * np.pi * dist * dist * self.spectrum  # erg/s/A
-        tot_luminosity = simpson(y=erg_s_A, x=self.wavelengths.to(u.AA).value)  # erg/s
+        erg_s_A = 4 * np.pi * dist * dist * self._spectrum  # erg/s/A
+        tot_luminosity = simpson(y=erg_s_A, x=self._wavelengths.to(u.AA).value)  # erg/s
         norm_factor = luminosity / tot_luminosity  # dimensionless
-        self.spectrum *= norm_factor  # erg/s/cm^2/A
+        self._spectrum *= norm_factor  # erg/s/cm^2/A
 
     def get_AB_mag(self, TelescopeObj=None):
         """
@@ -3095,79 +3180,84 @@ class NormMixin:
             scalars representing the source's AB magnitude through each of the telescope's
             passbands.
         """
-        if self.spectrum is None or self.wavelengths is None:
+        if self._spectrum is None or self._wavelengths is None:
             raise ValueError(
                 "Please generate a spectrum before calculating AB magnitude(s)."
             )
-        wavelengths_AA = self.wavelengths.to(u.AA).value
+
+        # NOTE: this is probably unsafe, but I don't want to debug this too hard right now
+        if isinstance(self._wavelengths, u.Quantity):
+            wavelengths_AA = self._wavelengths.to(u.AA).value
+        else:
+            wavelengths_AA = self._wavelengths
+
         if TelescopeObj is None:
             #
             # Calculate bolometric AB magnitude
             #
             return flam_to_AB_mag(
                 wavelengths_AA,
-                self.spectrum,
+                self._spectrum,
                 np.ones_like(wavelengths_AA, dtype=float),  # perfect "passband" response
             )
-        else:
-            #
-            # Calculate the AB magnitude through each of the telescope's passbands
-            #
-            if not isinstance(TelescopeObj, Telescope):
-                raise TypeError(
-                    "`TelescopeObj` must be a `castor_etc.telescope.Telescope` object."
-                )
-            ab_mags = dict.fromkeys(TelescopeObj.passbands)
-            for band in TelescopeObj.passbands:
-                # Interpolate passband to spectrum resolution
-                passband_wavelengths = (
-                    TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
-                )
-                passband_interp = interp1d(
-                    x=passband_wavelengths,
-                    # y=passband_response,
-                    y=TelescopeObj.full_passband_curves[band]["response"],
-                    kind="linear",
-                    bounds_error=False,
-                    fill_value=np.nan,
-                )
-                passband_response = passband_interp(wavelengths_AA)
-                # Do not integrate NaNs
-                isgood_passband = np.isfinite(passband_response)
-                isgood_spectrum = np.isfinite(self.spectrum)
-                if np.any(~isgood_passband):
-                    if np.all(~isgood_passband):
-                        raise RuntimeError(
-                            f"{band}-band response could not be estimated "
-                            + "at any source spectrum wavelength"
-                        )
-                    elif np.any(
-                        ~isgood_passband[
-                            (wavelengths_AA >= passband_wavelengths.min())
-                            & (wavelengths_AA <= passband_wavelengths.max())
-                        ]
-                    ):  # only warn if there are NaNs/infs in the passband range
-                        warnings.warn(
-                            f"{band}-band response could not be estimated "
-                            + "at some source spectrum wavelengths",
-                            RuntimeWarning,
-                        )
-                if np.any(~isgood_spectrum):
-                    if np.all(~isgood_spectrum):
-                        raise RuntimeError("Source spectrum values are all non-finite!")
-                    elif np.any(
-                        ~isgood_spectrum[
-                            (wavelengths_AA >= passband_wavelengths.min())
-                            & (wavelengths_AA <= passband_wavelengths.max())
-                        ]
-                    ):  # only warn if there are NaNs/infs in the passband range
-                        warnings.warn(
-                            "Source spectrum values are not finite at some wavelengths",
-                            RuntimeWarning,
-                        )
-                ab_mags[band] = flam_to_AB_mag(
-                    wavelengths_AA[isgood_passband & isgood_spectrum],
-                    self.spectrum[isgood_passband & isgood_spectrum],
-                    passband_response[isgood_passband & isgood_spectrum],
-                )
-            return ab_mags
+        #
+        # Calculate the AB magnitude through each of the telescope's passbands
+        #
+        if not isinstance(TelescopeObj, Telescope):
+            raise TypeError(
+                "`TelescopeObj` must be a `castor_etc.telescope.Telescope` object."
+            )
+        ab_mags = dict.fromkeys(TelescopeObj.passbands)
+        for band in TelescopeObj.passbands:
+            # Interpolate passband to spectrum resolution
+            passband_wavelengths = (
+                TelescopeObj.full_passband_curves[band]["wavelength"].to(u.AA).value
+            )
+            passband_interp = interp1d(
+                x=passband_wavelengths,
+                # y=passband_response,
+                y=TelescopeObj.full_passband_curves[band]["response"],
+                kind="linear",
+                bounds_error=False,
+                fill_value=np.nan,
+            )
+            passband_response = passband_interp(wavelengths_AA)
+            # Do not integrate NaNs
+            isgood_passband = np.isfinite(passband_response)
+            isgood_spectrum = np.isfinite(self._spectrum)
+            if np.any(~isgood_passband):
+                if np.all(~isgood_passband):
+                    raise RuntimeError(
+                        f"{band}-band response could not be estimated "
+                         "at any source spectrum wavelength"
+                    )
+                if np.any(
+                    ~isgood_passband[
+                        (wavelengths_AA >= passband_wavelengths.min())
+                        & (wavelengths_AA <= passband_wavelengths.max())
+                    ]
+                ):  # only warn if there are NaNs/infs in the passband range
+                    warnings.warn(
+                        f"{band}-band response could not be estimated "
+                         "at some source spectrum wavelengths",
+                        RuntimeWarning,
+                    )
+            if np.any(~isgood_spectrum):
+                if np.all(~isgood_spectrum):
+                    raise RuntimeError("Source spectrum values are all non-finite!")
+                if np.any(
+                    ~isgood_spectrum[
+                        (wavelengths_AA >= passband_wavelengths.min())
+                        & (wavelengths_AA <= passband_wavelengths.max())
+                    ]
+                ):  # only warn if there are NaNs/infs in the passband range
+                    warnings.warn(
+                        "Source spectrum values are not finite at some wavelengths",
+                        RuntimeWarning,
+                    )
+            ab_mags[band] = flam_to_AB_mag(
+                wavelengths_AA[isgood_passband & isgood_spectrum],
+                self._spectrum[isgood_passband & isgood_spectrum],
+                passband_response[isgood_passband & isgood_spectrum],
+            )
+        return ab_mags

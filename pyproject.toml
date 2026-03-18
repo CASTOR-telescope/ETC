@@ -20,10 +20,12 @@ dependencies = [
     "corner",
     "emcee",
     "matplotlib",
+    "mpmath",
     "numpy",
     "pandas",
     "photutils",
     "pytransit",
+    "regions",
     "scikit-image",
     "scipy",
     "spectres",
@@ -43,15 +45,25 @@ lint = [
     "black",
     "ruff",
     "mypy",
+    "isort",
 ]
 docs = [
     "sphinx",
-    "sphinx-rtd-theme",
-    "sphinx-autoapi",
+    "myst-nb",
+    "sphinx-book-theme",
+    "sphinxcontrib-napoleon",
+    "sphinx-autodoc2",
+    "sphinx-autobuild",
+    "mathjax",
+    "sphinx_rtd_theme",
 ]
-
-[tool.pytest.ini_options]
-addopts = "--maxfail=1 --cov=castor_etc --cov-report term-missing"
+dev = [
+    "pipdeptree",
+    "pre-commit", 
+    "ipython",
+    "build",
+    "pip-audit",
+]
 
 [tool.coverage.run]
 relative_files = true
@@ -70,46 +82,59 @@ exclude_lines = [
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "_version.py"
+version-file = "castor_etc/_version.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/castor_etc",
+    "castor_etc",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["/castor_etc"]
+packages = ["castor_etc"]
 
-[tool.hatch.envs.build]
-dependencies = [
-    "isort"
-]
+[tool.hatch.envs.default]
+installer = "uv"
 
 [tool.hatch.envs.test]
 dependencies = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
-    "ruff",
 ]
+installer = "uv"
 
-[tool.hatch.envs.test.scripts]
-test = "pytest {args:tests}"
-cov = "pytest --cov=castor_etc --cov-report=xml --cov-report=term-missing {args:tests}"
+[tool.hatch.envs.lint]
+dependencies = [
+    "black",
+    "ruff",
+    "mypy",
+    "isort",
+]
+installer = "uv"
 
 [tool.hatch.envs.docs]
-python = ["3.11", "3.12"]
 dependencies = [
     "sphinx",
-    "-r docs/requirements.txt"
+    "myst-nb",
+    "sphinx-book-theme",
+    "sphinxcontrib-napoleon",
+    "sphinx-autodoc2",
+    "sphinx-autobuild",
+    "mathjax",
+    "sphinx_rtd_theme",
 ]
+installer = "uv"
 
 [tool.hatch.envs.docs.scripts]
 build = "sphinx-build -b html docs/source docs/build"
 serve = "sphinx-build -b html docs/source docs/build --open-in-browser"
 
-[dependency-groups]
-dev = [
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
+[tool.hatch.envs.dev]
+dependencies = [
+    "pipdeptree",
+    "pre-commit",
+    "ipython",
+    "build",
+    "pip-audit",
 ]
+installer = "uv"

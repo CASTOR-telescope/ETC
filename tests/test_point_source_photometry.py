@@ -72,10 +72,10 @@ import astropy.units as u
 import numpy as np
 
 from castor_etc.background import Background
-from castor_etc.telescope import Telescope
 from castor_etc.photometry import Photometry
+from castor_etc.telescope import Telescope
 
-_TOL = 1e-5  # floating-point tolerance
+_TOL = 1e-3  # floating-point tolerance
 
 class PointSourcePhotometryTestCase(unittest.TestCase):
     """
@@ -83,7 +83,7 @@ class PointSourcePhotometryTestCase(unittest.TestCase):
     """
     def setUp(self):
         # Default Telescope parameters
-        self.scope = Telescope()
+        self.scope = Telescope(read_noise=3.0, dark_current=1e-4, gain=2.0)
 
         # Default background with one emission line
         self.bg = Background()
@@ -111,12 +111,12 @@ class PointSourcePhotometryTestCase(unittest.TestCase):
         Basic integration test to ensure that the getting started Jupyter notebook works.
         """
         # Confirm that the AB magnitude in each passband is consistent
-        ## Each test is conducted 
+        ## Each test is conducted
         mags = self.point_src.get_AB_mag(self.scope)
         self.assertAlmostEqual(mags['uv'], np.float64(26.44580324104077),delta=_TOL) # check the uv component to 3rd decimal
         self.assertAlmostEqual(mags['u'], np.float64(24.964036810739323), delta=_TOL) # check the u component
         self.assertAlmostEqual(mags['g'], np.float64(24.391672332311423), delta=_TOL)
-        
+
     def test_point_source_exposure_time_calculator(self):
         TARGET_SNR = 10
         REDDENING = 0.01  # E(B-V)

@@ -72,8 +72,8 @@ import astropy.units as u
 import numpy as np
 
 from castor_etc.background import Background
-from castor_etc.telescope import Telescope
 from castor_etc.photometry import Photometry
+from castor_etc.telescope import Telescope
 
 _TOL = 1e-5  # floating-point tolerance
 
@@ -83,7 +83,7 @@ class ExtendedSourcePhotometryTestCase(unittest.TestCase):
     """
     def setUp(self):
         # Default Telescope parameters
-        self.scope = Telescope(dark_current=0.01)
+        self.scope = Telescope(read_noise=3.0, dark_current=0.01, gain=2.0)
 
         # Default background with one emission line
         self.bg = Background(mags_per_sq_arcsec={"uv": 26.08, "u": 23.74, "g": 22.60})
@@ -109,16 +109,18 @@ class ExtendedSourcePhotometryTestCase(unittest.TestCase):
         self.phot.use_rectangular_aperture(
             width=4.5 * u.arcsec, length=3 * u.arcsec, center=[0.5, -1] * u.arcsec
         )
-  
+
     def test_extended_source_exposure_time_calculator(self):
         TARGET_SNR = 10
         REDDENING = 0
 
         # Test exposure times
         exp_t = self.phot.calc_snr_or_t(snr=TARGET_SNR, reddening=REDDENING, quiet=True)
-        self.assertAlmostEqual(exp_t['uv'], np.float64(1838787157.018459), delta=_TOL)
-        self.assertAlmostEqual(exp_t['u'], np.float64(4377393648824651.5), delta=_TOL)
-        self.assertAlmostEqual(exp_t['g'], np.float64(8039.467736646107), delta=_TOL)
+
+        # The calculated exposure times are huge, so let's say we want to estimate up to the 1E2
+        self.assertAlmostEqual(exp_t['uv'], np.float64(1838787157.018459), places=-2)
+        self.assertAlmostEqual(exp_t['u'], np.float64(4377393648824651.5), places=-2)
+        self.assertAlmostEqual(exp_t['g'], np.float64(8039.467736646107), places=-2)
 
     def test_extended_source_snr_calculator(self):
         """

@@ -104,7 +104,7 @@ def calc_photon_energy(
     """
     if wavelength is not None and frequency is not None:
         raise ValueError("Only one of wavelength and frequency should be provided")
-    elif wavelength is not None:
+    if wavelength is not None:
         if isinstance(wavelength, u.Quantity):
             wavelength = wavelength.to(u.AA).value
         if isinstance(wavelength_err, u.Quantity):
@@ -153,7 +153,6 @@ def convert_freq_wavelength(data, to="wavelength", output_unit = u.AA):
         unit = u.AA  # data are wavelengths
     else:
         raise ValueError("to must be 'wavelength' or 'frequency'")
-    #
     if isinstance(data, u.Quantity):
         data = data.to(unit)
     else:
@@ -349,7 +348,6 @@ def convert_rel_abs_mag(mag, dist, mag_err=0.0, dist_err=0.0, to="abs"):
     else:
         raise ValueError("to must be either 'abs' or 'rel'")
     new_mag_err = np.sqrt(mag_err**2 + (5 / np.log(10) * dist_err / dist) ** 2)
-    #
     return new_mag, new_mag_err
 
 
@@ -388,7 +386,6 @@ def flux_to_mag(flux, flux_err=0.0, zpt=-48.60, calc_abs=False, dist=None, dist_
     #
     rel_mag = -2.5 * np.log10(flux) + zpt
     rel_mag_err = 2.5 / np.log(10) * abs(flux_err / flux)
-    #
     if calc_abs:
         if dist is None:
             raise ValueError("dist must be provided if calc_abs is True")
@@ -396,7 +393,6 @@ def flux_to_mag(flux, flux_err=0.0, zpt=-48.60, calc_abs=False, dist=None, dist_
             rel_mag, dist, mag_err=rel_mag_err, dist_err=dist_err, to="abs"
         )
         return abs_mag, abs_mag_err
-    #
     return rel_mag, rel_mag_err
 
 
@@ -611,7 +607,6 @@ def convert_electron_flux_mag(
                 var2, var2_err = fnu_to_flam(
                     var2, wavelengths, fnu_err=var2_err, wavelength_err=wavelengths_err
                 )  # flam
-    #
     elif var1_type == "fnu":
         if var2_type == "flam":
             # Fnu to flam
@@ -628,7 +623,6 @@ def convert_electron_flux_mag(
                 var2, var2_err = mag_to_flux(
                     var2, mag_err=var2_err, zpt=phot_zpt
                 )  # electron/s
-    #
     elif var1_type == "electron":
         # Electron/s to AB magnitude
         var2, var2_err = flux_to_mag(
@@ -642,7 +636,6 @@ def convert_electron_flux_mag(
                 var2, var2_err = fnu_to_flam(
                     var2, wavelengths, fnu_err=var2_err, wavelength_err=wavelengths_err
                 )  # flam
-    #
     elif var1_type == "flam":
         # Flam to fnu
         var2, var2_err = flam_to_fnu(
@@ -658,10 +651,8 @@ def convert_electron_flux_mag(
                 var2, var2_err = mag_to_flux(
                     var2, mag_err=var2_err, zpt=phot_zpt
                 )  # electron/s
-    #
     else:
         raise ValueError(
             "Something went wrong. This statement should be impossible to reach..."
         )
-    #
     return var2, var2_err

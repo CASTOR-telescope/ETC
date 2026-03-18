@@ -204,8 +204,7 @@ class Profiles:
 
         if a is None and b is None:
             return _uniform_aper
-        else:
-            return _uniform_ellipse
+        return _uniform_ellipse
 
     @staticmethod
     def ellipse(
@@ -340,7 +339,7 @@ class Profiles:
                 r_eff = r_eff.to(u.arcsec).value
             except Exception:
                 raise TypeError("r_eff must be an angular quantity (e.g., u.arcsec)")
-        for param, param_name in zip([n, e, angle], ["n", "e", "angle"]):
+        for param, param_name in zip([n, e, angle], ["n", "e", "angle"], strict=False):
             if not isinstance(param, Number):
                 raise TypeError(f"{param_name} must be a scalar")
         angle = np.deg2rad(angle)
@@ -451,23 +450,21 @@ class Source(SpectrumMixin, NormMixin, metaclass=ABCMeta):
                 ):
                     raise TypeError(
                         "`profile` should return a 2D array of floats. "
-                        + "See the docstring below for more details.\n"
+                         "See the docstring below for more details.\n"
                         + Source.__init__.__doc__
                     )
             except Exception:
                 raise ValueError(
                     "profile may not be of the correct form. "
-                    + "profile must be a function with 3 positional arguments "
-                    + "`(x, y, aper_center)` and return a 2D array of floats with the "
-                    + "same shape as x and y. Also check the traceback for more details."
+                     "profile must be a function with 3 positional arguments "
+                     "`(x, y, aper_center)` and return a 2D array of floats with the "
+                     "same shape as x and y. Also check the traceback for more details."
                 )
         self.profile = profile
         self.passband = None  # for custom surface brightness profiles from a file
         #
         # Initialize some potential future attributes
         #
-        self.spectrum = None
-        self.wavelengths = None
         if init_dimensions:
             self.a = None
             self.b = None
@@ -854,12 +851,12 @@ class ExtendedSource(Source):
         if exponential_scale_lengths is None and profile == "exponential":
             raise ValueError(
                 "`exponential_scale_lengths` must be provided"
-                + "if `profile` is 'exponential'"
+                 "if `profile` is 'exponential'"
             )
-        elif exponential_scale_lengths is not None and profile != "exponential":
+        if exponential_scale_lengths is not None and profile != "exponential":
             raise ValueError(
                 "`exponential_scale_lengths` must not be provided"
-                + "if `profile` is not 'exponential'"
+                 "if `profile` is not 'exponential'"
             )
         if isinstance(profile, str):
             if profile == "uniform":
@@ -1139,7 +1136,7 @@ class CustomSource(Source):
             if np.any(x[0] != x[-1]) or np.any(y[:, 0] != y[:, -1]):
                 raise ValueError(
                     "For this profile, the x- and y-coordinate arrays should be "
-                    + "generated via `np.meshgrid(..., indexing='xy')`!"
+                     "generated via `np.meshgrid(..., indexing='xy')`!"
                 )
             x_1d = x[0]
             y_1d = y[:, 0]

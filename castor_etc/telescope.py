@@ -126,7 +126,7 @@ def secant_method(f, x0, x1, tol=1e-6, max_iter=100):
         x0, x1 = x1, x2
     warnings.warn(
         "Maximum number of iterations reached in secant method. "
-        + "Exiting and returning current estimate",
+         "Exiting and returning current estimate",
         RuntimeWarning,
     )
     return x2
@@ -170,7 +170,7 @@ def bisection_method(f, x0, x1, tol=1e-6, max_iter=100):
             x0 = x2  # move lower bound right
     warnings.warn(
         "Maximum number of iterations reached in bisection method. "
-        + "Exiting and returning current estimate",
+         "Exiting and returning current estimate",
         RuntimeWarning,
     )
     return x2
@@ -522,7 +522,6 @@ class Telescope:
             """
             d = d.copy()
             warning_printed = False  # track if warning has already been printed
-            #
             if any(band not in d.keys() for band in passbands):
                 raise KeyError(f"Not all keys in `passbands` are in `{d_name}`.")
             if value_types is u.Quantity:
@@ -533,18 +532,16 @@ class Telescope:
                         raise TypeError(f"`{d_name}` must be dict of {value_types_str}")
             elif any(not isinstance(value, value_types) for value in d.values()):
                 raise TypeError(f"`{d_name}` must be dict of {value_types_str}")
-            #
             for band in list(d):
                 if band not in passbands:
                     if show_warnings and not warning_printed:
                         warning_printed = True
                         warnings.warn(
                             f"Some key(s) in `{d_name}` are not in `passbands`! "
-                            + "These will be removed.",
+                             "These will be removed.",
                             UserWarning,
                         )
                     del d[band]
-            #
             return d
 
         #
@@ -561,7 +558,7 @@ class Telescope:
         except Exception:
             raise TypeError(
                 "passband_resolution must be an `astropy.Quantity` length "
-                + "(e.g., u.nm or u.AA)"
+                 "(e.g., u.nm or u.AA)"
             )
         passband_limits = _check_dict(
             passband_limits,
@@ -590,7 +587,7 @@ class Telescope:
             )
             print(
                 "INFO: `passband_pivots` and passband response files both provided. Will "
-                + "use user-supplied `passband_pivots` rather than calculating pivots."
+                 "use user-supplied `passband_pivots` rather than calculating pivots."
             )
         psf_filepaths = _check_dict(
             psf_filepaths, "`psf_filepaths`", str, "absolute filepath strings"
@@ -615,11 +612,11 @@ class Telescope:
             )
             print(
                 "INFO: `phot_zpts` and passband response files both provided. Will use "
-                + "user-supplied `phot_zpts` rather than calculating zero-points."
+                 "user-supplied `phot_zpts` rather than calculating zero-points."
             )
         angles = [fwhm, px_scale]
         angles_str = ["fwhm", "px_scale"]
-        for angle, angle_str in zip(angles, angles_str):
+        for angle, angle_str in zip(angles, angles_str, strict=False):
             try:
                 _ = angle.to(u.arcsec)
             except Exception:
@@ -636,13 +633,13 @@ class Telescope:
             if ifov_dimen.shape != (2,):
                 raise ValueError(
                     "ifov_dimen must be a 2-element `astropy.Quantity` angle array "
-                    + "(e.g., [0.44, 0.56] * u.deg)"
+                     "(e.g., [0.44, 0.56] * u.deg)"
                 )
             _ = ifov_dimen.to(u.arcsec)
         except Exception:
             raise TypeError(
                 "ifov_dimen must be a 2-element `astropy.Quantity` angle array "
-                + "(e.g., [0.44, 0.56] * u.deg)"
+                 "(e.g., [0.44, 0.56] * u.deg)"
             )
         if len(transit_ccd_dim) != 2:
             raise TypeError(
@@ -656,7 +653,7 @@ class Telescope:
             )
         scalars = [mp, dark_current, bias, read_noise, gain]
         scalars_str = ["mp", "dark_current", "bias", "read_noise", "gain"]
-        for scalar, scalar_str in zip(scalars, scalars_str):
+        for scalar, scalar_str in zip(scalars, scalars_str, strict=False):
             if not isinstance(scalar, Number):
                 raise TypeError(f"{scalar_str} must be an int or float")
         #
@@ -795,7 +792,6 @@ class Telescope:
         psf_px_scale = (self.px_scale / self.psf_supersample_factor).to(u.arcsec).value
         extent_y = 0.5 * psf_px_scale * psf.shape[0]
         extent_x = 0.5 * psf_px_scale * psf.shape[1]
-        #
         rc = {"axes.grid": False}
         _ds9heat_cmap.set_bad("k")  # set NaNs and infs to black
         with plt.rc_context(rc):  # matplotlib v3.5.x has bug affecting grid + imshow
@@ -940,7 +936,6 @@ class Telescope:
             limits = limits.copy()
             for band in limits:
                 limits[band] = (limits[band]).to(file_units[band]).value
-            #
         if resolution is not None:
             resolutions = dict.fromkeys(filepaths)
             for band in resolutions:

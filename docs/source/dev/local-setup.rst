@@ -56,6 +56,10 @@ To start, install Hatchling on your computer using pip:
 .. code-block:: bash
     pip install hatch
 
+If you use `uv <https://docs.astral.sh/uv/>`_ for your Python modules, you can install it into `uv` instead
+.. code-block:: bash
+    uv pip install hatch
+
 Once Hatchling is installed, restart your terminal and verify that your shell can find and run by using the following command:
 .. code-block:: bash
     hatch --version

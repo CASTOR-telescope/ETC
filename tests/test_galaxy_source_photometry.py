@@ -72,8 +72,8 @@ import astropy.units as u
 import numpy as np
 
 from castor_etc.background import Background
-from castor_etc.telescope import Telescope
 from castor_etc.photometry import Photometry
+from castor_etc.telescope import Telescope
 
 _TOL = 1e-2
 
@@ -83,13 +83,13 @@ class GalaxySourcePhotometryTestCase(unittest.TestCase):
     """
     def setUp(self):
         # Default Telescope parameters
-        self.scope = Telescope()
+        self.scope = Telescope(read_noise=3.0, dark_current=1e-4, gain=2.0)
 
         # Default background with one emission line
         self.bg = Background()  # default Earthshine and zodiacal light
         self.bg.add_geocoronal_emission(
                 flux=1e-15, wavelength=2345 * u.AA, linewidth=0.023 * u.AA)
-              
+
         from castor_etc.sources import GalaxySource
 
 
@@ -117,17 +117,17 @@ class GalaxySourcePhotometryTestCase(unittest.TestCase):
 
         self.assertAlmostEqual(self.src.get_AB_mag(), np.float64(23.39051359135356), delta=_TOL )
 
-    def test_expectected_spectrum_plot(self):
+    def test_expected_spectrum_plot(self):
         self.src.show_spectrum(plot=False)
-        pass  # Just ensure no exceptions are raised
+        # Just ensure no exceptions are raised
 
     def test_galaxy_source_snr_calculator(self):
         INTEGRATION_TIME = 4321  # seconds
         REDDENING = 0.01
 
-        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)['uv'], np.float64(1.9289396333476412), delta=_TOL)
-        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)["u"], np.float64(2.311967051585148), delta=_TOL)
-        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)["g"], np.float64(4.912896778606595), delta=_TOL)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)['uv'], np.float64(1.9289396333476412), places=5)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)["u"], np.float64(2.311967051585148), places=5)
+        self.assertAlmostEqual(self.phot.calc_snr_or_t(t=INTEGRATION_TIME, reddening=REDDENING, quiet=True)["g"], np.float64(4.912896778606595), places=5)
 
 
     def test_galaxy_source_exposure_time_calculator(self):

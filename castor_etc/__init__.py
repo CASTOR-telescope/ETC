@@ -78,16 +78,51 @@ __all__ = [
     "constants",
     "conversions",
     "data",
+    "deprecated",
     "filepaths",
     "parameters",
     "photometry",
+    "simulator",
     "sources",
     "spectrum",
     "telescope",
     "uvmos_spectroscopy",
     "transit",
-    "grism"
+    "grism",
 ]
+
+import logging
+import numpy as np
+
+class BaseClass(object):
+    # Inspiration from this blogpost: https://bbengfort.github.io/2016/01/logging-mixin/
+    """
+    A mixin class to allow classes to use loggers
+    """
+
+    @property
+    def logger(self) -> logging.Logger :
+        """
+        Instantiates a logger based on the class name
+        """
+        if not hasattr(self, '_logger') or not self._logger:
+            self._logger = logging.getLogger(__name__)
+        return self._logger
+
+# This is a "hacky" way of dealing with the annoying pytransit failure from not finding trapz!
+if not hasattr(np, "trapz"):
+    try:
+        # Try the new NumPy 2.x location
+        from numpy import trapezoid as _trapz
+        np.trapz = _trapz
+    except ImportError:
+        # Fallback for other versions/scipy
+        try:
+            from scipy.integrate import trapz as _trapz
+            np.trapz = _trapz
+        except ImportError:
+            pass
+
 
 from . import (
     background,
@@ -100,7 +135,9 @@ from . import (
     photometry,
     sources,
     spectrum,
+    simulator,
     telescope,
     transit,
     uvmos_spectroscopy,
+    deprecated
 )
