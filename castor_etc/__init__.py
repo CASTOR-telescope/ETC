@@ -125,6 +125,7 @@ __all__ = [
     "detector",
     "grism",
     "photometry",
+    "simulator",
     "sources",
     "spectra",
     "telescope",
