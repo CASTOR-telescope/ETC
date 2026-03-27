@@ -71,7 +71,7 @@ from os.path import join
 
 import astropy.units as u
 
-from .filepaths import DATAPATH
+from castor_etc import DATAPATH
 
 # -------------------------------- TELESCOPE PARAMETERS -------------------------------- #
 

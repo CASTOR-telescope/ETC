@@ -17,6 +17,7 @@ dependencies = [
     "astropy",
     "astroquery",
     "celerite",
+    "click",
     "corner",
     "emcee",
     "matplotlib",
@@ -34,6 +35,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/CASTOR-telescope/ETC"
+
+[project.scripts]
+castor-etc = "castor_etc.cli:cli"
 
 [project.optional-dependencies]
 test = [

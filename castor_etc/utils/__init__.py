@@ -58,18 +58,20 @@
 # FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
-"""
-Contains filepaths for CASTOR. Mostly private constants that should be re-factored elsewhere later.
-"""
+import logging
 
-from os.path import abspath, dirname, join
 
-# ------------------------- FILEPATHS (N.B. no trailing slash) ------------------------- #
+class BaseClass(object):
+    # Inspiration from this blogpost: https://bbengfort.github.io/2016/01/logging-mixin/
+    """
+    A mixin class to allow classes to use loggers
+    """
 
-# The location of the castor_etc package
-__BASEPATH = dirname(abspath(__file__))  # + "/"
-
-# The directory containing the data files (e.g., passbands, sky background, etc.)
-DATAPATH = join(__BASEPATH, "data")
-
-# -------------------------------------------------------------------------------------- #
+    @property
+    def logger(self) -> logging.Logger :
+        """
+        Instantiates a logger based on the class name
+        """
+        if not hasattr(self, '_logger') or not self._logger:
+            self._logger = logging.getLogger(__name__)
+        return self._logger
