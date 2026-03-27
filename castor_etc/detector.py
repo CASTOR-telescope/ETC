@@ -16,7 +16,7 @@ This is still work in progress, so please do not import this package directly fo
 
 import numpy as np
 
-from castor_etc.utils import BaseClass
+from . import BaseClass
 
 # TODO: implement gain profile based on measured gain from different SPI settings
 
