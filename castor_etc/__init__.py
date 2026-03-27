@@ -121,18 +121,18 @@ def verify_data_installation():
 # -------------------------------------------------------------------------------------- #
 
 __all__ = [
+    "data",
+    "deprecated",
+    "spectra",
+    "utils",
     "background",
     "detector",
     "grism",
     "photometry",
-    "simulator",
     "sources",
-    "spectra",
     "telescope",
     "transit",
-    "utils",
-    "uvmos_spectroscopy",
-    "deprecated",
+    "uvmos_spectroscopy"
 ]
 
 import numpy as np
@@ -151,6 +151,14 @@ if not hasattr(np, "trapz"):
         except ImportError:
             pass
 
+# Relative import of important sub-packages under utils
+from .utils import (
+    BaseClass,
+    constants,
+    conversions,
+    parameters
+)
+
 # Relative import of all scientific sub-packages
 from . import (
     background,
@@ -164,6 +172,5 @@ from . import (
     transit,
     uvmos_spectroscopy,
     deprecated,
-    utils
 )
 
