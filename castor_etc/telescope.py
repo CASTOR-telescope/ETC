@@ -79,8 +79,8 @@ from matplotlib.colors import LinearSegmentedColormap
 from scipy.integrate import simpson
 from scipy.interpolate import interp1d
 
-from . import parameters as params
-from .conversions import fnu_to_photlam, mag_to_flux
+from castor_etc.utils import parameters as params
+from castor_etc.utils.conversions import fnu_to_photlam, mag_to_flux
 
 # Make our own matplotlib colormap to mimic the "heat" map in DS9, because we're extra
 # Based on: <https://gist.github.com/adonath/c9a97d2f2d964ae7b9eb>

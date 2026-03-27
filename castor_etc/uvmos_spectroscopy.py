@@ -86,10 +86,10 @@ from scipy.interpolate import RectBivariateSpline, interp1d
 from scipy.ndimage import rotate
 from scipy.optimize import curve_fit
 
-from .background import Background
-from .filepaths import DATAPATH
-from .sources import PointSource, Source
-from .telescope import Telescope
+from castor_etc import DATAPATH
+from castor_etc.background import Background
+from castor_etc.sources import PointSource, Source
+from castor_etc.telescope import Telescope
 
 UVMOS_DATAPATH = join(DATAPATH, "UVMOS_data")
 

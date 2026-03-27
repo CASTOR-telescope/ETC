@@ -82,13 +82,15 @@ from scipy.ndimage import gaussian_filter, interpolation
 from skimage.transform import downscale_local_mean
 from tqdm import tqdm
 
+# CASTOR main scientific packages
 from castor_etc.background import Background
 from castor_etc.sources import PointSource
-from castor_etc.spectrum import getStarData
+from castor_etc.spectra.base import getStarData
 from castor_etc.telescope import Telescope
 
-from .conversions import calc_photon_energy, convert_electron_flux_mag, flam_to_AB_mag, mag_to_flux
-from .filepaths import DATAPATH
+# Utilities import
+from castor_etc.utils.conversions import calc_photon_energy, convert_electron_flux_mag, flam_to_AB_mag, mag_to_flux
+from castor_etc import DATAPATH
 
 # The optimal aperture for a point source is a circular aperture with a radius equal to the factor below times half the telescope's FWHM
 _OPTIMAL_APER_FACTOR = 1.4

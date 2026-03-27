@@ -58,119 +58,90 @@
 # FORECASTOR ETC. If not, see          si ce n'est pas le cas, consultez :
 # <http://www.gnu.org/licenses/>.      <http://www.gnu.org/licenses/>.
 
+
 """
-A modular, user-friendly Python package for easy estimation and analysis of CASTOR imaging
-performance. See the [`ETC_frontend`](https://github.com/CASTOR-telescope/ETC_frontend)
-GitHub repository for a graphical user interface to complement this package.
+cli.py
 
-Includes:
-  1. Astronomical source generation and background noise estimation
-  2. Telescope imaging chain simulation, featuring a pixel-based photometry approach
-  3. Convenience functions for converting between useful quantities (e.g., flux to
-     electron/s to AB magnitude)
-
-Author: Isaac Cheng
-Contact: isaac.cheng.ca@gmail.com
+FORECASTOR ETC Command Line tool - built using the click module
 """
 
-try:
-    from ._version import __version__
-except ImportError:
-    try:
-        import importlib.metadata
-        __version__ = importlib.metadata.version("castor-etc")
-    except importlib.metadata.PackageNotFoundError:
-        __version__ = "unknown" # or "unknown"
-
-# ------------------------- FILEPATHS (N.B. no trailing slash) ------------------------- #
-from pathlib import Path
-
-# The location of the castor_etc package
-__BASEPATH = Path(__file__).resolve().parent  # + "/"
-
-# The directory containing the data files (e.g., passbands, sky background, etc.)
-DATAPATH = __BASEPATH / "data"
-
-def verify_data_installation():
-    """
-    Scans the DATAPATH and checks if subdirectories contain any files.
-    
-    Returns a dictionary of {folder_name: not_empty_bool}.
-    """
-    from pathlib import Path
-    
-    data_dir = Path(DATAPATH)
-    
-    if not data_dir.exists():
-        return {}
-    
-    # Iterate through all the folders for all non hidden sub-folders
-    subfolders = [
-        d for d in data_dir.iterdir() 
-        if d.is_dir() and not d.name.startswith((".", "__"))
-    ]
-    
-    results = {}
-    for folder_path in subfolders:
-        # Check if a non-directory file exists and returns boolean if true
-        has_files = any(f.is_file() for f in folder_path.iterdir())
-        results[folder_path.name] = has_files
-        
-    return results
-
-# -------------------------------------------------------------------------------------- #
-
-__all__ = [
-    "data",
-    "deprecated",
-    "spectra",
-    "utils",
-    "background",
-    "detector",
-    "grism",
-    "photometry",
-    "sources",
-    "telescope",
-    "transit",
-    "uvmos_spectroscopy"
-]
-
+import click
+import os
+import sys
+import platform
 import numpy as np
+import astropy
+import scipy
+import pandas
+import castor_etc
 
-# This is a "hacky" way of dealing with the annoying pytransit failure from not finding trapz!
-if not hasattr(np, "trapz"):
-    try:
-        # Try the new NumPy 2.x location
-        from numpy import trapezoid as _trapz
-        np.trapz = _trapz
-    except ImportError:
-        # Fallback for other versions/scipy
-        try:
-            from scipy.integrate import trapz as _trapz
-            np.trapz = _trapz
-        except ImportError:
-            pass
+@click.group()
+@click.version_option(version=castor_etc.__version__)
+def cli():
+    """
+    FORECASTOR ETC Command Line Interface.
 
-# Relative import of important sub-packages under utils
-from .utils import (
-    BaseClass,
-    constants,
-    conversions,
-    parameters
-)
+    The CASTOR Exposure Time Calculator (ETC) helps users estimate the SNR 
+    and performance of the CASTOR telescope across its UV, U, and G bands.
+    This command line tool validates your installation, check local data assets 
+    (passbands, PSFs), and gather information for bug reports.
+    """
+    pass
 
-# Relative import of all scientific sub-packages
-from . import (
-    background,
-    data,
-    detector,
-    grism,
-    photometry,
-    sources,
-    spectra,
-    telescope,
-    transit,
-    uvmos_spectroscopy,
-    deprecated,
-)
+@cli.command()
+def info():
+    """Prints installation and system information for bug reports"""
+    click.secho("--- Environment Info ---", fg="cyan", bold=True)
+    click.echo(f"OS/Platform:    {platform.platform()}")
+    click.echo(f"Python:         {sys.version.split()[0]}")
+    click.echo(f"Executable:     {sys.executable}")
+    
+    click.secho("\n--- Package Info ---", fg="cyan", bold=True)
+    click.echo(f"Version:        {castor_etc.__version__}")
+    click.echo(f"Install Path:   {os.path.dirname(castor_etc.__file__)}")
+    
+    click.secho("\n--- Core Dependencies ---", fg="cyan", bold=True)
+    click.echo(f"NumPy:          {np.__version__}")
+    click.echo(f"SciPy:          {scipy.__version__}")
+    click.echo(f"Astropy:        {astropy.__version__}")
+    click.echo(f"Pandas:         {pandas.__version__}")
 
+@cli.command()
+def validate():
+    """Verify data folder content to ensure data folders exist and have content
+
+    NOTE: This only validates that local data assets exist in the package 
+    directory. It does NOT verify if the package is correctly installed 
+    in your Python environment. Use 'info' for installation details.
+    """
+    from castor_etc import verify_data_installation, DATAPATH
+    
+    click.secho(f"Validating data content in: {DATAPATH}", fg="yellow")
+    
+    results = verify_data_installation()
+    
+    if not results:
+        click.secho("\n[!] Data directory is empty/not found.", fg="red", bold=True)
+        click.echo(f"Expected path: {DATAPATH}")
+        sys.exit(1)
+
+    all_ok = True
+    click.echo("--- Content Check ---")
+    for folder, has_content in sorted(results.items()):
+        if has_content:
+            status = click.style("FOUND", fg="green")
+            click.echo(f"  [{status}] {folder}")
+        else:
+            status = click.style("EMPTY", fg="red")
+            click.echo(f"  [{status}] {folder}")
+            all_ok = False
+            
+    if all_ok:
+        click.secho("\nSuccess: local data assets found.", fg="green", bold=True)
+    else:
+        click.secho("\nWarning: missing local data assets", 
+                    fg="red", bold=True)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    cli()

@@ -79,12 +79,11 @@ from astropy.io import ascii
 from astropy.modeling.models import Sersic2D
 from scipy.interpolate import interp1d
 
+from castor_etc import DATAPATH
 from castor_etc.background import Background
 from castor_etc.sources import GalaxySource
 from castor_etc.telescope import Telescope
-
-from .conversions import calc_photon_energy, flam_to_photlam, mag_to_flux
-from .filepaths import DATAPATH
+from castor_etc.utils.conversions import calc_photon_energy, flam_to_photlam, mag_to_flux
 
 
 class Grism:

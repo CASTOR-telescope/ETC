@@ -92,7 +92,7 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 from photutils.aperture import EllipticalAperture
 from scipy.interpolate import RectBivariateSpline
 
-from .spectrum import NormMixin, SpectrumMixin
+from castor_etc.spectra import NormMixin, SpectrumMixin
 
 
 class Profiles:
