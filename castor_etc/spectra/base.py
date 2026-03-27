@@ -110,11 +110,6 @@ from castor_etc.telescope import Telescope
 fnu = u.def_unit("fnu", u.erg / (u.s * u.cm**2 * u.Hz))
 flam = u.def_unit("flam", u.erg / (u.s * u.cm**2 * u.AA))
 
-## DEFINE CUSTOM UNITS
-fnu = u.def_unit("fnu", u.erg / (u.s * u.cm**2 * u.Hz))
-flam = u.def_unit("flam", u.erg / (u.s * u.cm**2 * u.AA))
-
-
 def getStarData(
     temperature,
     metallicity,
