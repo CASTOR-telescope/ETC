@@ -249,7 +249,7 @@ class Background:
             flux = GEOCORONAL_FLUX_LOW
         elif not isinstance(flux, Number):
             raise ValueError(
-                "`flux` must be a scalar or one of 'high', 'medium', or 'low'"
+                "`flux` must be a scalar or one of 'high', 'avg', or 'low'"
             )
         if isinstance(wavelength, u.Quantity):
             try:
