@@ -1105,7 +1105,6 @@ class CustomSource(Source):
             xs,
             ys,
             data.astype(np.float64),
-            kind="linear",
             bounds_error=False,
             fill_value=0.0,
         )
