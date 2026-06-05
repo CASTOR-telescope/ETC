@@ -1104,9 +1104,10 @@ class CustomSource(Source):
         profile_interp = RectBivariateSpline(
             xs,
             ys,
-            data.astype(np.float64),
-            bounds_error=False,
-            fill_value=0.0,
+            data.astype(np.float64)
+            #bounds_error=False,
+            #fill_value=0.0,
+            #kind = "linear"
         )
 
         def profile(x, y, center):
