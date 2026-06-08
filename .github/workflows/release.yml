@@ -91,7 +91,7 @@ jobs:
       - name: Flatten artifacts directory
         run: |
           mkdir -p release-artifacts
-          cp artifacts/dist-artifacts/* release-artifacts/
+          cp dist/* release-artifacts/
           ls -lh release-artifacts/
 
       - name: Extract release notes from tag
