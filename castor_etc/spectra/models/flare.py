@@ -5,10 +5,10 @@
 
 ## THE SEGMENT BELOW CONTAINS EXTERNAL CODE ##
 
-#For more information on this function with examples go to this link
+# For more information on this package with examples go to the following link
 # -> 'https://github.com/parkus/fiducial_flare/tree/master'
-#This package was created by Parke Loyd 2017
-# This package was added to CASTOR Github in Feb 2026
+# This package was created by Parke Loyd 2017
+# Accessed June 2026
 
 # MIT License
 # Copyright (c) 2017 Parke Loyd
@@ -845,139 +845,136 @@ from astropy import table
 from astropy import units as u
 from matplotlib import pyplot as plt
 
-def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figure):
+
+def M_star_spectra(star_radius, star_eff_temp, dist_to_star, add_flare, show_figure):
     """ 
     Calculates flux from input values, picks corresponding spectra for M0-M9.
-    Adds corresponding correction factors for chosen MUSCLES model.
-    Generate time-evolving spectra from a random series of flares.
+    Returns quiescent spectra or Generate time-evolving spectra from a random series of flares if desiered.
+    Adds corresponding correction factors for chosen flare MUSCLES model.
+
 
     Parameters
     ----------
-    {Star_radius} in solar radius
+    {star_radius} in solar radius
     {star_eff_temp} in Kelvin
-    {dist_to_star} in light-years
-    {print_figure} prints the full spectrum, 
+    {dist_to_star} in kpc
+    {add_flare} adds flare on top of quiescent spectra
+    {show_figure} shows figure of the full spectrum 
     Returns
     -------
     spectra : 2D array
         Array of spectra in each tbin, where the array has dimensions
         (len(tbins)-1, len(wbins)-1). Units will match the product of
-        the eqd and SiIV_quiescent units, divided by time and length.
+        the eqd and MgII_quiescent units, divided by time and length.
         Returns wavelength, flux
         
     """
+    # Used to calculate flux of inputted star later in the code
+    R_sun = 6.95700e8      # Mean radius in meters
+    sigma_sb = 5.67037e-8  # Units W/m^2/K^4
+    kpc = 3.086e19         # Units meters
 
-    #Units (W / m2) converted later
-    R_sun = 6.95700e8  # Mean Radius in meters
-    sigma_sb = 5.67037e-8 # Units W/m^2/k^4
-    ly = 9.46073e15 #Units meters
-
-    Calculated_flux = (((R_sun*star_radius)**2)*sigma_sb*(star_eff_temp**4))/((ly*dist_to_star)**2)
-
-    # Depending on star temperature it will choose which flare profile has the closest match
-    # Files correspond to Main Sequence M star flare spectra
-    # Files are from the following link for MUSCLES spectra for M0-M5.5 'https://archive.stsci.edu/missions/hlsp/muscles/'
-    # Files taken in Feb 2026
-
+    ####################### Choosing Quiescence Starting Spectrum ##########################
+    
+    # Depending on star temperature code will choose which M star quiescence spectra has the closest match
+    # Files are from following link for MUSCLES spectra M0-M5.5 'https://archive.stsci.edu/missions/hlsp/muscles/v22/'
+    # MUSCLES -> (Measurements of the Ultraviolet Spectral Characteristics of Low-mass Exoplanetary Systems) Treasury Survey
+    # Each spectra file is based on a star at a certain distance, d_MUS is that distance used as a correction factor
+    # Files taken Feb 2026
+    
     # Partially Convective
-    # M0-M1
+    # M0-M1 
     if star_eff_temp >= 3600:
         path_sed = 'ETC/castor_etc/data/flare_simulator_data/M1.5V_hlsp_muscles_multi_multi_gj667c_broadband_v22_adapt-const-res-sed.fits'
-
+        d_MUS = 0.00724 # kpc
+        
     # M2
     elif star_eff_temp < 3600 and star_eff_temp >= 3500:
         path_sed = 'ETC/castor_etc/data/flare_simulator_data/M2V_hlsp_muscles_multi_multi_gj176_broadband_v22_adapt-const-res-sed.fits'
-
+        d_MUS =  0.00949 # kpc
+        
     # M3
     elif star_eff_temp < 3500 and star_eff_temp >= 3400:
         path_sed = 'ETC/castor_etc/data/flare_simulator_data/M3V_hlsp_muscles_multi_multi_gj581_broadband_v22_adapt-const-res-sed.fits'
-
+        d_MUS =  0.0063 # kpc
+        
     # Fully Convective
-    # Fully Convective produce stronger more energetic flares
     # M4
     elif star_eff_temp < 3400 and star_eff_temp >= 3200:
-
         path_sed = 'ETC/castor_etc/data/flare_simulator_data/M4_hlsp_muscles_multi_multi_gj876_broadband_v22_adapt-const-res-sed.fits'
-
-    # M5.5
-    else:
+        d_MUS =  0.0047 # kpc
+        
+    # M5.5, No MUSCLES model available for M6-M9, default will be M5.5
+    else: 
         path_sed = 'ETC/castor_etc/data/flare_simulator_data/M5.5_hlsp_muscles_multi_multi_gj551_broadband_v22_adapt-const-res-sed.fits'
-
-    # No MUSCLES model available for M stars M6-M9, default will be M5.5
-
-
-    # Spectral Energy Distribution (SED), the base quiescent SED is from the MSUCLES spectrum different for each star class
+        d_MUS =  0.0013 # kpc
+        
+    # Spectral Energy Distribution (SED), base quiescent SED is from the MUSCLES spectrum
     sed = table.Table.read(path_sed, hdu=1, unit_parse_strict="silent")
 
-    # Next part adds correction factors based on research paper "Optically Quiet, But FUV Loud:" cited below:
-    # Paper used archival FUV observations of low-mass stars to test the UV predictions of literature flare models
-    # Flare model used in this funtion is the MUSCLES model
-    # MUSCLES -> (Measurements of the Ultraviolet Spectral Characteristics of Low-mass Exoplanetary Systems) Treasury Survey
+
+    ################## Adding Correction Factors to Flare Flux Values #########################
+    
+    # Next section adds correction factors to certain flux values based on research paper "Optically Quiet, But FUV Loud:" cited below:
+    # Paper used archival FUV observations of M stars to test the UV predictions of literature flare models
     # Wavelength values below were taken from Table 1 in "Optically Quiet, But FUV Loud:" paper
-    # Corretion factors used was from Table 4 and Table 5 for MUSCLES Model in "Optically Quiet, But FUV Loud:" paper
-    # Corretion factors were split based on if the star was partially or fully convective
-
-    #### Cited paper: ####
-    # Jackman, J. A. G., Shkolnik, E. L., Loyd, R. O. P., and Richey-Yowell, T.,
+    # Corretion factors used were taken from Table 4 and Table 5 in "Optically Quiet, But FUV Loud:" paper
+    
+    #### Cited paper: Paper accessed Feb 2026 ####
+    # Jackman, J. A. G., Shkolnik, E. L., Loyd, R. O. P., and Richey-Yowell, T., 
     # “Optically quiet, but FUV loud: results from comparing the far-ultraviolet predictions of flare models with TESS and HST”,
-    # <i>Monthly Notices of the Royal Astronomical Society</i>, vol. 533, no. 2, OUP, pp. 1894–1906, 2024.
-    # doi:10.1093/mnras/stae1570.
-    # 'https://ui.adsabs.harvard.edu/abs/2024MNRAS.533.1894J/abstract'
-
-    # Paper accessed Feb 2026
-
+    # Monthly Notices of the Royal Astronomical Society, vol. 533, no. 2, OUP, pp. 1894–1906, 2024. 
+    # doi:10.1093/mnras/stae1570. https://ui.adsabs.harvard.edu/abs/2024MNRAS.533.1894J/abstract
 
     w = sed["WAVELENGTH"]
     f = sed['BOLOFLUX']
-
+    
     # Changing file format
     w = np.asarray(w)
     f = np.asarray(f)
 
-    if star_eff_temp >= 3400: #Partially Convective Correction Factor Field Age M star M0~M3
-
+    #Partially convective M0~M3
+    if star_eff_temp >= 3400: 
+        
     #####  White Light Correction for partially convective ######
 
         # how this works: 1. condition, 2. if true, 3. if false
         f = np.where((w > 1173.65) & (w < 1198.49), 0.42 * f, f)
         f = np.where((w > 1201.71) & (w < 1206.50), 0.42 * f, f)
-        f = np.where((w > 1223.00) & (w < 1273.50), 0.42 * f, f)
+        f = np.where((w > 1223.00) & (w < 1273.50), 0.42 * f, f)        
         f = np.where((w > 1328.20) & (w < 1354.49), 0.42 * f, f)
         f = np.where((w > 1356.71) & (w < 1357.59), 0.42 * f, f)
         f = np.where((w > 1359.51) & (w < 1362.70), 0.42 * f, f)
-
 
     ##### FUV Correction for partially convective #####
 
         f = np.where((w > 1173.65) & (w < 1198.49), 0.5 * f, f)
         f = np.where((w > 1201.71) & (w < 1212.16), 0.5 * f, f)
-        f = np.where((w > 1219.18) & (w < 1274.04), 0.5 * f, f)
+        f = np.where((w > 1219.18) & (w < 1274.04), 0.5 * f, f)        
         f = np.where((w > 1329.25) & (w < 1354.49), 0.5 * f, f)
         f = np.where((w > 1356.71) & (w < 1357.59), 0.5 * f, f)
         f = np.where((w > 1359.51) & (w < 1428.90), 0.5 * f, f)
-
-
+            
     ##### Pseudo-continuum 130 Correction for partially convective #####
 
         f = np.where((w > 1173.65) & (w < 1174.50), 0.68 * f, f)
         f = np.where((w > 1176.80) & (w < 1190.00), 0.68 * f, f)
-        f = np.where((w > 1223.00) & (w < 1238.40), 0.68 * f, f)
+        f = np.where((w > 1223.00) & (w < 1238.40), 0.68 * f, f)        
         f = np.where((w > 1239.30) & (w < 1242.00), 0.68 * f, f)
         f = np.where((w > 1243.50) & (w < 1273.50), 0.68 * f, f)
-        f = np.where((w > 1329.00) & (w < 1334.00), 0.68 * f, f)
+        f = np.where((w > 1329.00) & (w < 1334.00), 0.68 * f, f)    
         f = np.where((w > 1336.00) & (w < 1354.49), 0.68 * f, f)
         f = np.where((w > 1356.71) & (w < 1357.59), 0.68 * f, f)
         f = np.where((w > 1359.51) & (w < 1362.70), 0.68 * f, f)
 
-
      ##### Si IV Correction for partially convective #####
 
         f = np.where((w > 1393.76) & (w < 1402.77), 0.19 * f, f)
-
+                
     ##### Si III Correction for partially convective #####
 
         f = np.where((w == 1206.51), 0.10 * f, f)
-
+                
     ##### C III Correction for partially convective #####
 
         f = np.where((w == 1174.93), 0.84 * f, f)
@@ -987,53 +984,48 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
         f = np.where((w == 1175.99), 0.84 * f, f)
         f = np.where((w == 1176.37), 0.84 * f, f)
 
-
-    # Fully Convective Correction Factor Field Age M Star M4~M9
-    else:
+    
+    else: # Fully Convective Correction Factor M4~M9
 
     #####  White Light Correction for fully convective ######
 
         f = np.where((w > 1173.65) & (w < 1198.49), 4.7 * f, f)
         f = np.where((w > 1201.71) & (w < 1206.50), 4.7 * f, f)
-        f = np.where((w > 1223.00) & (w < 1273.50), 4.7 * f, f)
+        f = np.where((w > 1223.00) & (w < 1273.50), 4.7 * f, f)        
         f = np.where((w > 1328.20) & (w < 1354.49), 4.7 * f, f)
         f = np.where((w > 1356.71) & (w < 1357.59), 4.7 * f, f)
         f = np.where((w > 1359.51) & (w < 1362.70), 4.7 * f, f)
-
-
+    
     ##### FUV Correction for fully convective #####
-
 
         f = np.where((w > 1173.65) & (w < 1198.49), 2.9 * f, f)
         f = np.where((w > 1201.71) & (w < 1212.16), 2.9 * f, f)
-        f = np.where((w > 1219.18) & (w < 1274.04), 2.9 * f, f)
+        f = np.where((w > 1219.18) & (w < 1274.04), 2.9 * f, f)        
         f = np.where((w > 1329.25) & (w < 1354.49), 2.9 * f, f)
         f = np.where((w > 1356.71) & (w < 1357.59), 2.9 * f, f)
         f = np.where((w > 1359.51) & (w < 1428.90), 2.9 * f, f)
-
 
     ##### Pseudo-continuum 130 Correction for fully convective #####
 
         f = np.where((w > 1173.65) & (w < 1174.50), 4.71 * f, f)
         f = np.where((w > 1176.80) & (w < 1190.00), 4.71 * f, f)
-        f = np.where((w > 1223.00) & (w < 1238.40), 4.71 * f, f)
+        f = np.where((w > 1223.00) & (w < 1238.40), 4.71 * f, f)        
         f = np.where((w > 1239.30) & (w < 1242.00), 4.71 * f, f)
         f = np.where((w > 1243.50) & (w < 1273.50), 4.71 * f, f)
-        f = np.where((w > 1329.00) & (w < 1334.00), 4.71 * f, f)
+        f = np.where((w > 1329.00) & (w < 1334.00), 4.71 * f, f)    
         f = np.where((w > 1336.00) & (w < 1354.49), 4.71 * f, f)
         f = np.where((w > 1356.71) & (w < 1357.59), 4.71 * f, f)
         f = np.where((w > 1359.51) & (w < 1362.70), 4.71 * f, f)
 
-
     ##### Si IV Correction for fully convective #####
-
+        
         f = np.where((w > 1393.76) & (w < 1402.77), 3.09 * f, f)
-
+                
     ##### C II Correction for fully convective #####
-
+        
         f = np.where((w == 1334.53), 4.70 * f, f)
         f = np.where((w == 1335.71), 4.70 * f, f)
-
+                
     ##### C III Correction for fully convective #####
 
         f = np.where((w == 1174.93), 6.41 * f, f)
@@ -1048,99 +1040,155 @@ def compute_flux_wavelength(star_radius, star_eff_temp, dist_to_star, show_figur
         f = np.where((w == 1238.82), 8.08 * f, f)
         f = np.where((w == 1242.80), 8.08 * f, f)
 
-    # The rest of the function was modified from fiducial_flare package, refer to top of document for more information
+   
+    ################## Using fiducial_flare Package to Rebin SED #########################
 
-    # The SED has higher resolution needed.
-    # In fiducial flare spectrum, lines are represented by single 200 km/s wide bins (about 1 Å in the FUV).
-    # Higher resolutions will yield odd-looking output once we add flare spectra to the SED.
-    # We'll rebin to 1 Å bins from 100-3000 Å and then 10 Å through the 5.5 µm limit of the SED
-    # The original SED also has variable binning. The left and and right edges of the bins are given in the
-    #'WAVELENGTH0' and 'WAVELENGTH1' columns.
+    # Following section uses code from Loyd paper below to rebin the SED. 
+    # Code previously generated approx. UV emission of M stars over a single flare used for simulating exoplanet atmposheres.
+    # Code has been modified to represent what CASTOR would measure from these stars with and without a flare.
+    # More information on original function with other examples -> https://github.com/parkus/fiducial_flare/tree/master (Accessed Feb 2026)
+    
+    #### Cited paper: Paper accessed Feb 2026 ####
+    # Loyd, R. O. P., “The MUSCLES Treasury Survey. V. FUV Flares on Active and Inactive M Dwarfs”,
+    # The Astrophysical Journal, vol. 867, no. 1, Art. no. 71, IOP, 2018. doi:10.3847/1538-4357/aae2bd.
+    # https://ui.adsabs.harvard.edu/abs/2018ApJ...867...71L/abstract
+    
+    # The SED has way higher resolution that we need. lines are represented by single 200 km/s wide bins (about 1 Å in the FUV).
+    # Higher resolutions will yield odd-looking output once we add flare spectra to the SED.  
+    # Rebin to 1 Å bins from 100-3000 Å and then 10 Å through the 5.5 µm limit of the SED
+    # The original SED also has variable binning. Left and and right edges of the bins are given in the 'WAVELENGTH0' and 'WAVELENGTH1' columns.
     # The rebin function is one of the few in fiducial_flare that specifically requires input without units.
-
+    
     wbins_sed = np.append(sed['WAVELENGTH0'], sed['WAVELENGTH1'][-1]) * u.AA
-
     wbins_fuv = np.arange(100, 3000, 1) * u.AA
     wbins_red = np.arange(3000, 5.5e4, 10) * u.AA
     wbins = np.hstack((wbins_fuv, wbins_red))
-
-    # Now rebin, f is 'BOLOFLUX'
-    Flux_quiescent_bolo = rebin(wbins.value, wbins_sed.value, f)
-
-    # Add the proper units since rebin can't work with them.
-    Flux_quiescent_bolo = Flux_quiescent_bolo * u.Unit('AA-1')
+    
+    ################ Next Section Returns Quiescent Spectra or Flare Spectra #################
 
 
-    # The flux here is normalized by the bolometric luminosity of the star (units of Å-1).
-    # Calculating flux of inputted star using flux calculated at beginning.
-    Flux_bolo_your_star = Calculated_flux * u.Unit('W m-2')
-    Flux_quiescent = Flux_quiescent_bolo * Flux_bolo_your_star
-    Flux_quiescent = Flux_quiescent.to('erg s-1 cm-2 AA-1')
-
-
-    # Now that we've got the quiescent SED all prepped, let's simulate some flares to go on top of that.
-    # Blackbody emission is added to simulate flux emitted at longer wavelengths.
+    ################ Return Flare Spectra #################
+    
+    # Prep quiescent SED and simulate some flares to go on top of that. 
     # Flares are scaled to the quisecent flux of the star in the Si IV 1393,1402 Å emission line doublet.
 
-    # Flares are scaled to this value for SiIV.
-    wbin_SiIV = [1390, 1410] * u.AA
-    Fq_SiIV = rebin(wbin_SiIV.value, wbins.value, Flux_quiescent.value) * u.Unit('erg s-1 cm-2 AA-1')
+    if add_flare == "yes" or add_flare == "Yes":
 
-    # This actually spits out the flux density, but what we want is the flux.
-    Fq_SiIV = Fq_SiIV * np.diff(wbin_SiIV)
-
-
-    # We need some time bins to simulate flares over. We will use 60 s bins covering a full day.
-    # sadly arange can't handle unit input
-    tbins = np.arange(0, 24*60*60, 60) * u.s
-
-
-    # Simulating time series of fluxes from a random series of flares.
-    np.random.seed(42)
-    Flux_flare = flare_series_spectra(wbins, tbins, SiIV_quiescent=Fq_SiIV)
-
-
-    # The resulting array has dimensions of (no. time bins) x (no. wavelength bins), in this case 1439x8099.
-    # Each row (e.g. Flux_flare[0,:]) is a spectrum for the corresponding time bin.
-
-    # To get the spectrum CASTOR will actually see, we need to add these spectra onto the quiescent SED.
-    Flux_tot = Flux_quiescent[None,:] + Flux_flare
-
-    # Highest peak
-    imax = np.argmax(Flux_flare[:,0])
-
-    # Plot spectra at the highest peak and at quiescence
-    if show_figure == "yes" or show_figure == "Yes":
-        plt.figure()
-
-        # Quiescence
-        line_quiescence, = plt.step(wbins[:-1], Flux_quiescent, where='pre', label='quiescence')
-
+        # Now rebin, f is 'BOLOFLUX' with flare correction factors.
+        Flux_quiescent_bolo = rebin(wbins.value, wbins_sed.value, f)
+        
+        # Add the proper units since rebin can't work with them.
+        Flux_quiescent_bolo = Flux_quiescent_bolo * u.Unit('AA-1')
+        
+        # Using input parameters of users star.
+        Calculated_flux = (((R_sun*star_radius)**2)*sigma_sb*(star_eff_temp**4))/((kpc*dist_to_star)**2) 
+        
+        # The flux here is normalized by the bolometric luminosity of the star (units of Å-1).
+        Flux_bolo_user_star = Calculated_flux * u.Unit('W m-2')
+        Flux_quiescent = Flux_quiescent_bolo * Flux_bolo_user_star
+        
+        # Account for distance since each original SED is desigened to represent absolute flux density obsereved at Earth.
+        Fq_dist_corr = Flux_quiescent * ((d_MUS/dist_to_star)**2)
+        Flux_quiescent = Fq_dist_corr.to('erg s-1 cm-2 AA-1')
+        
+        # Flares are scaled to this value for MgII.
+        wbin_MgII = [2796, 2803] * u.AA
+        Fq_MgII = rebin(wbin_MgII.value, wbins.value, Flux_quiescent.value) * u.Unit('erg s-1 cm-2 AA-1')
+        
+        # This actually spits out the flux density, but what we want is the flux.
+        Fq_MgII = Fq_MgII * np.diff(wbin_MgII)
+    
+        # We need some time bins to simulate flares over. We will use 60 s bins covering a full day.
+        # np.arange can't handle unit input.
+        tbins = np.arange(0, 24*60*60, 60) * u.s
+    
+        # Simulating time series of fluxes from a random series of flares. Original function used SiIV
+        np.random.seed(42)
+        Flux_flare = flare_series_spectra(wbins, tbins, SiIV_quiescent=Fq_MgII)
+    
+        # The resulting array has dimensions of (no. time bins) x (no. wavelength bins), in this case 1439x8099. 
+        # Each row (e.g. Flux_flare[0,:]) is a spectrum for the corresponding time bin.
+    
+        # To get the spectrum CASTOR will actually see, we need to add these spectra onto the quiescent SED.
+        Flux_tot = Flux_quiescent[None,:] + Flux_flare
+    
         # Highest peak
-        line_peak, = plt.step(wbins[:-1], Flux_tot[imax,:], where='pre', label='max')
+        imax = np.argmax(Flux_flare[:,0])
 
+        # Converts to units CASTOR_UVMOS can use
+        wavelength = wbins[:-1].value
+        flux = Flux_tot[imax,:].value
+        
+        ### Plot Spectra For Flare and Quiescence ###
+            
+        if show_figure == "yes" or show_figure == "Yes":
+            plt.figure()
+                
+            # Quiescence
+            line_quiescence, = plt.step(wbins[:-1], Flux_quiescent, where='pre', label='quiescence')
+                
+            # Highest peak
+            line_peak, = plt.step(wbins[:-1], Flux_tot[imax,:], where='pre', label='max')
+                    
+            plt.legend(handles=(line_quiescence, line_peak))
+            plt.xlabel('Wavelength (Å)')
+            plt.ylabel('Flux (erg s-1 cm-2 Å-1)')
+            plt.xlim(0, 5500) #Limit is set to CASTORS wavelengths
+            plt.yscale('log')
+        
+        # Skips plotting
+        elif show_figure == "no" or show_figure == "No":
+            pass
 
-        plt.legend(handles=(line_quiescence, line_peak))
-        plt.xlabel('Wavelength (Å)')
-        plt.ylabel('Flux (erg s-1 cm-2 Å-1)')
-        plt.xlim(0, 5500) #Limit is set to CASTORS wavelengths
-        plt.yscale('log')
+        
+    ################ Return Quiescent Spectra #################
 
-    # Skips plotting
-    else: show_figure == "no" or show_figure == "No"
-    # Converts to units CASTOR_UVMOS can use
-    wavelength = wbins[:-1].value
-    flux = Flux_tot[imax,:].value
+    elif add_flare == "no" or add_flare == "No":
 
-    #UVMOS has wavelengths from 1500Å to 5500Å, this is sliced to reflect that.
-    #If you have a different wavelength range comment out and return wavelength, flux
+        # Now rebin
+        Flux_quiescent_bolo = rebin(wbins.value, wbins_sed.value, sed['BOLOFLUX'])
+        
+        # Add the proper units since rebin can't work with them.
+        Flux_quiescent_bolo = Flux_quiescent_bolo * u.Unit('AA-1')
+        
+        # Using input parameters of users star
+        Calculated_flux = (((R_sun*star_radius)**2)*sigma_sb*(star_eff_temp**4))/((kpc*dist_to_star)**2) 
+        
+        # The flux here is normalized by the bolometric luminosity of the star (units of Å-1).
+        Flux_bolo_user_star = Calculated_flux * u.Unit('W m-2')
+        Flux_quiescent = Flux_quiescent_bolo * Flux_bolo_user_star
+        
+        # Account for distance since each original SED is desigened to represent absolute flux density obsereved at Earth.
+        Fq_dist_corr = Flux_quiescent * ((d_MUS/dist_to_star)**2)
+        Flux_quiescent = Fq_dist_corr.to('erg s-1 cm-2 AA-1')
+            
+        flux = Flux_quiescent.value
+        wavelength = wbins[:-1].value
+
+            ### Plot Spectra at Quiescence ###
+            
+        if show_figure == "yes" or show_figure == "Yes":
+            plt.figure()
+                
+            # Quiescence
+            line_quiescence = plt.step(wbins[:-1], Flux_quiescent, where='pre', label='quiescence')
+                
+            plt.legend(handles=(line_quiescence))
+            plt.xlabel('Wavelength (Å)')
+            plt.ylabel('Flux (erg s-1 cm-2 Å-1)')
+            plt.xlim(0, 5500) #Limit is set to CASTORS wavelengths
+            plt.yscale('log')
+        
+        # Skips plotting
+        elif show_figure == "no" or show_figure == "No":
+            pass
+            
+
+    #UVMOS has wavelengths from 1500Å to 5500Å, slice is used to visualize that spectra section
     wavelength_sliced = wavelength[1400:3101]
     flux_sliced = flux[1400:3101]
-
+ 
     # Wavlength and flux can be directly inputted into CASTOR_UVMOS to use
     return wavelength_sliced, flux_sliced
-
-    #If not using UVMOS range
-    #return wavelength, flux
-
+    
 #endregion
