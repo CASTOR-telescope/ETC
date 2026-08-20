@@ -87,7 +87,7 @@ from castor_etc.background import Background
 from castor_etc.sources import PointSource
 from castor_etc.telescope import Telescope
 
-from castor_etc.filepaths import DATAPATH
+from castor_etc import DATAPATH
 
 import sys
 

@@ -94,6 +94,7 @@ class PointSourcePhotometryTestCase(unittest.TestCase):
         # Generate the black body from the example and add associated emission lines
         self.point_src = PointSource()
         self.point_src.generate_bb(8000 * u.K, redshift=0.06, limits=[900, 30000] * u.AA)
+        
         self.point_src.norm_to_AB_mag(25)
         self.point_src.add_emission_line(
             center=2000 * u.AA, fwhm=200 * u.AA, peak=5e-19, shape="gaussian", abs_peak=False

@@ -1,0 +1,105 @@
+:py:mod:`castor_etc._version`
+=============================
+
+.. py:module:: castor_etc._version
+
+.. autodoc2-docstring:: castor_etc._version
+   :parser: myst
+   :allowtitles:
+
+Module Contents
+---------------
+
+Data
+~~~~
+
+.. list-table::
+   :class: autosummary longtable
+   :align: left
+
+   * - :py:obj:`__all__ <castor_etc._version.__all__>`
+     - .. autodoc2-docstring:: castor_etc._version.__all__
+          :parser: myst
+          :summary:
+   * - :py:obj:`version <castor_etc._version.version>`
+     - .. autodoc2-docstring:: castor_etc._version.version
+          :parser: myst
+          :summary:
+   * - :py:obj:`__version__ <castor_etc._version.__version__>`
+     - .. autodoc2-docstring:: castor_etc._version.__version__
+          :parser: myst
+          :summary:
+   * - :py:obj:`__version_tuple__ <castor_etc._version.__version_tuple__>`
+     - .. autodoc2-docstring:: castor_etc._version.__version_tuple__
+          :parser: myst
+          :summary:
+   * - :py:obj:`version_tuple <castor_etc._version.version_tuple>`
+     - .. autodoc2-docstring:: castor_etc._version.version_tuple
+          :parser: myst
+          :summary:
+   * - :py:obj:`commit_id <castor_etc._version.commit_id>`
+     - .. autodoc2-docstring:: castor_etc._version.commit_id
+          :parser: myst
+          :summary:
+   * - :py:obj:`__commit_id__ <castor_etc._version.__commit_id__>`
+     - .. autodoc2-docstring:: castor_etc._version.__commit_id__
+          :parser: myst
+          :summary:
+
+API
+~~~
+
+.. py:data:: __all__
+   :canonical: castor_etc._version.__all__
+   :value: ['__version__', '__version_tuple__', 'version', 'version_tuple', '__commit_id__', 'commit_id']
+
+   .. autodoc2-docstring:: castor_etc._version.__all__
+      :parser: myst
+
+.. py:data:: version
+   :canonical: castor_etc._version.version
+   :type: str
+   :value: None
+
+   .. autodoc2-docstring:: castor_etc._version.version
+      :parser: myst
+
+.. py:data:: __version__
+   :canonical: castor_etc._version.__version__
+   :type: str
+   :value: None
+
+   .. autodoc2-docstring:: castor_etc._version.__version__
+      :parser: myst
+
+.. py:data:: __version_tuple__
+   :canonical: castor_etc._version.__version_tuple__
+   :type: tuple[int | str, ...]
+   :value: None
+
+   .. autodoc2-docstring:: castor_etc._version.__version_tuple__
+      :parser: myst
+
+.. py:data:: version_tuple
+   :canonical: castor_etc._version.version_tuple
+   :type: tuple[int | str, ...]
+   :value: None
+
+   .. autodoc2-docstring:: castor_etc._version.version_tuple
+      :parser: myst
+
+.. py:data:: commit_id
+   :canonical: castor_etc._version.commit_id
+   :type: str | None
+   :value: None
+
+   .. autodoc2-docstring:: castor_etc._version.commit_id
+      :parser: myst
+
+.. py:data:: __commit_id__
+   :canonical: castor_etc._version.__commit_id__
+   :type: str | None
+   :value: None
+
+   .. autodoc2-docstring:: castor_etc._version.__commit_id__
+      :parser: myst

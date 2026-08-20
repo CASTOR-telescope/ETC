@@ -80,7 +80,7 @@ API
 .. py:class:: Source(profile, init_dimensions=True, check_profile=True)
    :canonical: castor_etc.sources.Source
 
-   Bases: :py:obj:`castor_etc.spectrum.SpectrumMixin`, :py:obj:`castor_etc.spectrum.NormMixin`
+   Bases: :py:obj:`castor_etc.spectra.SpectrumMixin`, :py:obj:`castor_etc.spectra.NormMixin`
 
    .. autodoc2-docstring:: castor_etc.sources.Source
       :parser: myst

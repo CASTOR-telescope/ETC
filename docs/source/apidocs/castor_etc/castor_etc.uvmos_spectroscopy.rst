@@ -53,7 +53,7 @@ API
    .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.Gaussian2D
       :parser: myst
 
-.. py:class:: UVMOS_Spectroscopy(TelescopeObj, SourceObj, BackgroundObj)
+.. py:class:: UVMOS_Spectroscopy(TelescopeObj, SceneObj, BackgroundObj, deltaXY, **kwargs)
    :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy
 
    .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy
@@ -64,16 +64,34 @@ API
    .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.__init__
       :parser: myst
 
-   .. py:method:: specify_slit(slit_width=0.214 * u.arcsec, slit_height=1 * u.arcsec)
-      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.specify_slit
+   .. py:method:: _specify_DMD_FOV()
+      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._specify_DMD_FOV
 
-      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.specify_slit
+      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._specify_DMD_FOV
          :parser: myst
 
-   .. py:method:: show_slit()
-      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.show_slit
+   .. py:method:: _get_slit_coordinates()
+      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._get_slit_coordinates
 
-      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.show_slit
+      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._get_slit_coordinates
+         :parser: myst
+
+   .. py:method:: _generate_slits()
+      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._generate_slits
+
+      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._generate_slits
+         :parser: myst
+
+   .. py:method:: _check_slits()
+      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._check_slits
+
+      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._check_slits
+         :parser: myst
+
+   .. py:method:: show_slits()
+      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.show_slits
+
+      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.show_slits
          :parser: myst
 
    .. py:method:: _calc_slit_transmission(print_transmission_fact=False)
@@ -94,7 +112,7 @@ API
       .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.show_source_pix_weights
          :parser: myst
 
-   .. py:method:: show_slit_image(wave)
+   .. py:method:: show_slit_image(wavelength)
       :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.show_slit_image
 
       .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.show_slit_image
@@ -112,16 +130,16 @@ API
       .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._getTransmission
          :parser: myst
 
-   .. py:method:: _getDispersion(x)
-      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._getDispersion
-
-      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._getDispersion
-         :parser: myst
-
    .. py:method:: showTransmission()
       :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.showTransmission
 
       .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.showTransmission
+         :parser: myst
+
+   .. py:method:: _getDispersion(x)
+      :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._getDispersion
+
+      .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy._getDispersion
          :parser: myst
 
    .. py:method:: _calc_sigmaPix(dispersion)
@@ -148,13 +166,13 @@ API
       .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.showResolvingPower
          :parser: myst
 
-   .. py:method:: calc_source_CASTORSpectrum(extraction_width=1, extraction_lowerlim=0, extraction_upperlim='max')
+   .. py:method:: calc_source_CASTORSpectrum(extraction_width=1, extraction_lowerlim=1, extraction_upperlim='max')
       :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.calc_source_CASTORSpectrum
 
       .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.calc_source_CASTORSpectrum
          :parser: myst
 
-   .. py:method:: calc_background_CASTORSpectrum(extraction_width=1, extraction_lowerlim=0, extraction_upperlim='max')
+   .. py:method:: calc_background_CASTORSpectrum(extraction_width=1, extraction_lowerlim=1, extraction_upperlim='max')
       :canonical: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.calc_background_CASTORSpectrum
 
       .. autodoc2-docstring:: castor_etc.uvmos_spectroscopy.UVMOS_Spectroscopy.calc_background_CASTORSpectrum
