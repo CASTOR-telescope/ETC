@@ -3,8 +3,11 @@
 
 # --platform=linux/amd64 ensures that the docker image CPU architecture matches with the CANFAR server CPU architecture.
 # Docker base image from <https://quay.io/repository/jupyter/scipy-notebook?tab=tags>
-FROM --platform=linux/amd64 quay.io/jupyter/scipy-notebook:hub-5.2.1
+FROM quay.io/jupyter/scipy-notebook:hub-5.2.1
 LABEL maintainer="Isaac Cheng <isaac.cheng.ca@gmail.com>"
+
+## User Arguments
+ARG WHEEL_URL=https://github.com/CASTOR-telescope/ETC/releases/download/v2.0.0/castor_etc-2.0.0-py3-none-any.whl
 
 USER ${NB_UID}
 
@@ -17,20 +20,26 @@ RUN jupyter nbextension enable --py --sys-prefix ipyevents
 USER root
 
 RUN mkdir /opt/image-build && chmod 777 /opt/image-build
+RUN mkdir -m 777 -p /opt/FORECASTOR/stellar_models
+
+# Install required apt packages
+RUN apt-get -y update && \
+    apt-get -y install gcc sudo vim sssd acl && \
+    apt-get clean --yes && \
+    apt-get autoremove --purge --quiet --yes && \
+    rm -rf /var/lib/apt/lists/* /var/tmp/*
 
 # Add required files for CANFAR
 ADD docker/nsswitch.conf /etc/
-COPY docker/apt-install.sh /opt/image-build
-WORKDIR /opt/image-build
-RUN ./apt-install.sh sssd acl gcc g++
 
+# Copy over bash.bashrc for environment set-up
 COPY docker/bash.bashrc /opt/image-build
 RUN cat /opt/image-build/bash.bashrc >> /etc/bash.bashrc
 
-RUN pip install photutils
-
-#<https://github.com/NVIDIA/NeMo/issues/841> similarly, it is a dependency to pytransit
-RUN pip install llvmlite --ignore-installed
+# # Install other dependencies
+# RUN pip install photutils
+# #<https://github.com/NVIDIA/NeMo/issues/841> similarly, it is a dependency to pytransit
+# RUN pip install llvmlite --ignore-installed
 
 # Start notebook in user's home directory
 RUN chmod 777 /usr/local/bin/start-notebook.d
@@ -39,9 +48,6 @@ COPY docker/startup-hook.sh /usr/local/bin/start-notebook.d/
 # Install castor_etc package (always install newest version via CACHEBUST)
 # See <https://github.com/moby/moby/issues/1996#issuecomment-185872769>
 ARG CACHEBUST=1
-ADD castor_etc /opt/castor_etc
-COPY LICENSE setup.py /opt/
-WORKDIR /opt/mypackage
-RUN pip install .
+RUN pip install --no-cache-dir "${WHEEL_URL}"
 
 USER ${NB_UID}

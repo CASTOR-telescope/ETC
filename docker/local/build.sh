@@ -1,24 +1,36 @@
 #!/bin/bash
-# Build script for the CASTOR exposure time calculator. Not meant to be used on CANFAR
-echo "Building CASTOR exposure time calculator..."
-#
-# Set some parameters
-#
-VERSION=$(date +%y.%m.%d.%H%M)
-# (following line from <https://stackoverflow.com/a/246128>)
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-# (following line from <https://stackoverflow.com/a/8426110>)
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
-# ! NOTE 2024-11-10: You probably need to update `DOCKER_STELLAR_MODEL_DIR` below...
+# FORECASTOR local container build tools
+#
+# This is build script for any users hoping to build a container locally. Please note that this is NOT meant to be used for CANFAR builds.
+
+## User Parameters
+VERSION=$(date +%y.%m.%d)       # container version
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd ) # get current working directory for this build script (https://stackoverflow.com/a/246128)
+REPO_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"         # https://stackoverflow.com/a/8426110
+# Alternatively, we can also run:
+# git rev-parse --show-toplevel
+
+## Stellar Model files
+
+# This defines where the Docker container will store the stellar models ; by default, CASTOR ETC searchs for it under 3 different places:
+#           Variation 1: stellar_model_dir = "/arc/projects/CASTOR/stellar_models" --> Default path (Working in the CANFAR server).
+#   Variation 2: stellar_model_dir = <path to local stellar models directory>
+#   Variation 3: stellar_model_dir = join(DATAPATH,"transit_data/stellar_models") --> This path should be used when building docker container locally.
 DOCKER_STELLAR_MODEL_DIR="/opt/FORECASTOR/stellar_models"
-#
-# Load custom parameters
-#
-source ${SCRIPT_DIR}/Docker_env
-#
-# Build the project
-#
+
+## Custom Environment Parameters
+CUSTOMIZE_ENV=no        # yes if custom; no otherwise
+NB_USER=IsaacCheng      # Notebook username
+NOTEBOOK_DIR=/arc/home/IsaacCheng/CASTOR/ETC        # Notebook directory
+STELLAR_MODEL_DIR=""        # Change this to match where the stellar model files are installed locally
+JUPYTER_ENABLE_LAB=yes
+JUPYTER_TOKEN=""
+GRANT_SUDO=yes
+CHOWN_HOME=yes
+CHOWN_HOME_OPTS="-R"
+
+## Docker builds
 cd ${REPO_DIR}  # necessary so Docker can access other folders within the repo
 if [[ "$CUSTOMIZE_ENV" = "yes" ]]
 then
@@ -27,32 +39,29 @@ then
                  --build-arg NB_USER=${NB_USER} \
                  -t castor_etc:${VERSION} \
                  --build-arg CACHEBUST=$(date +%s) \
-                 -f docker/Dockerfile.yesCustomEnv .
+                 -f docker/local/Dockerfile.yesCustomEnv .
 elif [[ "$CUSTOMIZE_ENV" = "no" ]]
 then
     echo "Building with default JupyterLab environment"
     docker build -t castor_etc:${VERSION} \
                  --build-arg CACHEBUST=$(date +%s) \
-                 -f docker/Dockerfile.noCustomEnv .
+                 -f docker/local/Dockerfile.noCustomEnv .
 else
     echo "ERROR: CUSTOMIZE_ENV is must be yes or no"
     exit 1
 fi
-#
 echo "Finishing building castor_etc:${VERSION}"
-echo "Now running castor_etc_v${VERSION}..."
-#
-# Run the project
-#
 
-# The second mount binds stellar_models directory in the transit_data locally.
-# ! REMOVED --ip 0.0.0.0 because implied already and throws error
+# Run the project
+echo "Now running castor_etc_v${VERSION}..."
+
 docker run --interactive \
         --rm \
         --tty \
         --env DISPLAY=host.docker.internal:0 \
         -p 8888:8888 \
         -v ${REPO_DIR}:${NOTEBOOK_DIR} \
+        -v ${STELLAR_MODEL_DIR}:${DOCKER_STELLAR_MODEL_DIR} \
         --env JUPYTER_ENABLE_LAB=${JUPYTER_ENABLE_LAB} \
         --env JUPYTER_TOKEN=${JUPYTER_TOKEN} \
         --env NB_USER=${NB_USER} \
@@ -64,7 +73,6 @@ docker run --interactive \
         --name castor_etc_v${VERSION} \
         -d castor_etc:${VERSION}
 
-                # -v ${STELLAR_MODEL_DIR}:${DOCKER_STELLAR_MODEL_DIR} \
 #
 # Print the JupyterLab URL
 #

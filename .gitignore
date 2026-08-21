@@ -138,6 +138,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Ignore large stellar models
+**/stellar_models/**/**
+
 # VS Code stuff
 .vscode/
 
