@@ -41,6 +41,11 @@ Homepage = "https://github.com/CASTOR-telescope/ETC"
 castor-etc = "castor_etc.cli:cli"
 
 [project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+]
 lint = [
     "black",
     "ruff",
@@ -96,6 +101,14 @@ include = [
 packages = ["castor_etc"]
 
 [tool.hatch.envs.default]
+installer = "uv"
+
+[tool.hatch.envs.test]
+dependencies = [
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+]
 installer = "uv"
 
 [tool.hatch.envs.lint]
