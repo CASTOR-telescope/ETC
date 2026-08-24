@@ -517,12 +517,11 @@ def flam_to_AB_mag(wavelengths, flam, response):
     ## TODO: FIX THIS!
     ## The numerator is sometimes an astropy Quantity with units flam, and sometimes it's just a floating point object
     ## Need to find the issue and bugfix this to make it consistent
-    print(numer.value)
 
     c_converted = const.LIGHTSPEED.to_value(u.AA/u.s) # to Angstroms per sec
 
     return (
-        -2.5 * np.log10(numer.value / (c_converted * denom)) - 48.60
+        -2.5 * np.log10(numer / (c_converted * denom)) - 48.60
     )  # AB magnitude
 
 

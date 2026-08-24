@@ -16,8 +16,8 @@ dependencies = [
     "arviz",
     "astropy",
     "astroquery",
-    "celerite",
     "click",
+    "celerite2",
     "corner",
     "emcee",
     "matplotlib",
@@ -31,6 +31,7 @@ dependencies = [
     "scipy",
     "spectres",
     "tqdm",
+    "mako"
 ]
 
 [project.urls]
@@ -40,11 +41,6 @@ Homepage = "https://github.com/CASTOR-telescope/ETC"
 castor-etc = "castor_etc.cli:cli"
 
 [project.optional-dependencies]
-test = [
-    "pytest",
-    "pytest-cov",
-    "pytest-xdist",
-]
 lint = [
     "black",
     "ruff",
@@ -67,6 +63,9 @@ dev = [
     "ipython",
     "build",
     "pip-audit",
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
 ]
 
 [tool.coverage.run]
@@ -99,14 +98,6 @@ packages = ["castor_etc"]
 [tool.hatch.envs.default]
 installer = "uv"
 
-[tool.hatch.envs.test]
-dependencies = [
-    "pytest",
-    "pytest-cov",
-    "pytest-xdist",
-]
-installer = "uv"
-
 [tool.hatch.envs.lint]
 dependencies = [
     "black",
@@ -136,9 +127,12 @@ serve = "sphinx-build -b html docs/source docs/build --open-in-browser"
 [tool.hatch.envs.dev]
 dependencies = [
     "pipdeptree",
-    "pre-commit",
+    "pre-commit", 
     "ipython",
     "build",
     "pip-audit",
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
 ]
 installer = "uv"

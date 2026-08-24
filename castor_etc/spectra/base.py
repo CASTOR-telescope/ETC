@@ -704,7 +704,7 @@ class SpectrumMixin:
 
         # Save results to class
         self._wavelengths = wavelengths
-        self._spectrum = spectrum*flam
+        self._spectrum = spectrum
 
     def generate_bb(
         self,
@@ -825,7 +825,7 @@ class SpectrumMixin:
         # Assign to `Source` object attributes. Spectrum is in erg/s/cm^2/A
         #
         self._wavelengths = wavelengths*u.AA
-        self._spectrum = NormMixin.norm_to_star(spectrum, radius=radius, dist=dist)*flam  # flam
+        self._spectrum = NormMixin.norm_to_star(spectrum, radius=radius, dist=dist)
 
     def generate_power_law(
         self, ref_wavelength, wavelengths, exponent, overwrite=False, quiet=False
@@ -1604,7 +1604,7 @@ class SpectrumMixin:
             spectrum = mag_to_flux(mag=spectrum, mag_err=0.0, zpt=-21.10)[0]
 
         self._wavelengths = wavelengths
-        self._spectrum = spectrum*flam
+        self._spectrum = spectrum
 
     def use_custom_spectrum(
         self, filepath, wavelength_unit=u.AA, overwrite=False, quiet=False
@@ -1680,7 +1680,7 @@ class SpectrumMixin:
                     engine="python",
                 )  # sep=" +" is Python regex to match a variable number of spaces
                 self._wavelengths = (data[0].values * wavelength_unit).to(u.AA)
-                self._spectrum = data[1].values * flam
+                self._spectrum = data[1].values
         except Exception:
             raise RuntimeError(
                 "Could not read spectrum from file. File must be in ASCII or FITS format "
@@ -2245,7 +2245,7 @@ class SpectrumMixin:
             _range = np.where(wavelengths.to(u.AA).value <= 11000)
 
             self._wavelengths = wavelengths[_range]
-            self._spectrum = spectrum[_range] * flam
+            self._spectrum = spectrum[_range] 
 
         except Exception:
             raise RuntimeError(

@@ -141,9 +141,6 @@ dmypy.json
 # Ignore large stellar models
 **/stellar_models/**/**
 
-# VS Code stuff
-.vscode/
-
 # Local GH actions
 .artifacts
 .artifacts
